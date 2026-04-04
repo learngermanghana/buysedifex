@@ -200,3 +200,13 @@ Script is idempotent and safe to rerun.
 2. Products are in subcollections under each store.
 3. buy.sedifex.com only needs product-level browse/detail reads.
 4. Optional moderation gate uses `isApproved` when present.
+
+
+## I) Frontend app (Vercel-ready)
+
+A Next.js frontend was added under `frontend/` with:
+
+- Firestore read client for `publicProducts`
+- Category filter and pagination UI
+- Environment-variable driven Firebase config
+- `vercel.json` plus deploy instructions in `frontend/README.md`

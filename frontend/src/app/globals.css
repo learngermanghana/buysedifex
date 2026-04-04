@@ -1,0 +1,107 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: #f4f6fb;
+  color: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+header h1 {
+  margin-bottom: 0.25rem;
+}
+
+.toolbar {
+  margin: 1rem 0;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+select {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: #fff;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.card {
+  background: #fff;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  padding: 0.8rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.imageWrap {
+  background: #e2e8f0;
+  aspect-ratio: 4 / 3;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.imageWrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #334155;
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.card a,
+button {
+  background: #0f172a;
+  color: #fff;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+  border: none;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
