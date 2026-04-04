@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+functions/node_modules/
+
+# Build outputs
+frontend/.next/
+functions/lib/
+
+# Firebase logs and local state
+.firebase/
+firebase-debug.log*
+
+# Environment files
+.env
+.env.*
+frontend/.env.local
+functions/.env
