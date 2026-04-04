@@ -1,0 +1,14 @@
+{
+  "name": "buy-sedifex",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "install:frontend": "npm --prefix frontend install",
+    "build": "npm run install:frontend && npm --prefix frontend run build",
+    "dev": "npm --prefix frontend run dev",
+    "start": "npm --prefix frontend run start"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}
