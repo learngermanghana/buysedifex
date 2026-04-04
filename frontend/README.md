@@ -14,8 +14,7 @@ Create `.env.local` from `.env.example` and set Firebase web SDK values.
 ## Deploy to Vercel
 
 1. Import this repository in Vercel.
-2. Set the **Root Directory** to `frontend`.
-3. Add all `NEXT_PUBLIC_FIREBASE_*` variables.
-4. Deploy.
-
-Build settings are included in `vercel.json` for Next.js deployment.
+2. If you deploy from the repository root, keep **Root Directory** at `/` (the root `vercel.json` runs the frontend build automatically).
+3. If you prefer deploying only `frontend`, set **Root Directory** to `frontend` and use the local `frontend/vercel.json`.
+4. Add all `NEXT_PUBLIC_FIREBASE_*` variables.
+5. Deploy.
