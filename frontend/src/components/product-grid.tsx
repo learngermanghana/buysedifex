@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
+  FirestoreError,
   QueryConstraint,
   QueryDocumentSnapshot,
   collection,
@@ -12,7 +13,7 @@ import {
   startAfter,
   where,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, firebaseConfigError } from '@/lib/firebase';
 
 type PublicProduct = {
   id: string;
@@ -74,6 +75,11 @@ export function ProductGrid() {
   }, [products, searchText]);
 
   const fetchCategories = async () => {
+    if (!db) {
+      setError(firebaseConfigError ?? 'Firebase is not configured.');
+      return;
+    }
+
     setIsLoadingCategories(true);
 
     try {
@@ -115,6 +121,11 @@ export function ProductGrid() {
   };
 
   const fetchProducts = async (cursor?: QueryDocumentSnapshot) => {
+    if (!db) {
+      setError(firebaseConfigError ?? 'Firebase is not configured.');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -147,7 +158,13 @@ export function ProductGrid() {
       setLastDoc(snapshot.docs.at(-1) ?? null);
     } catch (err) {
       console.error(err);
-      setError('Could not load products. Check your Firebase public env vars and Firestore indexes.');
+      const firestoreError = err as FirestoreError;
+
+      if (firestoreError?.code === 'permission-denied') {
+        setError('Could not load products due to Firestore rules. Allow public read access to publicProducts.');
+      } else {
+        setError('Could not load products. Check your Firebase public env vars and Firestore indexes.');
+      }
     } finally {
       setIsLoading(false);
     }
