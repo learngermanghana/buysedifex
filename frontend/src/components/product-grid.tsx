@@ -33,6 +33,20 @@ type SortOption = 'newest' | 'price' | 'featured';
 
 const PAGE_SIZE = 12;
 
+const FALLBACK_IMAGES = [
+  'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1560343090-f0409e92791a?auto=format&fit=crop&w=900&q=80',
+];
+
+const getFallbackImage = (category?: string) => {
+  const seed = (category ?? 'general').split('').reduce((total, char) => total + char.charCodeAt(0), 0);
+  return FALLBACK_IMAGES[seed % FALLBACK_IMAGES.length];
+};
+
 export function ProductGrid() {
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [categories, setCategories] = useState<string[]>(['all']);
@@ -150,69 +164,95 @@ export function ProductGrid() {
   }, [selectedCategory, selectedSort]);
 
   return (
-    <section>
+    <section className="marketplace">
       <div className="toolbar">
-        <label htmlFor="category">Category</label>
-        <select
-          id="category"
-          value={selectedCategory}
-          disabled={isLoadingCategories}
-          onChange={(event) => setSelectedCategory(event.target.value)}
-        >
-          {categories.map((category) => (
-            <option value={category} key={category}>
+        <div className="searchWrap">
+          <label htmlFor="search">Search</label>
+          <input
+            id="search"
+            type="search"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder="Search products, stores, or categories"
+          />
+        </div>
+
+        <div className="sortWrap">
+          <label htmlFor="sort">Sort by</label>
+          <select id="sort" value={selectedSort} onChange={(event) => setSelectedSort(event.target.value as SortOption)}>
+            <option value="newest">Newest</option>
+            <option value="price">Price</option>
+            <option value="featured">Featured</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="categories" role="tablist" aria-label="Product categories">
+        {categories.map((category) => {
+          const active = category === selectedCategory;
+          return (
+            <button
+              type="button"
+              key={category}
+              role="tab"
+              aria-selected={active}
+              className={`chip ${active ? 'active' : ''}`}
+              disabled={isLoadingCategories}
+              onClick={() => setSelectedCategory(category)}
+            >
               {category}
-            </option>
-          ))}
-        </select>
-
-        <label htmlFor="sort">Sort</label>
-        <select id="sort" value={selectedSort} onChange={(event) => setSelectedSort(event.target.value as SortOption)}>
-          <option value="newest">Newest</option>
-          <option value="price">Price</option>
-          <option value="featured">Featured</option>
-        </select>
-
-        <label htmlFor="search">Search</label>
-        <input
-          id="search"
-          type="search"
-          value={searchText}
-          onChange={(event) => setSearchText(event.target.value)}
-          placeholder="Search products"
-        />
+            </button>
+          );
+        })}
       </div>
 
       {error && <p className="error">{error}</p>}
 
       <div className="grid">
-        {visibleProducts.map((item) => (
-          <article key={item.id} className="card">
-            <div className="imageWrap">
-              {item.imageUrls?.[0] ? (
-                <img src={item.imageUrls[0]} alt={item.productName ?? 'Product image'} />
-              ) : (
-                <div className="placeholder">No image</div>
-              )}
-            </div>
-            <h3>{item.productName ?? 'Untitled product'}</h3>
-            <p>{item.description ?? 'No description yet.'}</p>
-            <div className="meta">
-              <span>{item.storeName ?? 'Unknown store'}</span>
-              <strong>
-                {item.price != null ? `${item.currency ?? 'USD'} ${item.price.toFixed(2)}` : 'Price unavailable'}
-              </strong>
-            </div>
-            <a href={item.waLink ?? '#'} target="_blank" rel="noreferrer">
-              Buy on WhatsApp
-            </a>
-          </article>
-        ))}
+        {isLoading && products.length === 0
+          ? Array.from({ length: 8 }).map((_, index) => (
+              <article key={`skeleton-${index}`} className="card skeletonCard" aria-hidden="true">
+                <div className="skeleton skeletonImage" />
+                <div className="skeleton skeletonTitle" />
+                <div className="skeleton skeletonText" />
+                <div className="skeleton skeletonText short" />
+                <div className="skeleton skeletonButton" />
+              </article>
+            ))
+          : visibleProducts.map((item) => (
+              <article key={item.id} className="card">
+                <div className="imageWrap">
+                  <img
+                    src={item.imageUrls?.[0] ?? getFallbackImage(item.categoryKey)}
+                    alt={item.productName ?? 'Product image'}
+                    loading="lazy"
+                  />
+                </div>
+                <h3>{item.productName ?? 'Untitled product'}</h3>
+                <p>{item.description ?? 'No description yet.'}</p>
+                <div className="meta">
+                  <span>{item.storeName ?? 'Unknown store'}</span>
+                  <strong>
+                    {item.price != null ? `${item.currency ?? 'USD'} ${item.price.toFixed(2)}` : 'Price unavailable'}
+                  </strong>
+                </div>
+                <a className="waButton" href={item.waLink ?? '#'} target="_blank" rel="noreferrer">
+                  Contact on WhatsApp
+                </a>
+              </article>
+            ))}
       </div>
+
+      {!isLoading && visibleProducts.length === 0 && !error && (
+        <div className="emptyState">
+          <h3>No products found</h3>
+          <p>Try a different search term, category, or sort option.</p>
+        </div>
+      )}
 
       <div className="actions">
         <button type="button" disabled={!lastDoc || isLoading} onClick={() => fetchProducts(lastDoc ?? undefined)}>
-          {isLoading ? 'Loading...' : 'Load more'}
+          {isLoading && products.length > 0 ? 'Loading more...' : 'Load more products'}
         </button>
       </div>
     </section>

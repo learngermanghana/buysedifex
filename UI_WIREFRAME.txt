@@ -1,0 +1,127 @@
+UI WIREFRAME — MODERN PRODUCT MARKETPLACE
+=========================================
+
+1) DESKTOP LAYOUT (>= 1025px) — 4 COLUMN GRID
+-----------------------------------------------
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ HEADER                                                                        │
+│ [Modern Product Marketplace]                                                  │
+│ Discover curated products from trusted stores                                 │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ TOOLBAR                                                                        │
+│ [Search input.............................................] [Sort dropdown ▼] │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+Categories (chips): [All*] [Fashion] [Electronics] [Home] [Beauty] [Sports]
+
+┌──────────────┬──────────────┬──────────────┬──────────────┐
+│ Product Card │ Product Card │ Product Card │ Product Card │
+├──────────────┼──────────────┼──────────────┼──────────────┤
+│ Product Card │ Product Card │ Product Card │ Product Card │
+└──────────────┴──────────────┴──────────────┴──────────────┘
+
+                                [Load more products]
+
+
+2) TABLET / SMALL DESKTOP (781px–1024px) — 3 COLUMN GRID
+----------------------------------------------------------
+┌──────────────┬──────────────┬──────────────┐
+│ Product Card │ Product Card │ Product Card │
+├──────────────┼──────────────┼──────────────┤
+│ Product Card │ Product Card │ Product Card │
+└──────────────┴──────────────┴──────────────┘
+
+
+3) MOBILE LAYOUT (<= 780px) — 2 COLUMNS
+----------------------------------------
+┌─────────────────────────────────────────┐
+│ HEADER                                  │
+└─────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│ Search input                            │
+│ Sort dropdown                           │
+└─────────────────────────────────────────┘
+[All*] [Fashion] [Electronics] [Home] ...
+
+┌──────────────┬──────────────┐
+│ Product Card │ Product Card │
+├──────────────┼──────────────┤
+│ Product Card │ Product Card │
+└──────────────┴──────────────┘
+
+
+4) EXTRA SMALL MOBILE (<= 520px) — 1 COLUMN
+--------------------------------------------
+┌──────────────┐
+│ Product Card │
+├──────────────┤
+│ Product Card │
+└──────────────┘
+
+
+5) PRODUCT CARD DETAIL
+----------------------
+┌───────────────────────────────┐
+│ [Image 4:3 ratio]             │
+│ Product Name                  │
+│ Product short description ... │
+│ Store Name     USD 120.00     │
+│ [Contact on WhatsApp]         │
+└───────────────────────────────┘
+
+Hover state:
+- Card lifts up slightly
+- Shadow increases
+- Buttons/chips translate up 1px
+
+
+6) LOADING SKELETONS
+--------------------
+┌───────────────────────────────┐
+│ ████████████████████████████  │  <- image skeleton shimmer
+│ ███████████                   │  <- title skeleton
+│ ███████████████████           │  <- text skeleton
+│ ███████████                   │  <- text skeleton short
+│ █████████████████████         │  <- button skeleton
+└───────────────────────────────┘
+
+
+7) EMPTY STATE
+--------------
+┌──────────────────────────────────────────────────┐
+│ No products found                                 │
+│ Try a different search term, category, or sort.  │
+└──────────────────────────────────────────────────┘
+
+
+8) COLOR PALETTE
+----------------
+- Background gradient start: #F8FAFC
+- Background gradient end:   #EEF2FF
+- Primary text:              #0F172A
+- Secondary text:            #475569
+- Accent / active chip:      #4F46E5
+- Border:                    #E2E8F0
+- Input border:              #CBD5E1
+- WhatsApp button:           #16A34A
+- Error:                     #B91C1C
+
+
+9) RESPONSIVE BREAKPOINTS
+-------------------------
+- >= 1025px: 4 columns
+- 781px–1024px: 3 columns
+- 521px–780px: 2 columns
+- <= 520px: 1 column
+
+
+10) INTERACTION STATES
+----------------------
+- Category chip default: white background, gray border
+- Category chip active: indigo background, white text
+- Category chip hover: subtle translateY(-1px), border highlight
+- Card hover: translateY(-4px), deeper shadow
+- Button hover: translateY(-1px)
+- Inputs focus: visible indigo focus ring
