@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  background: linear-gradient(170deg, #f8fafc 0%, #eef2ff 42%, #fdf2f8 100%);
   color: #0f172a;
 }
 
@@ -17,11 +17,28 @@ body {
 .container {
   max-width: 1240px;
   margin: 0 auto;
-  padding: 2.5rem 1rem 4rem;
+  padding: 2.2rem 1rem 4rem;
 }
 
 .hero {
   margin-bottom: 1.5rem;
+  border-radius: 1.2rem;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 18px 36px -36px #0f172a;
+}
+
+.heroImage {
+  min-height: 210px;
+  background-image: linear-gradient(115deg, rgba(79, 70, 229, 0.55), rgba(14, 165, 233, 0.35), rgba(244, 63, 94, 0.45)),
+    url('https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=1700&q=80');
+  background-position: center;
+  background-size: cover;
+}
+
+.heroContent {
+  padding: 1.2rem 1.15rem 1.35rem;
 }
 
 .eyebrow {
@@ -29,7 +46,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.8rem;
-  color: #4f46e5;
+  color: #4338ca;
   font-weight: 700;
 }
 
@@ -49,7 +66,7 @@ body {
 }
 
 .toolbar {
-  background: rgba(255, 255, 255, 0.75);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(238, 242, 255, 0.85));
   border: 1px solid #e2e8f0;
   border-radius: 1rem;
   padding: 0.9rem;
@@ -106,14 +123,16 @@ select:focus {
 
 .chip:hover {
   transform: translateY(-1px);
-  border-color: #818cf8;
+  border-color: #6366f1;
+  background: #eef2ff;
   color: #312e81;
 }
 
 .chip.active {
-  background: #4f46e5;
-  border-color: #4f46e5;
+  background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+  border-color: transparent;
   color: #fff;
+  box-shadow: 0 8px 18px -12px #4338ca;
 }
 
 .error {
@@ -128,7 +147,7 @@ select:focus {
 }
 
 .card {
-  background: #fff;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border-radius: 0.95rem;
   border: 1px solid #e2e8f0;
   padding: 0.8rem;
@@ -178,7 +197,6 @@ select:focus {
 
 .waButton,
 .actions button {
-  background: #0f172a;
   color: #fff;
   border-radius: 0.6rem;
   text-decoration: none;
@@ -190,7 +208,11 @@ select:focus {
 }
 
 .waButton {
-  background: #16a34a;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+}
+
+.actions button {
+  background: linear-gradient(135deg, #0f172a, #1d4ed8);
 }
 
 .waButton:hover,
@@ -288,6 +310,10 @@ select:focus {
 @media (max-width: 520px) {
   .container {
     padding: 1.2rem 0.75rem 2.2rem;
+  }
+
+  .heroImage {
+    min-height: 160px;
   }
 
   .grid {
