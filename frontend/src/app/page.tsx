@@ -16,7 +16,7 @@ export default function HomePage() {
           <div className="heroHighlights">
             <span>Fast search</span>
             <span>Verified stores</span>
-            <span>Direct chat</span>
+            <span>Secure checkout</span>
           </div>
         </div>
       </header>
