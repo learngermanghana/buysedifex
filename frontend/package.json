@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test test/**/*.test.cjs"
+    "test": "node --test test/**/*.test.cjs",
+    "cwv": "NEXT_TELEMETRY_DISABLED=1 npx lighthouse http://localhost:3000 --only-categories=performance --output=json --output=html --output-path=./.lighthouse/core-web-vitals --chrome-flags=\"--headless=new\""
   },
   "dependencies": {
     "firebase": "^11.3.1",

@@ -61,3 +61,16 @@ Example document:
   "storeName": "Aster Pharmacy"
 }
 ```
+
+## Performance and Core Web Vitals
+
+We added a built-in web-vitals reporter (`src/components/web-vitals-reporter.tsx`) that logs metrics in dev and posts them to `/api/web-vitals` in production for collection.
+
+To generate a local Core Web Vitals report with Lighthouse:
+
+```bash
+npm run dev
+npm run cwv
+```
+
+This outputs `.lighthouse/core-web-vitals.report.html` and `.lighthouse/core-web-vitals.report.json`.

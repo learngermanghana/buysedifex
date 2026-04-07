@@ -17,6 +17,7 @@ test('product detail page renders key detail sections', () => {
   assert.match(source, /Product details/);
   assert.match(source, /Visit store page/);
   assert.match(source, /Availability:/);
+  assert.match(source, /alternates: \{ canonical: canonicalUrl \}/);
 });
 
 test('store page renders profile and product listing sections', () => {
@@ -24,4 +25,14 @@ test('store page renders profile and product listing sections', () => {
   assert.match(source, /<p className="eyebrow">Store<\/p>/);
   assert.match(source, /Products from \{profile\.storeName\}/);
   assert.match(source, /Store categories/);
+  assert.match(source, /alternates: \{ canonical: canonicalUrl \}/);
+});
+
+test('sitemap and robots routes are present for SEO', () => {
+  const sitemapSource = read('src/app/sitemap.ts');
+  const robotsSource = read('src/app/robots.ts');
+
+  assert.match(sitemapSource, /MetadataRoute\.Sitemap/);
+  assert.match(robotsSource, /MetadataRoute\.Robots/);
+  assert.match(robotsSource, /sitemap: canonicalUrlForPath\('\/sitemap\.xml'\)/);
 });

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -291,10 +292,14 @@ export function ProductGrid() {
               return (
                 <article key={item.id} className="card">
                   <div className="imageWrap">
-                    <img
-                      src={item.imageUrls?.[0]}
+                    <Image
+                      src={item.imageUrls?.[0] ?? 'https://placehold.co/640x640'}
                       alt={item.productName ?? 'Product image'}
                       loading="lazy"
+                      width={360}
+                      height={360}
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                      style={{ width: '100%', height: 'auto' }}
                     />
                   </div>
                   <h3>

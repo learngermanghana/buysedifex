@@ -1,4 +1,14 @@
+import type { Metadata } from 'next';
 import { ProductGrid } from '@/components/product-grid';
+import { canonicalUrlForPath } from '@/lib/seo';
+
+export const metadata: Metadata = {
+  title: 'Shop curated collections',
+  description: 'Browse fast, verified products and stores on Sedifex with direct WhatsApp checkout.',
+  alternates: {
+    canonical: canonicalUrlForPath('/'),
+  },
+};
 
 export default function HomePage() {
   return (

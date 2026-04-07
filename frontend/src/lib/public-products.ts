@@ -119,6 +119,20 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     endpoint.searchParams.set('key', firebaseApiKey);
   }
 
+  endpoint.searchParams.set('mask.fieldPaths', 'productName');
+  endpoint.searchParams.set('mask.fieldPaths', 'description');
+  endpoint.searchParams.set('mask.fieldPaths', 'imageUrls');
+  endpoint.searchParams.set('mask.fieldPaths', 'price');
+  endpoint.searchParams.set('mask.fieldPaths', 'currency');
+  endpoint.searchParams.set('mask.fieldPaths', 'storeName');
+  endpoint.searchParams.set('mask.fieldPaths', 'categoryKey');
+  endpoint.searchParams.set('mask.fieldPaths', 'sku');
+  endpoint.searchParams.set('mask.fieldPaths', 'stockCount');
+  endpoint.searchParams.set('mask.fieldPaths', 'city');
+  endpoint.searchParams.set('mask.fieldPaths', 'country');
+  endpoint.searchParams.set('mask.fieldPaths', 'storeId');
+  endpoint.searchParams.set('mask.fieldPaths', 'waLink');
+
   const response = await fetch(endpoint, {
     next: { revalidate: 300 },
   });
@@ -133,4 +147,48 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
 
   const document = (await response.json()) as FirestoreDocument;
   return productFromDocument(document);
+};
+
+
+export const listPublicProductIds = async (limitCount = 200): Promise<string[]> => {
+  if (!projectId) {
+    return [];
+  }
+
+  const endpoint = new URL(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`);
+
+  if (firebaseApiKey) {
+    endpoint.searchParams.set('key', firebaseApiKey);
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        select: { fields: [{ fieldPath: 'publishedAt' }] },
+        from: [{ collectionId: 'publicProducts' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'isVisible' },
+            op: 'EQUAL',
+            value: { booleanValue: true },
+          },
+        },
+        orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
+        limit: limitCount,
+      },
+    }),
+    next: { revalidate: 300 },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to list public product ids. Status: ${response.status}`);
+  }
+
+  const rows = (await response.json()) as Array<{ document?: FirestoreDocument }>;
+
+  return rows
+    .flatMap((row) => (row.document?.name ? [row.document.name.split('/').at(-1) ?? ''] : []))
+    .filter((id) => id.length > 0);
 };
