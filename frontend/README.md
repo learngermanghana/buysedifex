@@ -1,6 +1,6 @@
 # buy-sedifex frontend
 
-Next.js storefront for `publicProducts` in Firestore.
+Next.js storefront for `publicProducts` in Firestore with manual store approval from `approvedStores`.
 
 ## Run locally
 
@@ -29,3 +29,20 @@ Use the **Firebase Web app config** values (Firebase Console → Project setting
 - `NEXT_PUBLIC_FIREBASE_APP_ID` → `appId`
 
 `NEXT_PUBLIC_*` variables are inlined at build time by Next.js. If you add or change them in Vercel, trigger a **new deployment** so the storefront gets updated values.
+
+## Approving stores for the storefront
+
+The storefront now only shows products for stores that are listed in Firestore collection `approvedStores`.
+
+- Collection: `approvedStores`
+- Document ID: `{storeId}` (must match the store ID from `stores/{storeId}`)
+- Suggested fields:
+  - `storeName` (string, used for the store filter label)
+
+Example document:
+
+```json
+{
+  "storeName": "Aster Pharmacy"
+}
+```
