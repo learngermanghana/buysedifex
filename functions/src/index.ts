@@ -4,11 +4,15 @@ import { logger } from 'firebase-functions';
 
 admin.initializeApp();
 
-const db = admin.firestore();
+let db = admin.firestore();
 
 const STORE_PATH = 'stores/{storeId}';
 const FLAT_PRODUCT_PATH = 'products/{productId}';
 const PUBLIC_PRODUCTS_COLLECTION = 'publicProducts';
+
+export function __setDbForTests(testDb: admin.firestore.Firestore): void {
+  db = testDb;
+}
 
 // NOTE: Nested store product triggers are intentionally not used.
 // Only flat products/{productId} triggers should manage publicProducts sync.
@@ -343,6 +347,23 @@ export async function rebuildPublicProductsForStore(storeId: string): Promise<vo
 
   logger.info('Rebuild completed', { storeId, productsProcessed: productsSnap.size });
 }
+
+
+export const __testing = {
+  normalizeText,
+  normalizeCategory,
+  normalizeWhatsAppNumber,
+  normalizeProduct,
+  buildWhatsAppLink,
+  withStoreDefaults,
+  getEffectiveStoreStatus,
+  isStoreBuyVisible,
+  isVisibleProduct,
+  computeVisibility,
+  publicProductId,
+  toPublicProductDoc,
+  upsertOrDeletePublicProduct,
+};
 
 export const onStoreCreated = onDocumentCreated(STORE_PATH, async (event) => {
   if (!event.data) return;
