@@ -30,6 +30,7 @@ type StoreDoc = {
 type ProductDoc = {
   storeId?: string;
   itemType?: string;
+  shopLink?: string | null;
   category?: string;
   name?: string;
   slug?: string;
@@ -58,6 +59,7 @@ type ProductDoc = {
 type NormalizedProduct = ProductDoc & {
   storeId?: string;
   itemType?: string;
+  shopLink?: string | null;
   name?: string;
   slug?: string;
   description?: string;
@@ -121,6 +123,7 @@ function normalizeProduct(product: ProductDoc): NormalizedProduct {
     ...product,
     storeId: readFirstString(source, ['storeId', 'storeID', 'store_id', 'shopId', 'shop_id', 'merchantId', 'merchant_id']),
     itemType: readFirstString(source, ['itemType', 'item_type', 'type', 'kind']) ?? 'product',
+    shopLink: readFirstString(source, ['shopLink', 'shopURL', 'shopUrl', 'url', 'link']) ?? null,
     name: readFirstString(source, ['name', 'productName', 'product_name', 'title', 'itemName']),
     slug: readFirstString(source, ['slug', 'productSlug', 'product_slug']),
     description: readFirstString(source, ['description', 'desc', 'details', 'productDescription']),
@@ -168,11 +171,11 @@ function isStoreBuyVisible(store: StoreDoc): boolean {
 }
 
 function isVisibleProduct(product: NormalizedProduct): boolean {
+  const itemType = normalizeText(product.itemType);
   return (
-    product.itemType === 'product' &&
+    (itemType === 'product' || itemType === 'service') &&
     typeof product.name === 'string' &&
-    product.name.trim().length > 0 &&
-    typeof product.price === 'number'
+    product.name.trim().length > 0
   );
 }
 
@@ -230,6 +233,7 @@ function toPublicProductDoc(input: {
     featuredRank: typeof product.featuredRank === 'number' ? product.featuredRank : 0,
 
     itemType: normalizeText(product.itemType),
+    shopLink: normalizeText(product.shopLink),
     sku: normalizeText(product.sku),
     barcode: normalizeText(product.barcode),
     taxRate: typeof product.taxRate === 'number' ? product.taxRate : null,

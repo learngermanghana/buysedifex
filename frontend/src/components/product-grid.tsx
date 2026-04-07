@@ -26,6 +26,8 @@ type PublicProduct = {
   currency?: string;
   storeName?: string;
   waLink?: string;
+  shopLink?: string;
+  itemType?: string;
   isVisible?: boolean;
   featuredRank?: number;
   publishedAt?: { seconds: number };
@@ -258,7 +260,7 @@ export function ProductGrid() {
             type="search"
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Search products, stores, or categories"
+            placeholder="Search products, services, stores, or categories"
           />
         </div>
 
@@ -326,7 +328,7 @@ export function ProductGrid() {
                     loading="lazy"
                   />
                 </div>
-                <h3>{item.productName ?? 'Untitled product'}</h3>
+                <h3>{item.productName ?? 'Untitled item'}</h3>
                 <p>{item.description ?? 'No description yet.'}</p>
                 <div className="meta">
                   <span>{item.storeName ?? 'Unknown store'}</span>
@@ -334,16 +336,22 @@ export function ProductGrid() {
                     {item.price != null ? `${item.currency ?? 'USD'} ${item.price.toFixed(2)}` : 'Price unavailable'}
                   </strong>
                 </div>
-                <a className="waButton" href={item.waLink ?? '#'} target="_blank" rel="noreferrer">
-                  Contact on WhatsApp
-                </a>
+                {item.itemType === 'service' ? (
+                  <a className="waButton" href={item.shopLink ?? '/shop'}>
+                    Go to Shop
+                  </a>
+                ) : (
+                  <a className="waButton" href={item.waLink ?? '#'} target="_blank" rel="noreferrer">
+                    Contact on WhatsApp
+                  </a>
+                )}
               </article>
             ))}
       </div>
 
       {!isLoading && visibleProducts.length === 0 && !error && (
         <div className="emptyState">
-          <h3>No products found</h3>
+          <h3>No items found</h3>
           <p>Try a different search term, category, or sort option.</p>
         </div>
       )}
