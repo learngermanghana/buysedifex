@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPublicProductById } from '@/lib/public-products';
 
@@ -120,9 +121,19 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <p>{product.description}</p>
       <p>
         <strong>{product.storeName}</strong>
+        {product.storeId ? (
+          <>
+            {' '}
+            · <Link href={`/stores/${encodeURIComponent(product.storeId)}`}>Visit store page</Link>
+          </>
+        ) : null}
       </p>
       <p>{priceLabel}</p>
-      {product.categoryKey && <p>Category: {product.categoryKey}</p>}
+      {product.categoryKey && (
+        <p>
+          Category: <Link href={`/categories/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
+        </p>
+      )}
       {availabilityLabel && <p>Availability: {availabilityLabel}</p>}
       {product.imageUrls.length > 0 && (
         <section aria-label="Product images" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>

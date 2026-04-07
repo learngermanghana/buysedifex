@@ -1,5 +1,6 @@
 export type PublicProductDetail = {
   id: string;
+  storeId?: string;
   productName: string;
   description: string;
   imageUrls: string[];
@@ -89,6 +90,7 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
 
   return {
     id: doc.name.split('/').at(-1) ?? '',
+    storeId: readString(fields, ['storeId']),
     productName: readString(fields, ['productName', 'name']) ?? 'Untitled item',
     description: readString(fields, ['description']) ?? 'No description yet.',
     imageUrls,
