@@ -7,7 +7,6 @@ admin.initializeApp();
 const db = admin.firestore();
 
 const STORE_PATH = 'stores/{storeId}';
-const PRODUCT_PATH = 'stores/{storeId}/products/{productId}';
 const FLAT_PRODUCT_PATH = 'products/{productId}';
 const PUBLIC_PRODUCTS_COLLECTION = 'publicProducts';
 
@@ -21,46 +20,56 @@ type StoreDoc = {
   logoUrl?: string;
   bannerUrl?: string;
   category?: string;
-  updatedAt?: FirebaseFirestore.Timestamp;
+  updatedAt?: admin.firestore.Timestamp;
 };
 
 type ProductDoc = {
   storeId?: string;
+  itemType?: string;
+  category?: string;
   name?: string;
   slug?: string;
   description?: string;
-  category?: string;
+  imageUrl?: string | null;
+  imageAlt?: string | null;
   imageUrls?: string[];
   price?: number;
   currency?: string;
-  isActive?: boolean;
-  isApproved?: boolean;
+  sku?: string | null;
+  barcode?: string | null;
+  taxRate?: number | null;
+  reorderPoint?: number | null;
+  stockCount?: number | null;
+  expiryDate?: admin.firestore.Timestamp | null;
+  batchNumber?: string | null;
+  manufacturerName?: string | null;
+  productionDate?: admin.firestore.Timestamp | null;
+  showOnReceipt?: boolean;
   featuredRank?: number;
-  updatedAt?: FirebaseFirestore.Timestamp;
-  createdAt?: FirebaseFirestore.Timestamp;
+  updatedAt?: admin.firestore.Timestamp;
+  createdAt?: admin.firestore.Timestamp;
 };
 
-function normalizeText(value?: string): string | null {
+function normalizeText(value?: string | null): string | null {
   if (!value) return null;
   const trimmed = value.trim();
   return trimmed.length ? trimmed : null;
 }
 
-function normalizeCategory(value?: string): string | null {
+function normalizeCategory(value?: string | null): string | null {
   const text = normalizeText(value);
   return text ? text.toLowerCase() : null;
 }
 
-function normalizeWhatsAppNumber(raw?: string): string | null {
+function normalizeWhatsAppNumber(raw?: string | null): string | null {
   const normalized = (raw ?? '').replace(/[^\d]/g, '');
-  if (!normalized) return null;
-  return normalized;
+  return normalized || null;
 }
 
 function buildWhatsAppLink(input: {
-  phone?: string;
-  storeName?: string;
-  productName?: string;
+  phone?: string | null;
+  storeName?: string | null;
+  productName?: string | null;
   productId: string;
   storeId: string;
 }): string | null {
@@ -74,25 +83,27 @@ function buildWhatsAppLink(input: {
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
-function isStoreVisibleOnBuy(store: StoreDoc): boolean {
-  return (
-    store.storeStatus === 'active' &&
-    store.eligibleForBuy === true &&
-    store.buyOptOut === false
-  );
-}
-
-function isProductVisibleOnBuy(product: ProductDoc): boolean {
-  // Optional approval gate: when isApproved exists it must be true.
-  const approvedGate = product.isApproved === undefined || product.isApproved === true;
-  return product.isActive === true && approvedGate;
+function withStoreDefaults(store: StoreDoc): StoreDoc {
+  return {
+    ...store,
+    eligibleForBuy: store.eligibleForBuy ?? true,
+    buyOptOut: store.buyOptOut ?? false,
+  };
 }
 
 function computeVisibility(store: StoreDoc, product: ProductDoc): boolean {
-  // Temporary permissive mode:
-  // publish all store products, and let frontend approval be controlled
-  // only by approvedStores collection membership.
-  return true;
+  const storeVisible =
+    store.storeStatus === 'active' &&
+    store.eligibleForBuy === true &&
+    store.buyOptOut === false;
+
+  const productVisible =
+    product.itemType === 'product' &&
+    typeof product.name === 'string' &&
+    product.name.trim().length > 0 &&
+    typeof product.price === 'number';
+
+  return storeVisible && productVisible;
 }
 
 function publicProductId(storeId: string, productId: string): string {
@@ -111,59 +122,63 @@ function toPublicProductDoc(input: {
   const productName = normalizeText(product.name);
   const categoryKey = normalizeCategory(product.category ?? store.category);
 
+  const imageUrls =
+    Array.isArray(product.imageUrls) && product.imageUrls.length
+      ? product.imageUrls.slice(0, 8)
+      : product.imageUrl
+        ? [product.imageUrl]
+        : [];
+
   return {
-    // Identity
     id: publicProductId(storeId, productId),
     storeId,
     productId,
 
-    // Visibility + filters
     isVisible: true,
     storeStatus: store.storeStatus ?? null,
     eligibleForBuy: store.eligibleForBuy === true,
     buyOptOut: store.buyOptOut === true,
-    isActive: product.isActive === true,
-    isApproved: product.isApproved ?? null,
     categoryKey,
 
-    // Store (public subset only)
     storeName,
     storeSlug: normalizeText(store.slug),
     storeLogoUrl: normalizeText(store.logoUrl),
     storeBannerUrl: normalizeText(store.bannerUrl),
 
-    // Product (public subset only)
     productName,
     productSlug: normalizeText(product.slug),
     description: normalizeText(product.description),
-    imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls.slice(0, 8) : [],
+    imageUrls,
+    imageAlt: normalizeText(product.imageAlt),
     price: typeof product.price === 'number' ? product.price : null,
     currency: normalizeText(product.currency) ?? 'USD',
     featuredRank: typeof product.featuredRank === 'number' ? product.featuredRank : 0,
 
-    // CTA
+    itemType: normalizeText(product.itemType),
+    sku: normalizeText(product.sku),
+    barcode: normalizeText(product.barcode),
+    taxRate: typeof product.taxRate === 'number' ? product.taxRate : null,
+    reorderPoint: typeof product.reorderPoint === 'number' ? product.reorderPoint : null,
+    stockCount: typeof product.stockCount === 'number' ? product.stockCount : null,
+    expiryDate: product.expiryDate ?? null,
+    batchNumber: normalizeText(product.batchNumber),
+    manufacturerName: normalizeText(product.manufacturerName),
+    productionDate: product.productionDate ?? null,
+    showOnReceipt: product.showOnReceipt === true,
+
     waLink: buildWhatsAppLink({
       phone: store.whatsappNumber,
-      storeName: storeName ?? undefined,
-      productName: productName ?? undefined,
+      storeName,
+      productName,
       productId,
       storeId,
     }),
 
-    // Ranking & metadata
     createdAt: product.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
     productUpdatedAt: product.updatedAt ?? null,
     storeUpdatedAt: store.updatedAt ?? null,
     publishedAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  };
-}
-
-function withStoreDefaults(store: StoreDoc): StoreDoc {
-  return {
-    ...store,
-    eligibleForBuy: store.eligibleForBuy ?? true,
-    buyOptOut: store.buyOptOut ?? false,
   };
 }
 
@@ -193,39 +208,54 @@ export async function rebuildPublicProductsForStore(storeId: string): Promise<vo
   }
 
   const store = withStoreDefaults(storeSnap.data() as StoreDoc);
-  const productsRef = db.collection(`stores/${storeId}/products`);
 
-  let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | undefined;
-  const pageSize = 250;
+  const productsSnap = await db
+    .collection('products')
+    .where('storeId', '==', storeId)
+    .get();
 
-  while (true) {
-    let query: FirebaseFirestore.Query = productsRef.orderBy(admin.firestore.FieldPath.documentId()).limit(pageSize);
-    if (lastDoc) query = query.startAfter(lastDoc);
-
-    const page = await query.get();
-    if (page.empty) break;
-
-    const batch = db.batch();
-
-    for (const productDoc of page.docs) {
-      const product = productDoc.data() as ProductDoc;
-      const pubRef = db.collection(PUBLIC_PRODUCTS_COLLECTION).doc(publicProductId(storeId, productDoc.id));
-      const visible = computeVisibility(store, product);
-
-      if (!visible) {
-        batch.delete(pubRef);
-      } else {
-        batch.set(pubRef, toPublicProductDoc({ storeId, productId: productDoc.id, store, product }), { merge: true });
-      }
-    }
-
-    await batch.commit();
-    lastDoc = page.docs[page.docs.length - 1];
-
-    if (page.size < pageSize) break;
+  if (productsSnap.empty) {
+    logger.info('No flat products found for store', { storeId });
+    return;
   }
 
-  logger.info('Rebuild completed', { storeId });
+  let batch = db.batch();
+  let ops = 0;
+
+  for (const productDoc of productsSnap.docs) {
+    const product = productDoc.data() as ProductDoc;
+    const pubRef = db.collection(PUBLIC_PRODUCTS_COLLECTION).doc(publicProductId(storeId, productDoc.id));
+    const visible = computeVisibility(store, product);
+
+    if (!visible) {
+      batch.delete(pubRef);
+    } else {
+      batch.set(
+        pubRef,
+        toPublicProductDoc({
+          storeId,
+          productId: productDoc.id,
+          store,
+          product,
+        }),
+        { merge: true },
+      );
+    }
+
+    ops += 1;
+
+    if (ops === 400) {
+      await batch.commit();
+      batch = db.batch();
+      ops = 0;
+    }
+  }
+
+  if (ops > 0) {
+    await batch.commit();
+  }
+
+  logger.info('Rebuild completed', { storeId, productsProcessed: productsSnap.size });
 }
 
 export const onStoreCreated = onDocumentCreated(STORE_PATH, async (event) => {
@@ -254,7 +284,6 @@ export const onStoreUpdated = onDocumentUpdated(STORE_PATH, async (event) => {
   const after = withStoreDefaults(event.data.after.data() as StoreDoc);
   const before = withStoreDefaults(event.data.before.data() as StoreDoc);
 
-  // Normalize defaults if they were missing previously.
   if (event.data.after.data()?.eligibleForBuy === undefined || event.data.after.data()?.buyOptOut === undefined) {
     await event.data.after.ref.set(
       {
@@ -274,42 +303,12 @@ export const onStoreUpdated = onDocumentUpdated(STORE_PATH, async (event) => {
     before.name !== after.name ||
     before.slug !== after.slug ||
     before.logoUrl !== after.logoUrl ||
-    before.bannerUrl !== after.bannerUrl;
+    before.bannerUrl !== after.bannerUrl ||
+    before.category !== after.category;
 
   if (visibilityInputsChanged) {
     await rebuildPublicProductsForStore(storeId);
   }
-});
-
-export const onProductCreatedOrUpdated = onDocumentUpdated(PRODUCT_PATH, async (event) => {
-  if (!event.data) return;
-
-  const { storeId, productId } = event.params;
-  const storeSnap = await db.collection('stores').doc(storeId).get();
-  if (!storeSnap.exists) return;
-
-  const store = withStoreDefaults(storeSnap.data() as StoreDoc);
-  const product = event.data.after.data() as ProductDoc;
-
-  await upsertOrDeletePublicProduct({ storeId, productId, store, product });
-});
-
-export const onProductCreated = onDocumentCreated(PRODUCT_PATH, async (event) => {
-  if (!event.data) return;
-
-  const { storeId, productId } = event.params;
-  const storeSnap = await db.collection('stores').doc(storeId).get();
-  if (!storeSnap.exists) return;
-
-  const store = withStoreDefaults(storeSnap.data() as StoreDoc);
-  const product = event.data.data() as ProductDoc;
-
-  await upsertOrDeletePublicProduct({ storeId, productId, store, product });
-});
-
-export const onProductDeleted = onDocumentDeleted(PRODUCT_PATH, async (event) => {
-  const { storeId, productId } = event.params;
-  await db.collection(PUBLIC_PRODUCTS_COLLECTION).doc(publicProductId(storeId, productId)).delete().catch(() => undefined);
 });
 
 async function syncFlatProduct(params: {
@@ -349,12 +348,20 @@ async function syncFlatProduct(params: {
   }
 
   const store = withStoreDefaults(storeSnap.data() as StoreDoc);
-  await upsertOrDeletePublicProduct({ storeId: afterStoreId, productId, store, product: after });
+  await upsertOrDeletePublicProduct({
+    storeId: afterStoreId,
+    productId,
+    store,
+    product: after,
+  });
 }
 
 export const onFlatProductCreated = onDocumentCreated(FLAT_PRODUCT_PATH, async (event) => {
   if (!event.data) return;
-  await syncFlatProduct({ productId: event.params.productId, after: event.data.data() as ProductDoc });
+  await syncFlatProduct({
+    productId: event.params.productId,
+    after: event.data.data() as ProductDoc,
+  });
 });
 
 export const onFlatProductUpdated = onDocumentUpdated(FLAT_PRODUCT_PATH, async (event) => {
@@ -368,5 +375,8 @@ export const onFlatProductUpdated = onDocumentUpdated(FLAT_PRODUCT_PATH, async (
 
 export const onFlatProductDeleted = onDocumentDeleted(FLAT_PRODUCT_PATH, async (event) => {
   if (!event.data) return;
-  await syncFlatProduct({ productId: event.params.productId, before: event.data.data() as ProductDoc });
+  await syncFlatProduct({
+    productId: event.params.productId,
+    before: event.data.data() as ProductDoc,
+  });
 });
