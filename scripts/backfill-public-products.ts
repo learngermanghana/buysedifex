@@ -11,6 +11,7 @@ const db = admin.firestore();
 
 type StoreDoc = {
   storeStatus?: string;
+  status?: string;
   eligibleForBuy?: boolean;
   buyOptOut?: boolean;
   name?: string;
@@ -137,8 +138,12 @@ function withDefaults(store: StoreDoc): StoreDoc {
   };
 }
 
+function getEffectiveStoreStatus(store: StoreDoc): string | null {
+  return store.storeStatus ?? store.status ?? null;
+}
+
 function visible(store: StoreDoc, product: NormalizedProduct): boolean {
-  const storeVisible = store.storeStatus === 'active' && store.eligibleForBuy === true && store.buyOptOut === false;
+  const storeVisible = getEffectiveStoreStatus(store) === 'active' && store.eligibleForBuy === true && store.buyOptOut === false;
 
   const productVisible =
     product.itemType === 'product' &&
@@ -159,7 +164,7 @@ function toPublicDoc(storeId: string, productId: string, store: StoreDoc, produc
     storeId,
     productId,
     isVisible: true,
-    storeStatus: store.storeStatus ?? null,
+    storeStatus: getEffectiveStoreStatus(store),
     eligibleForBuy: store.eligibleForBuy === true,
     buyOptOut: store.buyOptOut === true,
     categoryKey: normalizeCategory(product.category ?? store.category),
