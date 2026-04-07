@@ -15,6 +15,12 @@ service cloud.firestore {
       allow write: if false; // Server-only via Admin SDK in Cloud Functions.
     }
 
+    // Manually curated list of approved stores for public storefront.
+    match /approvedStores/{storeId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Private canonical store data.
     match /stores/{storeId} {
       allow read, update, delete: if isStoreOwner(storeId);
