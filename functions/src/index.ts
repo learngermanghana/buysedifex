@@ -10,6 +10,9 @@ const STORE_PATH = 'stores/{storeId}';
 const FLAT_PRODUCT_PATH = 'products/{productId}';
 const PUBLIC_PRODUCTS_COLLECTION = 'publicProducts';
 
+// NOTE: Nested store product triggers are intentionally not used.
+// Only flat products/{productId} triggers should manage publicProducts sync.
+
 type StoreDoc = {
   name?: string;
   slug?: string;
@@ -91,19 +94,21 @@ function withStoreDefaults(store: StoreDoc): StoreDoc {
   };
 }
 
-function computeVisibility(store: StoreDoc, product: ProductDoc): boolean {
-  const storeVisible =
-    store.storeStatus === 'active' &&
-    store.eligibleForBuy === true &&
-    store.buyOptOut === false;
+function isStoreBuyVisible(store: StoreDoc): boolean {
+  return store.storeStatus === 'active' && store.eligibleForBuy === true && store.buyOptOut === false;
+}
 
-  const productVisible =
+function isVisibleProduct(product: ProductDoc): boolean {
+  return (
     product.itemType === 'product' &&
     typeof product.name === 'string' &&
     product.name.trim().length > 0 &&
-    typeof product.price === 'number';
+    typeof product.price === 'number'
+  );
+}
 
-  return storeVisible && productVisible;
+function computeVisibility(store: StoreDoc, product: ProductDoc): boolean {
+  return isStoreBuyVisible(store) && isVisibleProduct(product);
 }
 
 function publicProductId(storeId: string, productId: string): string {
@@ -122,12 +127,12 @@ function toPublicProductDoc(input: {
   const productName = normalizeText(product.name);
   const categoryKey = normalizeCategory(product.category ?? store.category);
 
-  const imageUrls =
-    Array.isArray(product.imageUrls) && product.imageUrls.length
-      ? product.imageUrls.slice(0, 8)
-      : product.imageUrl
-        ? [product.imageUrl]
-        : [];
+  const normalizedImageUrls = Array.isArray(product.imageUrls)
+    ? product.imageUrls.map((url) => normalizeText(url)).filter((url): url is string => Boolean(url))
+    : [];
+
+  const fallbackImageUrl = normalizeText(product.imageUrl);
+  const imageUrls = normalizedImageUrls.length ? normalizedImageUrls.slice(0, 8) : fallbackImageUrl ? [fallbackImageUrl] : [];
 
   return {
     id: publicProductId(storeId, productId),
