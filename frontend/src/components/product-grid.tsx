@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   FirestoreError,
@@ -287,7 +288,9 @@ export function ProductGrid() {
                     loading="lazy"
                   />
                 </div>
-                <h3>{item.productName ?? 'Untitled item'}</h3>
+                <h3>
+                  <Link href={`/products/${item.id}`}>{item.productName ?? 'Untitled item'}</Link>
+                </h3>
                 <p>{item.description ?? 'No description yet.'}</p>
                 <div className="meta">
                   <span>{item.storeName ?? 'Unknown store'}</span>
