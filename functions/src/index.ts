@@ -51,6 +51,21 @@ type ProductDoc = {
   featuredRank?: number;
   updatedAt?: admin.firestore.Timestamp;
   createdAt?: admin.firestore.Timestamp;
+  [key: string]: unknown;
+};
+
+type NormalizedProduct = ProductDoc & {
+  storeId?: string;
+  itemType?: string;
+  name?: string;
+  slug?: string;
+  description?: string;
+  category?: string;
+  imageUrl?: string | null;
+  imageUrls?: string[];
+  price?: number;
+  currency?: string;
+  featuredRank?: number;
 };
 
 function normalizeText(value?: string | null): string | null {
@@ -67,6 +82,55 @@ function normalizeCategory(value?: string | null): string | null {
 function normalizeWhatsAppNumber(raw?: string | null): string | null {
   const normalized = (raw ?? '').replace(/[^\d]/g, '');
   return normalized || null;
+}
+
+function readFirstString(source: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim().length) return value.trim();
+  }
+  return undefined;
+}
+
+function readFirstNumber(source: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return undefined;
+}
+
+function readFirstStringArray(source: Record<string, unknown>, keys: string[]): string[] | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (!Array.isArray(value)) continue;
+    const normalized = value.map((entry) => normalizeText(typeof entry === 'string' ? entry : null)).filter((entry): entry is string => Boolean(entry));
+    if (normalized.length) return normalized;
+  }
+  return undefined;
+}
+
+function normalizeProduct(product: ProductDoc): NormalizedProduct {
+  const source = product as Record<string, unknown>;
+  const normalized: NormalizedProduct = {
+    ...product,
+    storeId: readFirstString(source, ['storeId', 'storeID', 'store_id', 'shopId', 'shop_id', 'merchantId', 'merchant_id']),
+    itemType: readFirstString(source, ['itemType', 'item_type', 'type', 'kind']) ?? 'product',
+    name: readFirstString(source, ['name', 'productName', 'product_name', 'title', 'itemName']),
+    slug: readFirstString(source, ['slug', 'productSlug', 'product_slug']),
+    description: readFirstString(source, ['description', 'desc', 'details', 'productDescription']),
+    category: readFirstString(source, ['category', 'categoryKey', 'productCategory', 'department']),
+    imageUrl: readFirstString(source, ['imageUrl', 'imageURL', 'image', 'photoUrl', 'thumbnailUrl']) ?? null,
+    imageUrls: readFirstStringArray(source, ['imageUrls', 'imageURLs', 'images', 'gallery', 'photoUrls']) ?? product.imageUrls,
+    price: readFirstNumber(source, ['price', 'productPrice', 'amount', 'unitPrice', 'sellingPrice', 'salePrice']),
+    currency: readFirstString(source, ['currency', 'currencyCode', 'moneyCurrency']),
+    featuredRank: readFirstNumber(source, ['featuredRank', 'featureRank', 'priority']),
+  };
+  return normalized;
 }
 
 function buildWhatsAppLink(input: {
@@ -98,7 +162,7 @@ function isStoreBuyVisible(store: StoreDoc): boolean {
   return store.storeStatus === 'active' && store.eligibleForBuy === true && store.buyOptOut === false;
 }
 
-function isVisibleProduct(product: ProductDoc): boolean {
+function isVisibleProduct(product: NormalizedProduct): boolean {
   return (
     product.itemType === 'product' &&
     typeof product.name === 'string' &&
@@ -107,7 +171,7 @@ function isVisibleProduct(product: ProductDoc): boolean {
   );
 }
 
-function computeVisibility(store: StoreDoc, product: ProductDoc): boolean {
+function computeVisibility(store: StoreDoc, product: NormalizedProduct): boolean {
   return isStoreBuyVisible(store) && isVisibleProduct(product);
 }
 
@@ -121,7 +185,8 @@ function toPublicProductDoc(input: {
   store: StoreDoc;
   product: ProductDoc;
 }): Record<string, unknown> {
-  const { storeId, productId, store, product } = input;
+  const { storeId, productId, store } = input;
+  const product = normalizeProduct(input.product);
 
   const storeName = normalizeText(store.name);
   const productName = normalizeText(product.name);
@@ -193,7 +258,8 @@ async function upsertOrDeletePublicProduct(params: {
   store: StoreDoc;
   product: ProductDoc;
 }): Promise<void> {
-  const { storeId, productId, store, product } = params;
+  const { storeId, productId, store } = params;
+  const product = normalizeProduct(params.product);
   const visible = computeVisibility(store, product);
   const ref = db.collection(PUBLIC_PRODUCTS_COLLECTION).doc(publicProductId(storeId, productId));
 
@@ -214,10 +280,7 @@ export async function rebuildPublicProductsForStore(storeId: string): Promise<vo
 
   const store = withStoreDefaults(storeSnap.data() as StoreDoc);
 
-  const productsSnap = await db
-    .collection('products')
-    .where('storeId', '==', storeId)
-    .get();
+  const productsSnap = await db.collection('products').get();
 
   if (productsSnap.empty) {
     logger.info('No flat products found for store', { storeId });
@@ -228,7 +291,10 @@ export async function rebuildPublicProductsForStore(storeId: string): Promise<vo
   let ops = 0;
 
   for (const productDoc of productsSnap.docs) {
-    const product = productDoc.data() as ProductDoc;
+    const product = normalizeProduct(productDoc.data() as ProductDoc);
+    if (normalizeText(product.storeId) !== storeId) {
+      continue;
+    }
     const pubRef = db.collection(PUBLIC_PRODUCTS_COLLECTION).doc(publicProductId(storeId, productDoc.id));
     const visible = computeVisibility(store, product);
 
@@ -322,8 +388,10 @@ async function syncFlatProduct(params: {
   before?: ProductDoc;
 }): Promise<void> {
   const { productId, after, before } = params;
-  const afterStoreId = normalizeText(after?.storeId);
-  const beforeStoreId = normalizeText(before?.storeId);
+  const normalizedAfter = after ? normalizeProduct(after) : undefined;
+  const normalizedBefore = before ? normalizeProduct(before) : undefined;
+  const afterStoreId = normalizeText(normalizedAfter?.storeId);
+  const beforeStoreId = normalizeText(normalizedBefore?.storeId);
 
   if (beforeStoreId && beforeStoreId !== afterStoreId) {
     await db
@@ -333,7 +401,7 @@ async function syncFlatProduct(params: {
       .catch(() => undefined);
   }
 
-  if (!after || !afterStoreId) {
+  if (!normalizedAfter || !afterStoreId) {
     if (beforeStoreId) {
       await db
         .collection(PUBLIC_PRODUCTS_COLLECTION)
@@ -357,7 +425,7 @@ async function syncFlatProduct(params: {
     storeId: afterStoreId,
     productId,
     store,
-    product: after,
+    product: normalizedAfter,
   });
 }
 
