@@ -209,7 +209,9 @@ export function ProductGrid() {
       if (firestoreError?.code === 'permission-denied') {
         setError('Could not load products due to Firestore rules. Allow public read access to publicProducts.');
       } else if (firestoreError?.code === 'failed-precondition') {
-        setError('Could not load products. A Firestore index is likely missing. See debug details below.');
+        setError(
+          'Could not load products. Deploy Firestore indexes and rules with `firebase deploy --only firestore:indexes,firestore:rules`.',
+        );
       } else {
         setError('Could not load products. Check debug details below to see the exact Firestore error.');
       }
