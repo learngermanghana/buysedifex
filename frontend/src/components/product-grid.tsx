@@ -58,6 +58,7 @@ export function ProductGrid() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   const visibleProducts = useMemo(() => {
     const text = searchText.trim().toLowerCase();
@@ -113,7 +114,7 @@ export function ProductGrid() {
 
       setCategories(['all', ...Array.from(all).sort()]);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch categories', err);
       setCategories(['all']);
     } finally {
       setIsLoadingCategories(false);
@@ -128,6 +129,7 @@ export function ProductGrid() {
 
     setIsLoading(true);
     setError(null);
+    setDebugInfo(null);
 
     try {
       const constraints: QueryConstraint[] = [where('isVisible', '==', true)];
@@ -157,13 +159,24 @@ export function ProductGrid() {
       setProducts((current) => (cursor ? [...current, ...nextItems] : nextItems));
       setLastDoc(snapshot.docs.at(-1) ?? null);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch products', err);
       const firestoreError = err as FirestoreError;
+      const debugDetails = {
+        operation: 'fetchProducts',
+        selectedCategory,
+        selectedSort,
+        firestoreCode: firestoreError?.code ?? 'unknown',
+        firestoreMessage: firestoreError?.message ?? 'No message provided',
+        firebaseConfigError: firebaseConfigError ?? null,
+      };
+      setDebugInfo(JSON.stringify(debugDetails, null, 2));
 
       if (firestoreError?.code === 'permission-denied') {
         setError('Could not load products due to Firestore rules. Allow public read access to publicProducts.');
+      } else if (firestoreError?.code === 'failed-precondition') {
+        setError('Could not load products. A Firestore index is likely missing. See debug details below.');
       } else {
-        setError('Could not load products. Check your Firebase public env vars and Firestore indexes.');
+        setError('Could not load products. Check debug details below to see the exact Firestore error.');
       }
     } finally {
       setIsLoading(false);
@@ -224,6 +237,12 @@ export function ProductGrid() {
       </div>
 
       {error && <p className="error">{error}</p>}
+      {debugInfo && (
+        <details className="error" open>
+          <summary>Debug details</summary>
+          <pre>{debugInfo}</pre>
+        </details>
+      )}
 
       <div className="grid">
         {isLoading && products.length === 0
