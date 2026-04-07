@@ -21,6 +21,7 @@ type StoreDoc = {
   eligibleForBuy?: boolean;
   buyOptOut?: boolean;
   whatsappNumber?: string;
+  phone?: string;
   logoUrl?: string;
   bannerUrl?: string;
   category?: string;
@@ -154,6 +155,10 @@ function buildWhatsAppLink(input: {
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
+function resolveStorePhone(store: StoreDoc): string | null {
+  return normalizeText(store.whatsappNumber) ?? normalizeText(store.phone);
+}
+
 function withStoreDefaults(store: StoreDoc): StoreDoc {
   return {
     ...store,
@@ -220,6 +225,7 @@ function toPublicProductDoc(input: {
 
     storeName,
     storeSlug: normalizeText(store.slug),
+    storePhone: resolveStorePhone(store),
     storeLogoUrl: normalizeText(store.logoUrl),
     storeBannerUrl: normalizeText(store.bannerUrl),
 
@@ -229,7 +235,7 @@ function toPublicProductDoc(input: {
     imageUrls,
     imageAlt: normalizeText(product.imageAlt),
     price: typeof product.price === 'number' ? product.price : null,
-    currency: normalizeText(product.currency) ?? 'USD',
+    currency: normalizeText(product.currency) ?? 'GHS',
     featuredRank: typeof product.featuredRank === 'number' ? product.featuredRank : 0,
 
     itemType: normalizeText(product.itemType),
@@ -246,7 +252,7 @@ function toPublicProductDoc(input: {
     showOnReceipt: product.showOnReceipt === true,
 
     waLink: buildWhatsAppLink({
-      phone: store.whatsappNumber,
+      phone: resolveStorePhone(store),
       storeName,
       productName,
       productId,
@@ -380,6 +386,7 @@ export const onStoreUpdated = onDocumentUpdated(STORE_PATH, async (event) => {
     before.eligibleForBuy !== after.eligibleForBuy ||
     before.buyOptOut !== after.buyOptOut ||
     before.whatsappNumber !== after.whatsappNumber ||
+    before.phone !== after.phone ||
     before.name !== after.name ||
     before.slug !== after.slug ||
     before.logoUrl !== after.logoUrl ||
