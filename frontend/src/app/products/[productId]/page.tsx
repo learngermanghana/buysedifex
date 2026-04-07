@@ -27,7 +27,9 @@ const buildMetadataDescription = (input: {
   price?: number;
 }) => {
   const location = buildLocation(input.city, input.country);
-  const priceText = input.price == null ? 'Price unavailable' : `${(input.currency ?? 'USD').toUpperCase()} ${input.price}`;
+  const normalizedCurrency = (input.currency ?? 'GHS').toUpperCase();
+  const currencyLabel = normalizedCurrency === 'GHS' ? 'Cedis (GH₵)' : normalizedCurrency;
+  const priceText = input.price == null ? 'Price unavailable' : `${currencyLabel} ${input.price}`;
 
   return `Buy ${input.productName} from ${input.storeName}${location}. Price: ${priceText}. Order via WhatsApp on Sedifex.`;
 };
@@ -108,8 +110,9 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     },
   };
 
-  const priceLabel =
-    product.price == null ? 'Price unavailable' : `${(product.currency ?? 'USD').toUpperCase()} ${product.price.toFixed(2)}`;
+  const normalizedCurrency = (product.currency ?? 'GHS').toUpperCase();
+  const currencyLabel = normalizedCurrency === 'GHS' ? 'Cedis (GH₵)' : normalizedCurrency;
+  const priceLabel = product.price == null ? 'Price unavailable' : `${currencyLabel} ${product.price.toFixed(2)}`;
   const availabilityLabel =
     typeof product.stockCount === 'number' ? (product.stockCount > 0 ? 'In stock' : 'Out of stock') : undefined;
 
@@ -118,7 +121,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <p className="eyebrow">Product details</p>
       <h1>{product.productName}</h1>
-      <p>{product.description}</p>
+      {product.description ? <p>{product.description}</p> : null}
       <p>
         <strong>{product.storeName}</strong>
         {product.storeId ? (

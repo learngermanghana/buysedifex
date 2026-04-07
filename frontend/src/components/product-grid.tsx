@@ -39,31 +39,32 @@ type SortOption = 'newest' | 'price' | 'featured';
 
 const PAGE_SIZE = 12;
 
-const FALLBACK_IMAGES = [
-  'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=80',
-  'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80',
-  'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80',
-  'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80',
-  'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=900&q=80',
-  'https://images.unsplash.com/photo-1560343090-f0409e92791a?auto=format&fit=crop&w=900&q=80',
-];
-
-const getFallbackImage = (category?: string) => {
-  const seed = (category ?? 'general').split('').reduce((total, char) => total + char.charCodeAt(0), 0);
-  return FALLBACK_IMAGES[seed % FALLBACK_IMAGES.length];
-};
-
 const formatPrice = (price?: number, currency?: string) => {
   if (price == null) return 'Price unavailable';
   const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
-  const currencyLabel = normalizedCurrency === 'GHS' ? 'GH₵' : normalizedCurrency;
+  const currencyLabel = normalizedCurrency === 'GHS' ? 'Cedis (GH₵)' : normalizedCurrency;
   return `${currencyLabel} ${price.toFixed(2)}`;
 };
 
 const toWhatsAppPhone = (phone?: string) => (phone ?? '').replace(/[^\d]/g, '');
 
+const normalizeWhatsAppLink = (waLink?: string) => {
+  if (!waLink) return undefined;
+  const trimmed = waLink.trim();
+  if (!trimmed) return undefined;
+
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^wa\.me\//i.test(trimmed)) return `https://${trimmed}`;
+
+  const maybePhone = toWhatsAppPhone(trimmed);
+  if (maybePhone) return `https://wa.me/${maybePhone}`;
+
+  return undefined;
+};
+
 const buildWhatsAppLink = (item: PublicProduct) => {
-  if (item.waLink) return item.waLink;
+  const existingLink = normalizeWhatsAppLink(item.waLink);
+  if (existingLink) return existingLink;
   const phone = toWhatsAppPhone(item.storePhone);
   if (!phone) return '#';
 
@@ -88,6 +89,10 @@ export function ProductGrid() {
   const visibleProducts = useMemo(() => {
     const text = searchText.trim().toLowerCase();
     return products.filter((product) => {
+      if (!product.imageUrls?.[0]) {
+        return false;
+      }
+
       if (!text) return true;
       const haystack = [product.productName, product.description, product.storeName, product.categoryKey]
         .filter(Boolean)
@@ -279,34 +284,45 @@ export function ProductGrid() {
                 <div className="skeleton skeletonButton" />
               </article>
             ))
-          : visibleProducts.map((item) => (
-              <article key={item.id} className="card">
-                <div className="imageWrap">
-                  <img
-                    src={item.imageUrls?.[0] ?? getFallbackImage(item.categoryKey)}
-                    alt={item.productName ?? 'Product image'}
-                    loading="lazy"
-                  />
-                </div>
-                <h3>
-                  <Link href={`/products/${item.id}`}>{item.productName ?? 'Untitled item'}</Link>
-                </h3>
-                <p>{item.description ?? 'No description yet.'}</p>
-                <div className="meta">
-                  <span>
-                    {item.storeId ? (
-                      <Link href={`/stores/${encodeURIComponent(item.storeId)}`}>{item.storeName ?? 'Unknown store'}</Link>
-                    ) : (
-                      item.storeName ?? 'Unknown store'
-                    )}
-                  </span>
-                  <strong>{formatPrice(item.price, item.currency)}</strong>
-                </div>
-                <a className="waButton" href={buildWhatsAppLink(item)} target="_blank" rel="noreferrer">
-                  Contact on WhatsApp
-                </a>
-              </article>
-            ))}
+          : visibleProducts.map((item) => {
+              const whatsappLink = buildWhatsAppLink(item);
+              const canContactOnWhatsApp = whatsappLink !== '#';
+
+              return (
+                <article key={item.id} className="card">
+                  <div className="imageWrap">
+                    <img
+                      src={item.imageUrls?.[0]}
+                      alt={item.productName ?? 'Product image'}
+                      loading="lazy"
+                    />
+                  </div>
+                  <h3>
+                    <Link href={`/products/${item.id}`}>{item.productName ?? 'Untitled item'}</Link>
+                  </h3>
+                  <p>{item.description ?? ''}</p>
+                  <div className="meta">
+                    <span>
+                      {item.storeId ? (
+                        <Link href={`/stores/${encodeURIComponent(item.storeId)}`}>{item.storeName ?? 'Unknown store'}</Link>
+                      ) : (
+                        item.storeName ?? 'Unknown store'
+                      )}
+                    </span>
+                    <strong>{formatPrice(item.price, item.currency)}</strong>
+                  </div>
+                  {canContactOnWhatsApp ? (
+                    <a className="waButton" href={whatsappLink} target="_blank" rel="noreferrer">
+                      Contact on WhatsApp
+                    </a>
+                  ) : (
+                    <span className="waButton" aria-disabled="true" title="WhatsApp contact unavailable">
+                      WhatsApp unavailable
+                    </span>
+                  )}
+                </article>
+              );
+            })}
       </div>
 
       {!isLoading && visibleProducts.length === 0 && !error && (

@@ -106,7 +106,7 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
   return {
     id: readString(fields, ['productId']) ?? doc.name?.split('/').at(-1) ?? '',
     productName: readString(fields, ['productName', 'name']) ?? 'Untitled item',
-    description: readString(fields, ['description']) ?? 'No description yet.',
+    description: readString(fields, ['description']) ?? '',
     imageUrls,
     price: readNumber(fields, ['price']),
     currency: readString(fields, ['currency']),
@@ -211,7 +211,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
   const rows = await runPublicProductsQuery(query);
   const products = rows
     .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
-    .filter((item) => item.id && item.productName);
+    .filter((item) => item.id && item.productName && item.imageUrls.length > 0);
 
   if (products.length === 0) {
     return null;
@@ -271,5 +271,5 @@ export const getProductsByCategory = async (categoryKey: string): Promise<Public
   return rows
     .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
     .map(toPublicProductDetail)
-    .filter((item) => item.id && item.productName);
+    .filter((item) => item.id && item.productName && item.imageUrls.length > 0);
 };

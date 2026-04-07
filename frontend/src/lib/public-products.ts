@@ -92,7 +92,7 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
     id: doc.name.split('/').at(-1) ?? '',
     storeId: readString(fields, ['storeId']),
     productName: readString(fields, ['productName', 'name']) ?? 'Untitled item',
-    description: readString(fields, ['description']) ?? 'No description yet.',
+    description: readString(fields, ['description']) ?? '',
     imageUrls,
     price: readNumber(fields, ['price']),
     currency: readString(fields, ['currency']),
