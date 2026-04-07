@@ -33,11 +33,6 @@ type PublicProduct = {
   publishedAt?: { seconds: number };
 };
 
-type ApprovedStore = {
-  id: string;
-  storeName?: string;
-};
-
 type SortOption = 'newest' | 'price' | 'featured';
 
 const PAGE_SIZE = 12;
@@ -61,27 +56,16 @@ export function ProductGrid() {
   const [categories, setCategories] = useState<string[]>(['all']);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedSort, setSelectedSort] = useState<SortOption>('newest');
-  const [approvedStores, setApprovedStores] = useState<ApprovedStore[]>([]);
-  const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
   const [searchText, setSearchText] = useState<string>('');
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
-  const [isLoadingStores, setIsLoadingStores] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
-
-  const approvedStoreIds = useMemo(
-    () => new Set(approvedStores.map((store) => store.id)),
-    [approvedStores],
-  );
 
   const visibleProducts = useMemo(() => {
     const text = searchText.trim().toLowerCase();
     return products.filter((product) => {
-      const isFromApprovedStore = Boolean(product.storeId && approvedStoreIds.has(product.storeId));
-      if (!isFromApprovedStore) return false;
-      if (selectedStoreId !== 'all' && product.storeId !== selectedStoreId) return false;
       if (!text) return true;
       const haystack = [product.productName, product.description, product.storeName, product.categoryKey]
         .filter(Boolean)
@@ -89,28 +73,7 @@ export function ProductGrid() {
         .toLowerCase();
       return haystack.includes(text);
     });
-  }, [approvedStoreIds, products, searchText, selectedStoreId]);
-
-  const fetchApprovedStores = async () => {
-    if (!db) {
-      setError(firebaseConfigError ?? 'Firebase is not configured.');
-      return;
-    }
-
-    setIsLoadingStores(true);
-
-    try {
-      const storeSnapshot = await getDocs(query(collection(db, 'approvedStores'), orderBy('storeName', 'asc')));
-      const nextStores = storeSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as ApprovedStore[];
-      setApprovedStores(nextStores);
-    } catch (err) {
-      console.error('Failed to fetch approved stores', err);
-      setError('Could not load approved stores. Check Firestore rules for approvedStores read access.');
-      setApprovedStores([]);
-    } finally {
-      setIsLoadingStores(false);
-    }
-  };
+  }, [products, searchText]);
 
   const fetchCategories = async () => {
     if (!db) {
@@ -223,7 +186,6 @@ export function ProductGrid() {
   };
 
   useEffect(() => {
-    fetchApprovedStores();
     fetchCategories();
   }, []);
 
@@ -236,23 +198,6 @@ export function ProductGrid() {
   return (
     <section className="marketplace">
       <div className="toolbar">
-        <div className="sortWrap">
-          <label htmlFor="store">Store</label>
-          <select
-            id="store"
-            value={selectedStoreId}
-            onChange={(event) => setSelectedStoreId(event.target.value)}
-            disabled={isLoadingStores}
-          >
-            <option value="all">All approved stores</option>
-            {approvedStores.map((store) => (
-              <option key={store.id} value={store.id}>
-                {store.storeName ?? store.id}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <div className="searchWrap">
           <label htmlFor="search">Search</label>
           <input
@@ -273,13 +218,6 @@ export function ProductGrid() {
           </select>
         </div>
       </div>
-
-      {!isLoadingStores && approvedStores.length === 0 && (
-        <p className="error">
-          No approved stores found. Add documents to Firestore collection <code>approvedStores</code> using store IDs as
-          document IDs.
-        </p>
-      )}
 
       <div className="categories" role="tablist" aria-label="Product categories">
         {categories.map((category) => {
