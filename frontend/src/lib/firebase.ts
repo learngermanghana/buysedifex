@@ -1,9 +1,8 @@
 import { getApps, initializeApp } from 'firebase/app';
 import { Firestore, getFirestore } from 'firebase/firestore';
 
-const readEnv = (...names: string[]): string | undefined => {
-  for (const name of names) {
-    const value = process.env[name];
+const firstDefined = (...values: Array<string | undefined>): string | undefined => {
+  for (const value of values) {
     if (typeof value === 'string' && value.trim().length > 0) {
       return value.trim();
     }
@@ -13,10 +12,10 @@ const readEnv = (...names: string[]): string | undefined => {
 };
 
 const firebaseConfig = {
-  apiKey: readEnv('NEXT_PUBLIC_FIREBASE_API_KEY', 'FIREBASE_API_KEY'),
-  authDomain: readEnv('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN', 'FIREBASE_AUTH_DOMAIN'),
-  projectId: readEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID', 'FIREBASE_PROJECT_ID'),
-  appId: readEnv('NEXT_PUBLIC_FIREBASE_APP_ID', 'FIREBASE_APP_ID'),
+  apiKey: firstDefined(process.env.NEXT_PUBLIC_FIREBASE_API_KEY, process.env.FIREBASE_API_KEY),
+  authDomain: firstDefined(process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, process.env.FIREBASE_AUTH_DOMAIN),
+  projectId: firstDefined(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID, process.env.FIREBASE_PROJECT_ID),
+  appId: firstDefined(process.env.NEXT_PUBLIC_FIREBASE_APP_ID, process.env.FIREBASE_APP_ID),
 };
 
 const missingFirebaseEnv = Object.entries(firebaseConfig)
