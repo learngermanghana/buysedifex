@@ -17,6 +17,7 @@ type StoreDoc = {
   name?: string;
   slug?: string;
   storeStatus?: string;
+  status?: string;
   eligibleForBuy?: boolean;
   buyOptOut?: boolean;
   whatsappNumber?: string;
@@ -158,8 +159,12 @@ function withStoreDefaults(store: StoreDoc): StoreDoc {
   };
 }
 
+function getEffectiveStoreStatus(store: StoreDoc): string | null {
+  return store.storeStatus ?? store.status ?? null;
+}
+
 function isStoreBuyVisible(store: StoreDoc): boolean {
-  return store.storeStatus === 'active' && store.eligibleForBuy === true && store.buyOptOut === false;
+  return getEffectiveStoreStatus(store) === 'active' && store.eligibleForBuy === true && store.buyOptOut === false;
 }
 
 function isVisibleProduct(product: NormalizedProduct): boolean {
@@ -205,7 +210,7 @@ function toPublicProductDoc(input: {
     productId,
 
     isVisible: true,
-    storeStatus: store.storeStatus ?? null,
+    storeStatus: getEffectiveStoreStatus(store),
     eligibleForBuy: store.eligibleForBuy === true,
     buyOptOut: store.buyOptOut === true,
     categoryKey,
@@ -367,7 +372,7 @@ export const onStoreUpdated = onDocumentUpdated(STORE_PATH, async (event) => {
   }
 
   const visibilityInputsChanged =
-    before.storeStatus !== after.storeStatus ||
+    getEffectiveStoreStatus(before) !== getEffectiveStoreStatus(after) ||
     before.eligibleForBuy !== after.eligibleForBuy ||
     before.buyOptOut !== after.buyOptOut ||
     before.whatsappNumber !== after.whatsappNumber ||
