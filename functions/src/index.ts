@@ -87,7 +87,10 @@ function isProductVisibleOnBuy(product: ProductDoc): boolean {
 }
 
 function computeVisibility(store: StoreDoc, product: ProductDoc): boolean {
-  return isStoreVisibleOnBuy(store) && isProductVisibleOnBuy(product);
+  // Temporary permissive mode:
+  // publish all store products, and let frontend approval be controlled
+  // only by approvedStores collection membership.
+  return true;
 }
 
 function publicProductId(storeId: string, productId: string): string {
