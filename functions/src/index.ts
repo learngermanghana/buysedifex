@@ -8,6 +8,7 @@ const db = admin.firestore();
 
 const STORE_PATH = 'stores/{storeId}';
 const PRODUCT_PATH = 'stores/{storeId}/products/{productId}';
+const FLAT_PRODUCT_PATH = 'products/{productId}';
 const PUBLIC_PRODUCTS_COLLECTION = 'publicProducts';
 
 type StoreDoc = {
@@ -24,6 +25,7 @@ type StoreDoc = {
 };
 
 type ProductDoc = {
+  storeId?: string;
   name?: string;
   slug?: string;
   description?: string;
@@ -308,4 +310,63 @@ export const onProductCreated = onDocumentCreated(PRODUCT_PATH, async (event) =>
 export const onProductDeleted = onDocumentDeleted(PRODUCT_PATH, async (event) => {
   const { storeId, productId } = event.params;
   await db.collection(PUBLIC_PRODUCTS_COLLECTION).doc(publicProductId(storeId, productId)).delete().catch(() => undefined);
+});
+
+async function syncFlatProduct(params: {
+  productId: string;
+  after?: ProductDoc;
+  before?: ProductDoc;
+}): Promise<void> {
+  const { productId, after, before } = params;
+  const afterStoreId = normalizeText(after?.storeId);
+  const beforeStoreId = normalizeText(before?.storeId);
+
+  if (beforeStoreId && beforeStoreId !== afterStoreId) {
+    await db
+      .collection(PUBLIC_PRODUCTS_COLLECTION)
+      .doc(publicProductId(beforeStoreId, productId))
+      .delete()
+      .catch(() => undefined);
+  }
+
+  if (!after || !afterStoreId) {
+    if (beforeStoreId) {
+      await db
+        .collection(PUBLIC_PRODUCTS_COLLECTION)
+        .doc(publicProductId(beforeStoreId, productId))
+        .delete()
+        .catch(() => undefined);
+    } else {
+      logger.warn('Flat product missing storeId; skipping sync', { productId });
+    }
+    return;
+  }
+
+  const storeSnap = await db.collection('stores').doc(afterStoreId).get();
+  if (!storeSnap.exists) {
+    logger.warn('Store missing for flat product; skipping sync', { productId, storeId: afterStoreId });
+    return;
+  }
+
+  const store = withStoreDefaults(storeSnap.data() as StoreDoc);
+  await upsertOrDeletePublicProduct({ storeId: afterStoreId, productId, store, product: after });
+}
+
+export const onFlatProductCreated = onDocumentCreated(FLAT_PRODUCT_PATH, async (event) => {
+  if (!event.data) return;
+  await syncFlatProduct({ productId: event.params.productId, after: event.data.data() as ProductDoc });
+});
+
+export const onFlatProductUpdated = onDocumentUpdated(FLAT_PRODUCT_PATH, async (event) => {
+  if (!event.data) return;
+  await syncFlatProduct({
+    productId: event.params.productId,
+    before: event.data.before.data() as ProductDoc,
+    after: event.data.after.data() as ProductDoc,
+  });
+});
+
+export const onFlatProductDeleted = onDocumentDeleted(FLAT_PRODUCT_PATH, async (event) => {
+  if (!event.data) return;
+  await syncFlatProduct({ productId: event.params.productId, before: event.data.data() as ProductDoc });
 });
