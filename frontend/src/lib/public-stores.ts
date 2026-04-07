@@ -182,6 +182,46 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
   }
 
   const query = {
+    select: {
+      fields: [
+        { fieldPath: 'productId' },
+        { fieldPath: 'storeId' },
+        { fieldPath: 'productName' },
+        { fieldPath: 'name' },
+        { fieldPath: 'description' },
+        { fieldPath: 'imageUrls' },
+        { fieldPath: 'price' },
+        { fieldPath: 'currency' },
+        { fieldPath: 'storeName' },
+        { fieldPath: 'categoryKey' },
+        { fieldPath: 'category' },
+        { fieldPath: 'sku' },
+        { fieldPath: 'stockCount' },
+        { fieldPath: 'city' },
+        { fieldPath: 'storeCity' },
+        { fieldPath: 'country' },
+        { fieldPath: 'storeCountry' },
+        { fieldPath: 'waLink' },
+        { fieldPath: 'storePhone' },
+        { fieldPath: 'phone' },
+        { fieldPath: 'telephone' },
+        { fieldPath: 'storeSlug' },
+        { fieldPath: 'storeLogoUrl' },
+        { fieldPath: 'logoUrl' },
+        { fieldPath: 'storeBannerUrl' },
+        { fieldPath: 'bannerUrl' },
+        { fieldPath: 'addressLine1' },
+        { fieldPath: 'address' },
+        { fieldPath: 'instagramUrl' },
+        { fieldPath: 'facebookUrl' },
+        { fieldPath: 'xUrl' },
+        { fieldPath: 'twitterUrl' },
+        { fieldPath: 'tiktokUrl' },
+        { fieldPath: 'youtubeUrl' },
+        { fieldPath: 'websiteUrl' },
+        { fieldPath: 'publishedAt' },
+      ],
+    },
     from: [{ collectionId: 'publicProducts' }],
     where: {
       compositeFilter: {
@@ -241,6 +281,29 @@ export const getProductsByCategory = async (categoryKey: string): Promise<Public
   }
 
   const query = {
+    select: {
+      fields: [
+        { fieldPath: 'productId' },
+        { fieldPath: 'storeId' },
+        { fieldPath: 'productName' },
+        { fieldPath: 'name' },
+        { fieldPath: 'description' },
+        { fieldPath: 'imageUrls' },
+        { fieldPath: 'price' },
+        { fieldPath: 'currency' },
+        { fieldPath: 'storeName' },
+        { fieldPath: 'categoryKey' },
+        { fieldPath: 'category' },
+        { fieldPath: 'sku' },
+        { fieldPath: 'stockCount' },
+        { fieldPath: 'city' },
+        { fieldPath: 'storeCity' },
+        { fieldPath: 'country' },
+        { fieldPath: 'storeCountry' },
+        { fieldPath: 'waLink' },
+        { fieldPath: 'publishedAt' },
+      ],
+    },
     from: [{ collectionId: 'publicProducts' }],
     where: {
       compositeFilter: {
@@ -272,4 +335,32 @@ export const getProductsByCategory = async (categoryKey: string): Promise<Public
     .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
     .map(toPublicProductDetail)
     .filter((item) => item.id && item.productName && item.imageUrls.length > 0);
+};
+
+export const listPublicStoreIds = async (limitCount = 200): Promise<string[]> => {
+  const query = {
+    select: {
+      fields: [{ fieldPath: 'storeId' }, { fieldPath: 'publishedAt' }],
+    },
+    from: [{ collectionId: 'publicProducts' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'isVisible' },
+        op: 'EQUAL',
+        value: { booleanValue: true },
+      },
+    },
+    orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
+    limit: limitCount,
+  };
+
+  const rows = await runPublicProductsQuery(query);
+
+  return Array.from(
+    new Set(
+      rows
+        .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
+        .flatMap((product) => (product.storeId ? [product.storeId] : [])),
+    ),
+  );
 };

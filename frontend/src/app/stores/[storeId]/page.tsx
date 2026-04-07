@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getStoreProfileById } from '@/lib/public-stores';
+import { canonicalUrlForPath } from '@/lib/seo';
 
 type StorePageProps = {
   params: { storeId: string };
 };
-
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://buy.sedifex.com';
 
 const buildStoreTitle = (storeName: string, city?: string) => {
   const normalizedCity = city?.trim();
@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
   }
 
   const canonicalPath = `/stores/${params.storeId}`;
-  const canonicalUrl = new URL(canonicalPath, siteUrl).toString();
+  const canonicalUrl = canonicalUrlForPath(canonicalPath);
   const title = buildStoreTitle(profile.storeName, profile.city);
   const description = buildStoreDescription(profile.storeName, profile.city, profile.country);
   const socialImage = profile.storeBannerUrl ?? profile.storeLogoUrl;
@@ -65,7 +65,7 @@ export default async function StorePage({ params }: StorePageProps) {
     notFound();
   }
 
-  const canonicalUrl = new URL(`/stores/${params.storeId}`, siteUrl).toString();
+  const canonicalUrl = canonicalUrlForPath(`/stores/${params.storeId}`);
   const hasLocation = Boolean(profile.addressLine1 || profile.city || profile.country);
 
   const organizationType = hasLocation ? 'LocalBusiness' : 'OnlineStore';
@@ -100,7 +100,17 @@ export default async function StorePage({ params }: StorePageProps) {
       {profile.city || profile.country ? <p>{[profile.city, profile.country].filter(Boolean).join(', ')}</p> : null}
       {profile.addressLine1 ? <p>{profile.addressLine1}</p> : null}
       {profile.storePhone ? <p>Phone: {profile.storePhone}</p> : null}
-      {profile.storeBannerUrl ? <img src={profile.storeBannerUrl} alt={`${profile.storeName} storefront banner`} style={{ width: '100%', borderRadius: 12 }} /> : null}
+      {profile.storeBannerUrl ? (
+        <Image
+          src={profile.storeBannerUrl}
+          alt={`${profile.storeName} storefront banner`}
+          width={1200}
+          height={675}
+          priority
+          sizes="(max-width: 768px) 100vw, 920px"
+          style={{ width: '100%', height: 'auto', borderRadius: 12 }}
+        />
+      ) : null}
 
       {categoryKeys.length > 0 ? (
         <section aria-label="Store categories">

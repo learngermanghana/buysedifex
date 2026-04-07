@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPublicProductById } from '@/lib/public-products';
+import { canonicalUrlForPath } from '@/lib/seo';
 
 type ProductPageProps = {
   params: { productId: string };
 };
-
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://buy.sedifex.com';
 
 const buildLocation = (city?: string, country?: string) => {
   const parts = [city, country].filter(Boolean);
@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   }
 
   const canonicalPath = `/products/${productId}`;
-  const canonicalUrl = new URL(canonicalPath, siteUrl).toString();
+  const canonicalUrl = canonicalUrlForPath(canonicalPath);
   const title = `${product.productName}${buildLocation(product.city)} | ${product.storeName} | Sedifex`;
   const description = buildMetadataDescription(product);
   const ogImages = product.imageUrls.length > 0 ? product.imageUrls.map((url) => ({ url })) : undefined;
@@ -81,7 +81,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     notFound();
   }
 
-  const productUrl = new URL(`/products/${productId}`, siteUrl).toString();
+  const productUrl = canonicalUrlForPath(`/products/${productId}`);
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -139,9 +139,21 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       )}
       {availabilityLabel && <p>Availability: {availabilityLabel}</p>}
       {product.imageUrls.length > 0 && (
-        <section aria-label="Product images" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+        <section
+          aria-label="Product images"
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}
+        >
           {product.imageUrls.map((imageUrl) => (
-            <img key={imageUrl} src={imageUrl} alt={product.productName} loading="lazy" style={{ width: '100%', borderRadius: 12 }} />
+            <Image
+              key={imageUrl}
+              src={imageUrl}
+              alt={product.productName}
+              loading="lazy"
+              width={480}
+              height={480}
+              sizes="(max-width: 768px) 100vw, 33vw"
+              style={{ width: '100%', height: 'auto', borderRadius: 12 }}
+            />
           ))}
         </section>
       )}
