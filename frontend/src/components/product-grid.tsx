@@ -293,7 +293,13 @@ export function ProductGrid() {
                 </h3>
                 <p>{item.description ?? 'No description yet.'}</p>
                 <div className="meta">
-                  <span>{item.storeName ?? 'Unknown store'}</span>
+                  <span>
+                    {item.storeId ? (
+                      <Link href={`/stores/${encodeURIComponent(item.storeId)}`}>{item.storeName ?? 'Unknown store'}</Link>
+                    ) : (
+                      item.storeName ?? 'Unknown store'
+                    )}
+                  </span>
                   <strong>{formatPrice(item.price, item.currency)}</strong>
                 </div>
                 <a className="waButton" href={buildWhatsAppLink(item)} target="_blank" rel="noreferrer">
