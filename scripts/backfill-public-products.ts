@@ -36,6 +36,21 @@ type ProductDoc = {
   featuredRank?: number;
   createdAt?: FirebaseFirestore.Timestamp;
   updatedAt?: FirebaseFirestore.Timestamp;
+  [key: string]: unknown;
+};
+
+type NormalizedProduct = ProductDoc & {
+  storeId?: string;
+  itemType?: string;
+  category?: string;
+  name?: string;
+  slug?: string;
+  description?: string;
+  imageUrl?: string | null;
+  imageUrls?: string[];
+  price?: number;
+  currency?: string;
+  featuredRank?: number;
 };
 
 const dryRun = process.argv.includes('--dry-run');
@@ -56,7 +71,57 @@ function normalizeWhatsAppNumber(raw?: string): string | null {
   return normalized || null;
 }
 
-function buildWhatsAppLink(store: StoreDoc, product: ProductDoc, storeId: string, productId: string): string | null {
+function readFirstString(source: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim().length) return value.trim();
+  }
+  return undefined;
+}
+
+function readFirstNumber(source: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return undefined;
+}
+
+function readFirstStringArray(source: Record<string, unknown>, keys: string[]): string[] | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (!Array.isArray(value)) continue;
+    const normalized = value
+      .map((entry) => normalizeText(typeof entry === 'string' ? entry : undefined))
+      .filter((entry): entry is string => Boolean(entry));
+    if (normalized.length) return normalized;
+  }
+  return undefined;
+}
+
+function normalizeProduct(product: ProductDoc): NormalizedProduct {
+  const source = product as Record<string, unknown>;
+  return {
+    ...product,
+    storeId: readFirstString(source, ['storeId', 'storeID', 'store_id', 'shopId', 'shop_id', 'merchantId', 'merchant_id']),
+    itemType: readFirstString(source, ['itemType', 'item_type', 'type', 'kind']) ?? 'product',
+    category: readFirstString(source, ['category', 'categoryKey', 'productCategory', 'department']),
+    name: readFirstString(source, ['name', 'productName', 'product_name', 'title', 'itemName']),
+    slug: readFirstString(source, ['slug', 'productSlug', 'product_slug']),
+    description: readFirstString(source, ['description', 'desc', 'details', 'productDescription']),
+    imageUrl: readFirstString(source, ['imageUrl', 'imageURL', 'image', 'photoUrl', 'thumbnailUrl']) ?? undefined,
+    imageUrls: readFirstStringArray(source, ['imageUrls', 'imageURLs', 'images', 'gallery', 'photoUrls']) ?? product.imageUrls,
+    price: readFirstNumber(source, ['price', 'productPrice', 'amount', 'unitPrice', 'sellingPrice', 'salePrice']),
+    currency: readFirstString(source, ['currency', 'currencyCode', 'moneyCurrency']),
+    featuredRank: readFirstNumber(source, ['featuredRank', 'featureRank', 'priority']),
+  };
+}
+
+function buildWhatsAppLink(store: StoreDoc, product: NormalizedProduct, storeId: string, productId: string): string | null {
   const phone = normalizeWhatsAppNumber(store.whatsappNumber);
   if (!phone) return null;
 
@@ -72,7 +137,7 @@ function withDefaults(store: StoreDoc): StoreDoc {
   };
 }
 
-function visible(store: StoreDoc, product: ProductDoc): boolean {
+function visible(store: StoreDoc, product: NormalizedProduct): boolean {
   const storeVisible = store.storeStatus === 'active' && store.eligibleForBuy === true && store.buyOptOut === false;
 
   const productVisible =
@@ -88,7 +153,7 @@ function publicId(storeId: string, productId: string): string {
   return `${storeId}_${productId}`;
 }
 
-function toPublicDoc(storeId: string, productId: string, store: StoreDoc, product: ProductDoc): Record<string, unknown> {
+function toPublicDoc(storeId: string, productId: string, store: StoreDoc, product: NormalizedProduct): Record<string, unknown> {
   return {
     id: publicId(storeId, productId),
     storeId,
@@ -130,10 +195,13 @@ async function run(): Promise<void> {
   let deletes = 0;
 
   const stores = await db.collection('stores').get();
+  const storesById = new Map<string, StoreDoc>();
+
   for (const storeDoc of stores.docs) {
     storesProcessed += 1;
     const storeId = storeDoc.id;
     const store = withDefaults(storeDoc.data() as StoreDoc);
+    storesById.set(storeId, store);
 
     if (!dryRun && (storeDoc.data().eligibleForBuy === undefined || storeDoc.data().buyOptOut === undefined)) {
       await storeDoc.ref.set(
@@ -146,28 +214,42 @@ async function run(): Promise<void> {
       );
       writes += 1;
     }
+  }
 
-    const products = await db.collection('products').where('storeId', '==', storeId).get();
-    const batch = db.batch();
+  const products = await db.collection('products').get();
+  let batch = db.batch();
+  let ops = 0;
 
-    for (const productDoc of products.docs) {
-      productsProcessed += 1;
-      const productId = productDoc.id;
-      const product = productDoc.data() as ProductDoc;
-      const pubRef = db.collection('publicProducts').doc(publicId(storeId, productId));
+  for (const productDoc of products.docs) {
+    productsProcessed += 1;
+    const productId = productDoc.id;
+    const product = normalizeProduct(productDoc.data() as ProductDoc);
+    const storeId = normalizeText(product.storeId);
+    if (!storeId) continue;
 
-      if (visible(store, product)) {
-        batch.set(pubRef, toPublicDoc(storeId, productId, store, product), { merge: true });
-        writes += 1;
-      } else {
-        batch.delete(pubRef);
-        deletes += 1;
-      }
+    const store = storesById.get(storeId);
+    if (!store) continue;
+
+    const pubRef = db.collection('publicProducts').doc(publicId(storeId, productId));
+
+    if (visible(store, product)) {
+      batch.set(pubRef, toPublicDoc(storeId, productId, store, product), { merge: true });
+      writes += 1;
+    } else {
+      batch.delete(pubRef);
+      deletes += 1;
     }
 
-    if (!dryRun && !products.empty) {
+    ops += 1;
+    if (!dryRun && ops === 400) {
       await batch.commit();
+      batch = db.batch();
+      ops = 0;
     }
+  }
+
+  if (!dryRun && ops > 0) {
+    await batch.commit();
   }
 
   console.log(
