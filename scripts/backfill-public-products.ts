@@ -23,12 +23,13 @@ type StoreDoc = {
 };
 
 type ProductDoc = {
-  isActive?: boolean;
-  isApproved?: boolean;
+  storeId?: string;
+  itemType?: string;
   category?: string;
   name?: string;
   slug?: string;
   description?: string;
+  imageUrl?: string;
   imageUrls?: string[];
   price?: number;
   currency?: string;
@@ -73,7 +74,13 @@ function withDefaults(store: StoreDoc): StoreDoc {
 
 function visible(store: StoreDoc, product: ProductDoc): boolean {
   const storeVisible = store.storeStatus === 'active' && store.eligibleForBuy === true && store.buyOptOut === false;
-  const productVisible = product.isActive === true && (product.isApproved === undefined || product.isApproved === true);
+
+  const productVisible =
+    product.itemType === 'product' &&
+    typeof product.name === 'string' &&
+    product.name.trim().length > 0 &&
+    typeof product.price === 'number';
+
   return storeVisible && productVisible;
 }
 
@@ -90,8 +97,6 @@ function toPublicDoc(storeId: string, productId: string, store: StoreDoc, produc
     storeStatus: store.storeStatus ?? null,
     eligibleForBuy: store.eligibleForBuy === true,
     buyOptOut: store.buyOptOut === true,
-    isActive: product.isActive === true,
-    isApproved: product.isApproved ?? null,
     categoryKey: normalizeCategory(product.category ?? store.category),
     storeName: normalizeText(store.name),
     storeSlug: normalizeText(store.slug),
@@ -100,7 +105,12 @@ function toPublicDoc(storeId: string, productId: string, store: StoreDoc, produc
     productName: normalizeText(product.name),
     productSlug: normalizeText(product.slug),
     description: normalizeText(product.description),
-    imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls.slice(0, 8) : [],
+    imageUrls:
+      Array.isArray(product.imageUrls) && product.imageUrls.length
+        ? product.imageUrls.slice(0, 8)
+        : product.imageUrl
+          ? [product.imageUrl]
+          : [],
     price: typeof product.price === 'number' ? product.price : null,
     currency: normalizeText(product.currency) ?? 'USD',
     featuredRank: typeof product.featuredRank === 'number' ? product.featuredRank : 0,
@@ -137,7 +147,7 @@ async function run(): Promise<void> {
       writes += 1;
     }
 
-    const products = await db.collection(`stores/${storeId}/products`).get();
+    const products = await db.collection('products').where('storeId', '==', storeId).get();
     const batch = db.batch();
 
     for (const productDoc of products.docs) {
