@@ -26,6 +26,7 @@ type PublicProduct = {
   currency?: string;
   storeName?: string;
   waLink?: string;
+  storePhone?: string;
   shopLink?: string;
   itemType?: string;
   isVisible?: boolean;
@@ -49,6 +50,26 @@ const FALLBACK_IMAGES = [
 const getFallbackImage = (category?: string) => {
   const seed = (category ?? 'general').split('').reduce((total, char) => total + char.charCodeAt(0), 0);
   return FALLBACK_IMAGES[seed % FALLBACK_IMAGES.length];
+};
+
+const formatPrice = (price?: number, currency?: string) => {
+  if (price == null) return 'Price unavailable';
+  const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
+  const currencyLabel = normalizedCurrency === 'GHS' ? 'GH₵' : normalizedCurrency;
+  return `${currencyLabel} ${price.toFixed(2)}`;
+};
+
+const toWhatsAppPhone = (phone?: string) => (phone ?? '').replace(/[^\d]/g, '');
+
+const buildWhatsAppLink = (item: PublicProduct) => {
+  if (item.waLink) return item.waLink;
+  const phone = toWhatsAppPhone(item.storePhone);
+  if (!phone) return '#';
+
+  const productLabel = item.productName?.trim() || 'this item';
+  const storeLabel = item.storeName?.trim() || 'your store';
+  const message = `Hi! I'm interested in ${productLabel} from ${storeLabel}. (productId=${item.id}, storeId=${item.storeId ?? ''})`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 };
 
 export function ProductGrid() {
@@ -270,19 +291,11 @@ export function ProductGrid() {
                 <p>{item.description ?? 'No description yet.'}</p>
                 <div className="meta">
                   <span>{item.storeName ?? 'Unknown store'}</span>
-                  <strong>
-                    {item.price != null ? `${item.currency ?? 'USD'} ${item.price.toFixed(2)}` : 'Price unavailable'}
-                  </strong>
+                  <strong>{formatPrice(item.price, item.currency)}</strong>
                 </div>
-                {item.itemType === 'service' ? (
-                  <a className="waButton" href={item.shopLink ?? '/shop'}>
-                    Go to Shop
-                  </a>
-                ) : (
-                  <a className="waButton" href={item.waLink ?? '#'} target="_blank" rel="noreferrer">
-                    Contact on WhatsApp
-                  </a>
-                )}
+                <a className="waButton" href={buildWhatsAppLink(item)} target="_blank" rel="noreferrer">
+                  Contact on WhatsApp
+                </a>
               </article>
             ))}
       </div>
