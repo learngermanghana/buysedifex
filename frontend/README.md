@@ -19,6 +19,21 @@ Create `.env.local` from `.env.example` and set Firebase web SDK values.
 4. Add all `NEXT_PUBLIC_FIREBASE_*` variables.
 5. Deploy.
 
+## Deploy Firestore indexes and rules (required for product queries)
+
+The product grid uses Firestore queries that require composite indexes from `firestore.indexes.json`.
+If these indexes are not deployed, Firestore returns `failed-precondition` / `missing index` and products will not load.
+
+From the repository root, run:
+
+```bash
+firebase deploy --only firestore:indexes,firestore:rules
+```
+
+This deploys both:
+- `firestore.indexes.json` (composite indexes)
+- `firestore.rules` (public read access for `publicProducts` and `approvedStores`)
+
 ## Firebase env values (important)
 
 Use the **Firebase Web app config** values (Firebase Console → Project settings → General → Your apps → Web app config).
