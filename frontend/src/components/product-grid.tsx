@@ -14,6 +14,7 @@ import {
   startAfter,
   where,
 } from 'firebase/firestore';
+import { buildCategoryPath, formatCategoryName } from '@/lib/category';
 import { db, firebaseConfigError } from '@/lib/firebase';
 
 type PublicProduct = {
@@ -302,6 +303,11 @@ export function ProductGrid() {
                   </span>
                   <strong>{formatPrice(item.price, item.currency)}</strong>
                 </div>
+                {item.categoryKey ? (
+                  <p>
+                    <Link href={buildCategoryPath(item.categoryKey)}>{formatCategoryName(item.categoryKey)}</Link>
+                  </p>
+                ) : null}
                 <a className="waButton" href={buildWhatsAppLink(item)} target="_blank" rel="noreferrer">
                   Contact on WhatsApp
                 </a>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { buildCategoryPath, formatCategoryName } from '@/lib/category';
 import { getPublicProductById } from '@/lib/public-products';
 
 type ProductPageProps = {
@@ -131,7 +132,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <p>{priceLabel}</p>
       {product.categoryKey && (
         <p>
-          Category: <Link href={`/categories/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
+          Category: <Link href={buildCategoryPath(product.categoryKey)}>{formatCategoryName(product.categoryKey)}</Link>
         </p>
       )}
       {availabilityLabel && <p>Availability: {availabilityLabel}</p>}

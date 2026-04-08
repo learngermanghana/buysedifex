@@ -273,3 +273,102 @@ export const getProductsByCategory = async (categoryKey: string): Promise<Public
     .map(toPublicProductDetail)
     .filter((item) => item.id && item.productName);
 };
+
+
+type CategoryProductsPage = {
+  products: PublicProductDetail[];
+  hasMore: boolean;
+};
+
+export const getProductsByCategoryPage = async (
+  categoryKey: string,
+  page: number,
+  pageSize: number,
+): Promise<CategoryProductsPage> => {
+  if (!categoryKey || !projectId || page < 1 || pageSize < 1) {
+    return { products: [], hasMore: false };
+  }
+
+  const query = {
+    from: [{ collectionId: 'publicProducts' }],
+    where: {
+      compositeFilter: {
+        op: 'AND',
+        filters: [
+          {
+            fieldFilter: {
+              field: { fieldPath: 'categoryKey' },
+              op: 'EQUAL',
+              value: { stringValue: categoryKey },
+            },
+          },
+          {
+            fieldFilter: {
+              field: { fieldPath: 'isVisible' },
+              op: 'EQUAL',
+              value: { booleanValue: true },
+            },
+          },
+        ],
+      },
+    },
+    orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
+    offset: (page - 1) * pageSize,
+    limit: pageSize + 1,
+  };
+
+  const rows = await runPublicProductsQuery(query);
+  const products = rows
+    .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
+    .map(toPublicProductDetail)
+    .filter((item) => item.id && item.productName);
+
+  return {
+    products: products.slice(0, pageSize),
+    hasMore: products.length > pageSize,
+  };
+};
+
+export const getAllCategoryKeys = async (): Promise<string[]> => {
+  if (!projectId) {
+    return [];
+  }
+
+  const chunkSize = 200;
+  const seen = new Set<string>();
+
+  for (let offset = 0; offset < 4000; offset += chunkSize) {
+    const query = {
+      from: [{ collectionId: 'publicProducts' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'isVisible' },
+          op: 'EQUAL',
+          value: { booleanValue: true },
+        },
+      },
+      select: {
+        fields: [{ fieldPath: 'categoryKey' }],
+      },
+      orderBy: [{ field: { fieldPath: 'categoryKey' }, direction: 'ASCENDING' }],
+      offset,
+      limit: chunkSize,
+    };
+
+    const rows = await runPublicProductsQuery(query);
+    const docs = rows.flatMap((row) => (row.document ? [row.document] : []));
+
+    docs.forEach((doc) => {
+      const category = readString(doc.fields ?? {}, ['categoryKey']);
+      if (category) {
+        seen.add(category);
+      }
+    });
+
+    if (docs.length < chunkSize) {
+      break;
+    }
+  }
+
+  return Array.from(seen).sort((left, right) => left.localeCompare(right));
+};

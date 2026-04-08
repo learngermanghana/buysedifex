@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { buildCategoryPath, formatCategoryName } from '@/lib/category';
 import { getStoreProfileById } from '@/lib/public-stores';
 
 type StorePageProps = {
@@ -108,7 +109,7 @@ export default async function StorePage({ params }: StorePageProps) {
           <ul>
             {categoryKeys.map((category) => (
               <li key={category}>
-                <Link href={`/categories/${encodeURIComponent(category)}`}>{category}</Link>
+                <Link href={buildCategoryPath(category)}>{formatCategoryName(category)}</Link>
               </li>
             ))}
           </ul>
@@ -125,7 +126,7 @@ export default async function StorePage({ params }: StorePageProps) {
                 <>
                   {' '}
                   in{' '}
-                  <Link href={`/categories/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
+                  <Link href={buildCategoryPath(product.categoryKey)}>{formatCategoryName(product.categoryKey)}</Link>
                 </>
               ) : null}
             </li>
