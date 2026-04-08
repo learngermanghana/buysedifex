@@ -134,7 +134,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <p>{priceLabel}</p>
       {product.categoryKey && (
         <p>
-          Category: <Link href={`/categories/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
+          Category: <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
         </p>
       )}
       {availabilityLabel && <p>Availability: {availabilityLabel}</p>}

@@ -32,6 +32,12 @@ export type StoreProfile = {
   products: PublicProductDetail[];
 };
 
+
+export type CategoryProductPage = {
+  products: PublicProductDetail[];
+  hasMore: boolean;
+};
+
 type StoreEnrichedProduct = PublicProductDetail & {
   storeId?: string;
   storePhone?: string;
@@ -275,10 +281,17 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
   };
 };
 
-export const getProductsByCategory = async (categoryKey: string): Promise<PublicProductDetail[]> => {
+export const getProductsByCategory = async (
+  categoryKey: string,
+  options: { page?: number; pageSize?: number } = {},
+): Promise<CategoryProductPage> => {
   if (!categoryKey || !projectId) {
-    return [];
+    return { products: [], hasMore: false };
   }
+
+  const pageSize = Math.min(Math.max(options.pageSize ?? 24, 1), 48);
+  const page = Math.max(options.page ?? 1, 1);
+  const offset = (page - 1) * pageSize;
 
   const query = {
     select: {
@@ -327,14 +340,48 @@ export const getProductsByCategory = async (categoryKey: string): Promise<Public
       },
     },
     orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
-    limit: 60,
+    offset,
+    limit: pageSize + 1,
   };
 
   const rows = await runPublicProductsQuery(query);
-  return rows
+  const items = rows
     .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
     .map(toPublicProductDetail)
     .filter((item) => item.id && item.productName && item.imageUrls.length > 0);
+
+  return {
+    products: items.slice(0, pageSize),
+    hasMore: items.length > pageSize,
+  };
+};
+
+export const listPublicCategoryKeys = async (limitCount = 600): Promise<string[]> => {
+  const query = {
+    select: {
+      fields: [{ fieldPath: 'categoryKey' }, { fieldPath: 'category' }, { fieldPath: 'publishedAt' }],
+    },
+    from: [{ collectionId: 'publicProducts' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'isVisible' },
+        op: 'EQUAL',
+        value: { booleanValue: true },
+      },
+    },
+    orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
+    limit: limitCount,
+  };
+
+  const rows = await runPublicProductsQuery(query);
+
+  return Array.from(
+    new Set(
+      rows
+        .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
+        .flatMap((product) => (product.categoryKey ? [product.categoryKey] : [])),
+    ),
+  ).sort();
 };
 
 export const listPublicStoreIds = async (limitCount = 200): Promise<string[]> => {
