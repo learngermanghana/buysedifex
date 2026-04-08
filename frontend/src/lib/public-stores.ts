@@ -187,7 +187,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     return null;
   }
 
-  const query = {
+  const buildStoreQuery = (fieldPath: 'storeId' | 'storeSlug' | 'storeName', value: string) => ({
     select: {
       fields: [
         { fieldPath: 'productId' },
@@ -237,9 +237,9 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
         filters: [
           {
             fieldFilter: {
-              field: { fieldPath: 'storeId' },
+              field: { fieldPath },
               op: 'EQUAL',
-              value: { stringValue: storeId },
+              value: { stringValue: value },
             },
           },
           {
@@ -254,22 +254,44 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     },
     orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
     limit: 60,
-  };
+  });
 
-  const rows = await runPublicProductsQuery(query);
-  const products = rows
-    .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
-    .filter((item) => item.id && item.productName && item.imageUrls.length > 0);
+  const fallbackLookups: Array<{ fieldPath: 'storeId' | 'storeSlug' | 'storeName'; value: string }> = [
+    { fieldPath: 'storeId', value: storeId },
+    { fieldPath: 'storeSlug', value: storeId },
+  ];
 
-  if (products.length === 0) {
+  const normalizedStoreName = storeId
+    .split('-')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .join(' ');
+
+  if (normalizedStoreName) {
+    fallbackLookups.push({ fieldPath: 'storeName', value: normalizedStoreName });
+  }
+
+  let matchedProducts: StoreEnrichedProduct[] = [];
+  for (const lookup of fallbackLookups) {
+    const rows = await runPublicProductsQuery(buildStoreQuery(lookup.fieldPath, lookup.value));
+    matchedProducts = rows
+      .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
+      .filter((item) => item.id && item.productName && item.imageUrls.length > 0);
+
+    if (matchedProducts.length > 0) {
+      break;
+    }
+  }
+
+  if (matchedProducts.length === 0) {
     return null;
   }
 
-  const head = products[0];
-  const sameAs = Array.from(new Set(products.flatMap((item) => item.sameAs))).filter(isValidHttpUrl);
+  const head = matchedProducts[0];
+  const sameAs = Array.from(new Set(matchedProducts.flatMap((item) => item.sameAs))).filter(isValidHttpUrl);
 
   return {
-    storeId,
+    storeId: head.storeId ?? storeId,
     storeName: head.storeName,
     storeSlug: head.storeSlug,
     storePhone: head.storePhone,
@@ -279,7 +301,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     country: head.country,
     addressLine1: head.addressLine1,
     sameAs,
-    products: products.map(toPublicProductDetail),
+    products: matchedProducts.map(toPublicProductDetail),
   };
 };
 
