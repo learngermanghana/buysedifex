@@ -18,6 +18,11 @@ const buildLocation = (city?: string, country?: string) => {
   return ` in ${parts.join(', ')}`;
 };
 
+const normalizeDisplayCurrency = (currency?: string) => {
+  const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
+  return normalizedCurrency === 'USD' ? 'GHS' : normalizedCurrency;
+};
+
 const buildMetadataDescription = (input: {
   productName: string;
   storeName: string;
@@ -27,8 +32,8 @@ const buildMetadataDescription = (input: {
   price?: number;
 }) => {
   const location = buildLocation(input.city, input.country);
-  const normalizedCurrency = (input.currency ?? 'GHS').toUpperCase();
-  const currencyLabel = normalizedCurrency === 'GHS' ? 'Cedis (GH₵)' : normalizedCurrency;
+  const displayCurrency = normalizeDisplayCurrency(input.currency);
+  const currencyLabel = displayCurrency === 'GHS' ? 'Cedis (GH₵)' : displayCurrency;
   const priceText = input.price == null ? 'Price unavailable' : `${currencyLabel} ${input.price}`;
 
   return `Buy ${input.productName} from ${input.storeName}${location}. Price: ${priceText}. Order via WhatsApp on Sedifex.`;
@@ -97,7 +102,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     offers: {
       '@type': 'Offer',
       ...(product.price != null ? { price: product.price } : {}),
-      ...(product.currency ? { priceCurrency: product.currency.toUpperCase() } : {}),
+      ...(product.currency ? { priceCurrency: normalizeDisplayCurrency(product.currency) } : { priceCurrency: 'GHS' }),
       ...(typeof product.stockCount === 'number'
         ? {
             availability:
@@ -110,8 +115,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     },
   };
 
-  const normalizedCurrency = (product.currency ?? 'GHS').toUpperCase();
-  const currencyLabel = normalizedCurrency === 'GHS' ? 'Cedis (GH₵)' : normalizedCurrency;
+  const displayCurrency = normalizeDisplayCurrency(product.currency);
+  const currencyLabel = displayCurrency === 'GHS' ? 'Cedis (GH₵)' : displayCurrency;
   const priceLabel = product.price == null ? 'Price unavailable' : `${currencyLabel} ${product.price.toFixed(2)}`;
   const availabilityLabel =
     typeof product.stockCount === 'number' ? (product.stockCount > 0 ? 'In stock' : 'Out of stock') : undefined;
