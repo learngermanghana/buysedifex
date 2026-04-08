@@ -118,7 +118,7 @@ export default async function StorePage({ params }: StorePageProps) {
           <ul>
             {categoryKeys.map((category) => (
               <li key={category}>
-                <Link href={`/categories/${encodeURIComponent(category)}`}>{category}</Link>
+                <Link href={`/category/${encodeURIComponent(category)}`}>{category}</Link>
               </li>
             ))}
           </ul>
@@ -135,7 +135,7 @@ export default async function StorePage({ params }: StorePageProps) {
                 <>
                   {' '}
                   in{' '}
-                  <Link href={`/categories/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
+                  <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
                 </>
               ) : null}
             </li>
