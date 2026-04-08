@@ -65,3 +65,28 @@ test('upsert/delete sync behavior', async () => {
   assert.equal(deleted, 1);
   assert.equal(setCalls, 1);
 });
+
+
+test('store aliases are normalized for public product docs', () => {
+  const doc = t.toPublicProductDoc({
+    storeId: 'store-1',
+    productId: 'prod-1',
+    store: {
+      storeName: 'Renamed Store',
+      storePhone: '+233501234567',
+      storeCity: 'Accra',
+      storeCountry: 'Ghana',
+      address: '123 High St',
+      storeStatus: 'active',
+      eligibleForBuy: true,
+      buyOptOut: false,
+    },
+    product: { name: 'Rice', itemType: 'product' },
+  });
+
+  assert.equal(doc.storeName, 'Renamed Store');
+  assert.equal(doc.city, 'Accra');
+  assert.equal(doc.country, 'Ghana');
+  assert.equal(doc.addressLine1, '123 High St');
+  assert.match(doc.waLink, /wa\.me\/233501234567/);
+});
