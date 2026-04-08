@@ -95,6 +95,20 @@ function normalizeText(value?: string | null): string | null {
   return trimmed.length ? trimmed : null;
 }
 
+function toTitleCase(value?: string | null): string | null {
+  const text = normalizeText(value);
+  if (!text) return null;
+
+  return text
+    .split(/\s+/)
+    .map((word) => {
+      const first = word.charAt(0);
+      const rest = word.slice(1);
+      return `${first.toUpperCase()}${rest.toLowerCase()}`;
+    })
+    .join(' ');
+}
+
 function normalizeCategory(value?: string | null): string | null {
   const text = normalizeText(value);
   return text ? text.toLowerCase() : null;
@@ -162,7 +176,7 @@ function normalizeProduct(product: ProductDoc): NormalizedProduct {
     storeId: readFirstString(source, ['storeId', 'storeID', 'store_id', 'shopId', 'shop_id', 'merchantId', 'merchant_id']),
     itemType: readFirstString(source, ['itemType', 'item_type', 'type', 'kind']) ?? 'product',
     shopLink: readFirstString(source, ['shopLink', 'shopURL', 'shopUrl', 'url', 'link']) ?? null,
-    name: readFirstString(source, ['name', 'productName', 'product_name', 'title', 'itemName']),
+    name: toTitleCase(readFirstString(source, ['name', 'productName', 'product_name', 'title', 'itemName'])) ?? undefined,
     slug: readFirstString(source, ['slug', 'productSlug', 'product_slug']),
     description: readFirstString(source, ['description', 'desc', 'details', 'productDescription']),
     category: readFirstString(source, ['category', 'categoryKey', 'productCategory', 'department']),
@@ -389,6 +403,7 @@ export async function rebuildPublicProductsForStore(storeId: string): Promise<vo
 
 export const __testing = {
   normalizeText,
+  toTitleCase,
   normalizeCategory,
   normalizeWhatsAppNumber,
   normalizeProduct,

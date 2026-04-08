@@ -90,3 +90,14 @@ test('store aliases are normalized for public product docs', () => {
   assert.equal(doc.addressLine1, '123 High St');
   assert.match(doc.waLink, /wa\.me\/233501234567/);
 });
+
+test('product names are normalized to title case', () => {
+  assert.equal(t.toTitleCase('skin booster injection'), 'Skin Booster Injection');
+
+  const normalized = t.normalizeProduct({
+    productName: 'skin booster injection',
+    itemType: 'product',
+  });
+
+  assert.equal(normalized.name, 'Skin Booster Injection');
+});
