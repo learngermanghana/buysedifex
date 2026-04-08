@@ -28,13 +28,11 @@ type PublicProduct = {
   price?: number;
   currency?: string;
   storeName?: string;
-  waLink?: string;
   storePhone?: string;
   phone?: string;
   telephone?: string;
   city?: string;
   storeCity?: string;
-  shopLink?: string;
   itemType?: string;
   isVisible?: boolean;
   featuredRank?: number;
@@ -45,33 +43,35 @@ type SortOption = 'newest' | 'price' | 'featured';
 
 const PAGE_SIZE = 12;
 
+const normalizeDisplayCurrency = (currency?: string) => {
+  const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
+  return normalizedCurrency === 'USD' ? 'GHS' : normalizedCurrency;
+};
+
 const formatPrice = (price?: number, currency?: string) => {
   if (price == null) return 'Price unavailable';
-  const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
-  const currencyLabel = normalizedCurrency === 'GHS' ? 'Cedis (GH₵)' : normalizedCurrency;
+  const displayCurrency = normalizeDisplayCurrency(currency);
+  const currencyLabel = displayCurrency === 'GHS' ? 'Cedis (GH₵)' : displayCurrency;
   return `${currencyLabel} ${price.toFixed(2)}`;
 };
 
-const toWhatsAppPhone = (phone?: string) => (phone ?? '').replace(/[^\d]/g, '');
+const toWhatsAppPhone = (phone?: string | number) => String(phone ?? '').replace(/[^\d]/g, '');
 
-const normalizeWhatsAppLink = (waLink?: string) => {
-  if (!waLink) return undefined;
-  const trimmed = waLink.trim();
-  if (!trimmed) return undefined;
+const getContactPhone = (item: PublicProduct) => {
+  const source = item as Record<string, unknown>;
+  const candidateKeys = ['phone', 'storePhone', 'telephone', 'whatsappNumber', 'mobile'];
 
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (/^wa\.me\//i.test(trimmed)) return `https://${trimmed}`;
+  for (const key of candidateKeys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
 
-  const maybePhone = toWhatsAppPhone(trimmed);
-  if (maybePhone) return `https://wa.me/${maybePhone}`;
-
-  return undefined;
+  return '';
 };
 
 const buildWhatsAppLink = (item: PublicProduct) => {
-  const existingLink = normalizeWhatsAppLink(item.waLink);
-  if (existingLink) return existingLink;
-  const phone = toWhatsAppPhone(item.storePhone ?? item.phone ?? item.telephone);
+  const phone = toWhatsAppPhone(getContactPhone(item));
   if (!phone) return '#';
 
   const productLabel = item.productName?.trim() || 'this item';
@@ -80,10 +80,7 @@ const buildWhatsAppLink = (item: PublicProduct) => {
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 };
 
-const getStorePhone = (item: PublicProduct) => {
-  const rawPhone = item.storePhone ?? item.phone ?? item.telephone;
-  return rawPhone?.trim() || 'Phone unavailable';
-};
+const getStorePhone = (item: PublicProduct) => getContactPhone(item) || 'Phone unavailable';
 
 const getStoreCity = (item: PublicProduct) => {
   const rawCity = item.city ?? item.storeCity;
