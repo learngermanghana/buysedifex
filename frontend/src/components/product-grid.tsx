@@ -10,6 +10,7 @@ import {
   collection,
   getDocs,
   limit,
+  documentId,
   orderBy,
   query,
   startAfter,
@@ -104,10 +105,6 @@ export function ProductGrid() {
   const visibleProducts = useMemo(() => {
     const text = searchText.trim().toLowerCase();
     return products.filter((product) => {
-      if (!product.imageUrls?.[0]) {
-        return false;
-      }
-
       if (!text) return true;
       const haystack = [product.productName, product.description, product.storeName, product.categoryKey]
         .filter(Boolean)
@@ -174,27 +171,52 @@ export function ProductGrid() {
     setDebugInfo(null);
 
     try {
-      const constraints: QueryConstraint[] = [where('isVisible', '==', true)];
+      const filters: QueryConstraint[] = [where('isVisible', '==', true)];
 
       if (selectedCategory !== 'all') {
-        constraints.push(where('categoryKey', '==', selectedCategory));
+        filters.push(where('categoryKey', '==', selectedCategory));
       }
 
-      if (selectedSort === 'price') {
-        constraints.push(orderBy('price', 'asc'));
-        constraints.push(orderBy('publishedAt', 'desc'));
-      } else if (selectedSort === 'featured') {
-        constraints.push(orderBy('featuredRank', 'desc'));
-        constraints.push(orderBy('publishedAt', 'desc'));
-      } else {
-        constraints.push(orderBy('publishedAt', 'desc'));
+      const orderOptions: QueryConstraint[][] =
+        selectedSort === 'price'
+          ? [[orderBy('price', 'asc'), orderBy(documentId(), 'asc')], [orderBy(documentId(), 'asc')]]
+          : selectedSort === 'featured'
+            ? [[orderBy('featuredRank', 'desc'), orderBy(documentId(), 'asc')], [orderBy(documentId(), 'asc')]]
+            : [[orderBy('publishedAt', 'desc')], [orderBy(documentId(), 'asc')]];
+
+      let snapshot = null;
+
+      for (let index = 0; index < orderOptions.length; index += 1) {
+        const ordering = orderOptions[index];
+        try {
+          const baseQuery = query(collection(db, 'publicProducts'), ...filters, ...ordering, limit(PAGE_SIZE));
+          const pagedQuery = cursor ? query(baseQuery, startAfter(cursor)) : baseQuery;
+          const nextSnapshot = await getDocs(pagedQuery);
+
+          const shouldTryFallbackForMissingPublishedAt =
+            selectedSort === 'newest' &&
+            !cursor &&
+            index === 0 &&
+            nextSnapshot.empty &&
+            orderOptions.length > 1;
+
+          if (shouldTryFallbackForMissingPublishedAt) {
+            continue;
+          }
+
+          snapshot = nextSnapshot;
+          break;
+        } catch (queryErr) {
+          const firestoreError = queryErr as FirestoreError;
+          if (firestoreError?.code !== 'failed-precondition') {
+            throw queryErr;
+          }
+        }
       }
 
-      constraints.push(limit(PAGE_SIZE));
-
-      const baseQuery = query(collection(db, 'publicProducts'), ...constraints);
-      const pagedQuery = cursor ? query(baseQuery, startAfter(cursor)) : baseQuery;
-      const snapshot = await getDocs(pagedQuery);
+      if (!snapshot) {
+        throw new Error('Unable to fetch products with the available indexes.');
+      }
 
       const nextItems = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as PublicProduct[];
 
