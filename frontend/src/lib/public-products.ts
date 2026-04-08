@@ -100,7 +100,7 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
     categoryKey: readString(fields, ['categoryKey', 'category']),
     sku: readString(fields, ['sku']),
     stockCount: readNumber(fields, ['stockCount']),
-    city: readString(fields, ['city', 'storeCity']),
+    city: readString(fields, ['city', 'storeCity', 'town']),
     country: readString(fields, ['country', 'storeCountry']),
     waLink: readString(fields, ['waLink']),
   };
@@ -132,6 +132,8 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
   endpoint.searchParams.set('mask.fieldPaths', 'country');
   endpoint.searchParams.set('mask.fieldPaths', 'storeId');
   endpoint.searchParams.set('mask.fieldPaths', 'waLink');
+  endpoint.searchParams.set('mask.fieldPaths', 'storePhone');
+  endpoint.searchParams.set('mask.fieldPaths', 'whatsappNumber');
 
   const response = await fetch(endpoint, {
     next: { revalidate: 300 },

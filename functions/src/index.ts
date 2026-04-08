@@ -19,16 +19,29 @@ export function __setDbForTests(testDb: admin.firestore.Firestore): void {
 
 type StoreDoc = {
   name?: string;
+  storeName?: string;
+  title?: string;
   slug?: string;
+  storeSlug?: string;
   storeStatus?: string;
   status?: string;
   eligibleForBuy?: boolean;
   buyOptOut?: boolean;
   whatsappNumber?: string;
+  storePhone?: string;
   phone?: string;
+  telephone?: string;
   logoUrl?: string;
+  storeLogoUrl?: string;
   bannerUrl?: string;
+  storeBannerUrl?: string;
   category?: string;
+  city?: string;
+  storeCity?: string;
+  country?: string;
+  storeCountry?: string;
+  addressLine1?: string;
+  address?: string;
   updatedAt?: admin.firestore.Timestamp;
 };
 
@@ -122,6 +135,26 @@ function readFirstStringArray(source: Record<string, unknown>, keys: string[]): 
   return undefined;
 }
 
+function normalizeStore(store: StoreDoc): StoreDoc {
+  const source = store as Record<string, unknown>;
+
+  return {
+    ...store,
+    name: readFirstString(source, ['name', 'storeName', 'title']),
+    slug: readFirstString(source, ['slug', 'storeSlug']),
+    whatsappNumber:
+      readFirstString(source, ['whatsappNumber', 'whatsAppNumber']) ??
+      readFirstString(source, ['storePhone', 'phone', 'telephone', 'mobile']),
+    phone: readFirstString(source, ['storePhone', 'phone', 'telephone', 'mobile']),
+    logoUrl: readFirstString(source, ['logoUrl', 'storeLogoUrl']),
+    bannerUrl: readFirstString(source, ['bannerUrl', 'storeBannerUrl']),
+    category: readFirstString(source, ['category', 'categoryKey', 'department']),
+    city: readFirstString(source, ['city', 'storeCity', 'town']),
+    country: readFirstString(source, ['country', 'storeCountry']),
+    addressLine1: readFirstString(source, ['addressLine1', 'address', 'location']),
+  };
+}
+
 function normalizeProduct(product: ProductDoc): NormalizedProduct {
   const source = product as Record<string, unknown>;
   const normalized: NormalizedProduct = {
@@ -160,14 +193,15 @@ function buildWhatsAppLink(input: {
 }
 
 function resolveStorePhone(store: StoreDoc): string | null {
-  return normalizeText(store.whatsappNumber) ?? normalizeText(store.phone);
+  return normalizeText(store.whatsappNumber) ?? normalizeText(store.storePhone) ?? normalizeText(store.phone) ?? normalizeText(store.telephone);
 }
 
 function withStoreDefaults(store: StoreDoc): StoreDoc {
+  const normalized = normalizeStore(store);
   return {
-    ...store,
-    eligibleForBuy: store.eligibleForBuy ?? true,
-    buyOptOut: store.buyOptOut ?? false,
+    ...normalized,
+    eligibleForBuy: normalized.eligibleForBuy ?? true,
+    buyOptOut: normalized.buyOptOut ?? false,
   };
 }
 
@@ -202,7 +236,8 @@ function toPublicProductDoc(input: {
   store: StoreDoc;
   product: ProductDoc;
 }): Record<string, unknown> {
-  const { storeId, productId, store } = input;
+  const { storeId, productId } = input;
+  const store = normalizeStore(input.store);
   const product = normalizeProduct(input.product);
 
   const storeName = normalizeText(store.name);
@@ -232,6 +267,9 @@ function toPublicProductDoc(input: {
     storePhone: resolveStorePhone(store),
     storeLogoUrl: normalizeText(store.logoUrl),
     storeBannerUrl: normalizeText(store.bannerUrl),
+    city: normalizeText(store.city),
+    country: normalizeText(store.country),
+    addressLine1: normalizeText(store.addressLine1),
 
     productName,
     productSlug: normalizeText(product.slug),
@@ -412,7 +450,10 @@ export const onStoreUpdated = onDocumentUpdated(STORE_PATH, async (event) => {
     before.slug !== after.slug ||
     before.logoUrl !== after.logoUrl ||
     before.bannerUrl !== after.bannerUrl ||
-    before.category !== after.category;
+    before.category !== after.category ||
+    before.city !== after.city ||
+    before.country !== after.country ||
+    before.addressLine1 !== after.addressLine1;
 
   if (visibilityInputsChanged) {
     await rebuildPublicProductsForStore(storeId);
