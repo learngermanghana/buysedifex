@@ -87,6 +87,46 @@ const getStoreCity = (item: PublicProduct) => {
   return rawCity?.trim() || 'City unavailable';
 };
 
+const hasDisplayImage = (item: PublicProduct) => Array.isArray(item.imageUrls) && item.imageUrls.some((url) => Boolean(url?.trim()));
+
+const bucketProductsByStore = (items: PublicProduct[]) => {
+  const buckets = new Map<string, PublicProduct[]>();
+
+  items.forEach((item) => {
+    const storeKey = item.storeId?.trim() || item.storeName?.trim() || `unknown-store-${item.id}`;
+    const bucket = buckets.get(storeKey);
+
+    if (bucket) {
+      bucket.push(item);
+    } else {
+      buckets.set(storeKey, [item]);
+    }
+  });
+
+  return buckets;
+};
+
+const mixProductsAcrossStores = (items: PublicProduct[]) => {
+  const buckets = bucketProductsByStore(items);
+  const mixed: PublicProduct[] = [];
+
+  while (buckets.size > 0) {
+    for (const [storeKey, storeItems] of buckets) {
+      const nextItem = storeItems.shift();
+
+      if (nextItem) {
+        mixed.push(nextItem);
+      }
+
+      if (storeItems.length === 0) {
+        buckets.delete(storeKey);
+      }
+    }
+  }
+
+  return mixed;
+};
+
 export function ProductGrid() {
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [categories, setCategories] = useState<string[]>(['all']);
@@ -101,7 +141,7 @@ export function ProductGrid() {
 
   const visibleProducts = useMemo(() => {
     const text = searchText.trim().toLowerCase();
-    return products.filter((product) => {
+    const matchingProducts = products.filter((product) => {
       if (!text) return true;
       const haystack = [product.productName, product.description, product.storeName, product.categoryKey]
         .filter(Boolean)
@@ -109,6 +149,11 @@ export function ProductGrid() {
         .toLowerCase();
       return haystack.includes(text);
     });
+
+    const withImages = matchingProducts.filter(hasDisplayImage);
+    const withoutImages = matchingProducts.filter((product) => !hasDisplayImage(product));
+
+    return [...mixProductsAcrossStores(withImages), ...mixProductsAcrossStores(withoutImages)];
   }, [products, searchText]);
 
   const fetchCategories = async () => {
