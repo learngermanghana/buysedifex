@@ -97,9 +97,10 @@ export default async function StorePage({ params }: StorePageProps) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <p className="eyebrow">Store</p>
       <h1>{profile.storeName}</h1>
-      {profile.city || profile.country ? <p>{[profile.city, profile.country].filter(Boolean).join(', ')}</p> : null}
+      <p>City: {profile.city || 'City unavailable'}</p>
+      {profile.country ? <p>Country: {profile.country}</p> : null}
       {profile.addressLine1 ? <p>{profile.addressLine1}</p> : null}
-      {profile.storePhone ? <p>Phone: {profile.storePhone}</p> : null}
+      <p>Phone: {profile.storePhone || 'Phone unavailable'}</p>
       {profile.storeBannerUrl ? (
         <Image
           src={profile.storeBannerUrl}

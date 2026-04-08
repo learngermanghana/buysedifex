@@ -8,7 +8,7 @@ function read(path) {
 
 test('listing page has core rendering blocks', () => {
   const source = read('src/app/page.tsx');
-  assert.match(source, /Shop clean, curated collections/);
+  assert.match(source, /Discover and promote businesses across Ghana/);
   assert.match(source, /<ProductGrid\s*\/?>/);
 });
 

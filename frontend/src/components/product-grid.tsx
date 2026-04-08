@@ -29,6 +29,10 @@ type PublicProduct = {
   storeName?: string;
   waLink?: string;
   storePhone?: string;
+  phone?: string;
+  telephone?: string;
+  city?: string;
+  storeCity?: string;
   shopLink?: string;
   itemType?: string;
   isVisible?: boolean;
@@ -66,13 +70,23 @@ const normalizeWhatsAppLink = (waLink?: string) => {
 const buildWhatsAppLink = (item: PublicProduct) => {
   const existingLink = normalizeWhatsAppLink(item.waLink);
   if (existingLink) return existingLink;
-  const phone = toWhatsAppPhone(item.storePhone);
+  const phone = toWhatsAppPhone(item.storePhone ?? item.phone ?? item.telephone);
   if (!phone) return '#';
 
   const productLabel = item.productName?.trim() || 'this item';
   const storeLabel = item.storeName?.trim() || 'your store';
   const message = `Hi! I'm interested in ${productLabel} from ${storeLabel}. (productId=${item.id}, storeId=${item.storeId ?? ''})`;
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+};
+
+const getStorePhone = (item: PublicProduct) => {
+  const rawPhone = item.storePhone ?? item.phone ?? item.telephone;
+  return rawPhone?.trim() || 'Phone unavailable';
+};
+
+const getStoreCity = (item: PublicProduct) => {
+  const rawCity = item.city ?? item.storeCity;
+  return rawCity?.trim() || 'City unavailable';
 };
 
 export function ProductGrid() {
@@ -316,6 +330,8 @@ export function ProductGrid() {
                     </span>
                     <strong>{formatPrice(item.price, item.currency)}</strong>
                   </div>
+                  <p>City: {getStoreCity(item)}</p>
+                  <p>Phone: {getStorePhone(item)}</p>
                   {canContactOnWhatsApp ? (
                     <a className="waButton" href={whatsappLink} target="_blank" rel="noreferrer">
                       Contact on WhatsApp
