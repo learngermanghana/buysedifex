@@ -82,6 +82,14 @@ const isValidImageUrl = (value: string): boolean => {
 };
 
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? process.env.FIREBASE_PROJECT_ID;
+const normalizeRouteId = (value: string): string => {
+  try {
+    return decodeURIComponent(value).trim();
+  } catch {
+    return value.trim();
+  }
+};
+
 const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? process.env.FIREBASE_API_KEY;
 
 const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
@@ -107,12 +115,14 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
 };
 
 export const getPublicProductById = async (productId: string): Promise<PublicProductDetail | null> => {
-  if (!projectId || !productId) {
+  const normalizedProductId = normalizeRouteId(productId);
+
+  if (!projectId || !normalizedProductId) {
     return null;
   }
 
   const endpoint = new URL(
-    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/publicProducts/${encodeURIComponent(productId)}`,
+    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/publicProducts/${encodeURIComponent(normalizedProductId)}`,
   );
 
   if (firebaseApiKey) {
@@ -144,7 +154,7 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
   }
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch public product ${productId}. Status: ${response.status}`);
+    throw new Error(`Failed to fetch public product ${normalizedProductId}. Status: ${response.status}`);
   }
 
   const document = (await response.json()) as FirestoreDocument;
