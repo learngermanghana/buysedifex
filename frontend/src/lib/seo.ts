@@ -8,6 +8,19 @@ export const defaultSocialImagePath = '/opengraph-image';
 
 export const defaultSocialImageUrl = () => canonicalUrlForPath(defaultSocialImagePath);
 
+export const baseSeoKeywords = [
+  'beauty stores in ghana',
+  'buy products in ghana',
+  'ghana online marketplace',
+  'shops in ghana',
+  'ghanaian products',
+  'ghana business directory',
+  'whatsapp shopping ghana',
+  'sedifex',
+];
+
+export const buildSeoKeywords = (...keywords: string[]) => Array.from(new Set([...baseSeoKeywords, ...keywords]));
+
 export const categoryNameFromKey = (categoryKey: string) =>
   categoryKey
     .trim()

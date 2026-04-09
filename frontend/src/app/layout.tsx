@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
-import { canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
+import { baseSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -10,6 +10,7 @@ export const metadata: Metadata = {
     template: '%s | Buy on Sedifex',
   },
   description: 'Public storefront for approved Sedifex products',
+  keywords: baseSeoKeywords,
   alternates: {
     canonical: canonicalUrlForPath('/'),
   },

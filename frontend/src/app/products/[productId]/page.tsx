@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPublicProductById } from '@/lib/public-products';
-import { canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
+import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 type ProductPageProps = {
   params: { productId: string };
@@ -61,6 +61,11 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   return {
     title,
     description,
+    keywords: buildSeoKeywords(
+      `${product.productName.toLowerCase()} ghana`,
+      `${product.storeName.toLowerCase()} products`,
+      product.categoryKey ? `${product.categoryKey.toLowerCase()} ghana` : 'buy products online ghana',
+    ),
     alternates: { canonical: canonicalUrl },
     openGraph: {
       type: 'website',

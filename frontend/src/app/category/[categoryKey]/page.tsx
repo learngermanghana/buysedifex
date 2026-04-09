@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getProductsByCategory, listPublicCategoryKeys } from '@/lib/public-stores';
-import { canonicalUrlForPath, categoryNameFromKey, defaultSocialImageUrl } from '@/lib/seo';
+import { buildSeoKeywords, canonicalUrlForPath, categoryNameFromKey, defaultSocialImageUrl } from '@/lib/seo';
 
 type CategoryPageProps = {
   params: { categoryKey: string };
@@ -31,6 +31,7 @@ export async function generateMetadata({ params, searchParams }: CategoryPagePro
   return {
     title,
     description,
+    keywords: buildSeoKeywords(`${categoryName} in ghana`, `buy ${categoryName.toLowerCase()} online ghana`),
     alternates: { canonical },
     openGraph: {
       type: 'website',
