@@ -353,3 +353,59 @@ select:focus {
     font-size: 0.8rem;
   }
 }
+
+.infoPage {
+  display: grid;
+  gap: 1rem;
+  max-width: 900px;
+}
+
+.infoPage h1,
+.infoPage h2,
+.infoPage p {
+  margin: 0;
+}
+
+.infoPage section {
+  display: grid;
+  gap: 0.45rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  padding: 1rem;
+  background: #ffffffcc;
+}
+
+.infoPage ul,
+.infoPage ol {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.4rem;
+  color: #334155;
+}
+
+.infoPage a {
+  color: #1d4ed8;
+}
+
+.inlineLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.inlineLinks a {
+  text-decoration: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 0.38rem 0.72rem;
+  background: #fff;
+  color: #1e293b;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.inlineLinks a:hover {
+  background: #eef2ff;
+  border-color: #818cf8;
+}
