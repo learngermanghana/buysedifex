@@ -51,7 +51,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     };
   }
 
-  const canonicalPath = `/products/${productId}`;
+  const canonicalPath = `/products/${encodeURIComponent(productId)}`;
   const canonicalUrl = canonicalUrlForPath(canonicalPath);
   const title = `${product.productName}${buildLocation(product.city)} | ${product.storeName} | Sedifex`;
   const description = buildMetadataDescription(product);
@@ -92,7 +92,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     notFound();
   }
 
-  const productUrl = canonicalUrlForPath(`/products/${productId}`);
+  const productUrl = canonicalUrlForPath(`/products/${encodeURIComponent(productId)}`);
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',

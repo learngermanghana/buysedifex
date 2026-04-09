@@ -381,7 +381,7 @@ export function ProductGrid() {
                     />
                   </div>
                   <h3>
-                    <Link href={`/products/${item.id}`}>{item.productName ?? 'Untitled item'}</Link>
+                    <Link href={`/products/${encodeURIComponent(item.id)}`}>{item.productName ?? 'Untitled item'}</Link>
                   </h3>
                   <p>{item.description ?? ''}</p>
                   <div className="meta">
