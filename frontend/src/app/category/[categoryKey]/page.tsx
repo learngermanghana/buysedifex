@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getProductsByCategory, listPublicCategoryKeys } from '@/lib/public-stores';
-import { canonicalUrlForPath, categoryNameFromKey } from '@/lib/seo';
+import { canonicalUrlForPath, categoryNameFromKey, defaultSocialImageUrl } from '@/lib/seo';
 
 type CategoryPageProps = {
   params: { categoryKey: string };
@@ -38,6 +38,13 @@ export async function generateMetadata({ params, searchParams }: CategoryPagePro
       title,
       description,
       siteName: 'Sedifex',
+      images: [{ url: defaultSocialImageUrl() }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [defaultSocialImageUrl()],
     },
   };
 }

@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getStoreProfileById } from '@/lib/public-stores';
-import { canonicalUrlForPath } from '@/lib/seo';
+import { canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 type StorePageProps = {
   params: { storeId: string };
@@ -36,6 +36,7 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
   const title = buildStoreTitle(profile.storeName, profile.city);
   const description = buildStoreDescription(profile.storeName, profile.city, profile.country);
   const socialImage = profile.storeBannerUrl ?? profile.storeLogoUrl;
+  const socialImages = [{ url: socialImage ?? defaultSocialImageUrl() }];
 
   return {
     title,
@@ -47,13 +48,13 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
       title,
       description,
       siteName: 'Sedifex',
-      ...(socialImage ? { images: [{ url: socialImage }] } : {}),
+      images: socialImages,
     },
     twitter: {
-      card: socialImage ? 'summary_large_image' : 'summary',
+      card: 'summary_large_image',
       title,
       description,
-      ...(socialImage ? { images: [socialImage] } : {}),
+      images: socialImages.map((image) => image.url),
     },
   };
 }
