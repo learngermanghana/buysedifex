@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { ProductGrid } from '@/components/product-grid';
-import { canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
+import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 const title = 'Promote and shop businesses in Ghana';
 const description =
@@ -9,6 +9,7 @@ const description =
 export const metadata: Metadata = {
   title,
   description,
+  keywords: buildSeoKeywords('beauty products ghana', 'buy beauty products online', 'ghana stores online'),
   alternates: {
     canonical: canonicalUrlForPath('/'),
   },

@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getStoreProfileById } from '@/lib/public-stores';
-import { canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
+import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 type StorePageProps = {
   params: { storeId: string };
@@ -41,6 +41,10 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
   return {
     title,
     description,
+    keywords: buildSeoKeywords(
+      `${profile.storeName.toLowerCase()} ghana`,
+      profile.city ? `${profile.storeName.toLowerCase()} ${profile.city.toLowerCase()}` : 'shops in ghana',
+    ),
     alternates: { canonical: canonicalUrl },
     openGraph: {
       type: 'website',
