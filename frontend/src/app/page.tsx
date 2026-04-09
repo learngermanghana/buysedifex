@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { ProductGrid } from '@/components/product-grid';
 import { canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
@@ -46,6 +47,13 @@ export default function HomePage() {
             <span>Promote your store</span>
             <span>Direct customer contact</span>
           </div>
+          <nav className="inlineLinks" aria-label="Sedifex information pages">
+            <Link href="/about">About</Link>
+            <Link href="/sell">Sell on Sedifex</Link>
+            <Link href="/contact">Contact</Link>
+            <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
+          </nav>
         </div>
       </header>
       <ProductGrid />
