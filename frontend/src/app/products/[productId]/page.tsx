@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPublicProductById } from '@/lib/public-products';
-import { canonicalUrlForPath } from '@/lib/seo';
+import { canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 type ProductPageProps = {
   params: { productId: string };
@@ -55,7 +55,8 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   const canonicalUrl = canonicalUrlForPath(canonicalPath);
   const title = `${product.productName}${buildLocation(product.city)} | ${product.storeName} | Sedifex`;
   const description = buildMetadataDescription(product);
-  const ogImages = product.imageUrls.length > 0 ? product.imageUrls.map((url) => ({ url })) : undefined;
+  const socialImages =
+    product.imageUrls.length > 0 ? product.imageUrls.map((url) => ({ url })) : [{ url: defaultSocialImageUrl() }];
 
   return {
     title,
@@ -67,13 +68,13 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       title,
       description,
       siteName: 'Sedifex',
-      images: ogImages,
+      images: socialImages,
     },
     twitter: {
-      card: ogImages ? 'summary_large_image' : 'summary',
+      card: 'summary_large_image',
       title,
       description,
-      images: product.imageUrls,
+      images: socialImages.map((image) => image.url),
     },
   };
 }

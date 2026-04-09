@@ -4,6 +4,10 @@ export const getSiteUrl = () => process.env.NEXT_PUBLIC_SITE_URL ?? defaultSiteU
 
 export const canonicalUrlForPath = (path: string) => new URL(path, getSiteUrl()).toString();
 
+export const defaultSocialImagePath = '/opengraph-image';
+
+export const defaultSocialImageUrl = () => canonicalUrlForPath(defaultSocialImagePath);
+
 export const categoryNameFromKey = (categoryKey: string) =>
   categoryKey
     .trim()

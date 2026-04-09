@@ -1,12 +1,30 @@
 import type { Metadata } from 'next';
 import { ProductGrid } from '@/components/product-grid';
-import { canonicalUrlForPath } from '@/lib/seo';
+import { canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
+
+const title = 'Promote and shop businesses in Ghana';
+const description =
+  'Sedifex helps Ghanaian businesses promote products online and connect with customers through WhatsApp.';
 
 export const metadata: Metadata = {
-  title: 'Promote and shop businesses in Ghana',
-  description: 'Sedifex helps Ghanaian businesses promote products online and connect with customers through WhatsApp.',
+  title,
+  description,
   alternates: {
     canonical: canonicalUrlForPath('/'),
+  },
+  openGraph: {
+    type: 'website',
+    url: canonicalUrlForPath('/'),
+    title,
+    description,
+    siteName: 'Sedifex',
+    images: [{ url: defaultSocialImageUrl() }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title,
+    description,
+    images: [defaultSocialImageUrl()],
   },
 };
 
