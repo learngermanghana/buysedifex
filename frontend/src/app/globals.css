@@ -409,3 +409,62 @@ select:focus {
   background: #eef2ff;
   border-color: #818cf8;
 }
+
+.productDetailPage {
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.productSummaryCard,
+.productStoreCard {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 12px 30px -32px #0f172a;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.productSummaryCard h1,
+.productSummaryCard p,
+.productStoreCard h2,
+.productStoreCard p {
+  margin: 0;
+}
+
+.productStats {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.productStoreActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.25rem;
+}
+
+.productStoreActions a {
+  text-decoration: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 0.42rem 0.78rem;
+  color: #1e293b;
+  background: #fff;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.productStoreActions a:hover {
+  background: #eef2ff;
+  border-color: #818cf8;
+}
+
+.productImageGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}

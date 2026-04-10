@@ -23,6 +23,7 @@ export type StoreProfile = {
   storeName: string;
   storeSlug?: string;
   storePhone?: string;
+  websiteUrl?: string;
   storeLogoUrl?: string;
   storeBannerUrl?: string;
   city?: string;
@@ -44,6 +45,7 @@ type StoreEnrichedProduct = PublicProductDetail & {
   storeSlug?: string;
   storeLogoUrl?: string;
   storeBannerUrl?: string;
+  storeWebsiteUrl?: string;
   addressLine1?: string;
   sameAs: string[];
 };
@@ -128,6 +130,7 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
     storeSlug: readString(fields, ['storeSlug']),
     storeLogoUrl: readString(fields, ['storeLogoUrl', 'logoUrl']),
     storeBannerUrl: readString(fields, ['storeBannerUrl', 'bannerUrl']),
+    storeWebsiteUrl: readString(fields, ['websiteUrl', 'storeWebsite', 'website']),
     addressLine1: readString(fields, ['addressLine1', 'address']),
     sameAs: [
       readString(fields, ['instagramUrl']),
@@ -295,6 +298,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     storeName: head.storeName,
     storeSlug: head.storeSlug,
     storePhone: head.storePhone,
+    websiteUrl: isValidHttpUrl(head.storeWebsiteUrl) ? head.storeWebsiteUrl : undefined,
     storeLogoUrl: isValidHttpUrl(head.storeLogoUrl) ? head.storeLogoUrl : undefined,
     storeBannerUrl: isValidHttpUrl(head.storeBannerUrl) ? head.storeBannerUrl : undefined,
     city: head.city,
