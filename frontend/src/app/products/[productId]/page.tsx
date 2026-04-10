@@ -32,19 +32,6 @@ const sanitizePhoneForTel = (value?: string) => {
   return value.replace(/[^\d+]/g, '');
 };
 
-const getStoreProfileSafely = async (storeId?: string) => {
-  if (!storeId) {
-    return null;
-  }
-
-  try {
-    return await getStoreProfileById(storeId);
-  } catch (error) {
-    console.error(`Failed to resolve store profile for product page (storeId=${storeId}).`, error);
-    return null;
-  }
-};
-
 const buildMetadataDescription = (input: {
   productName: string;
   storeName: string;
@@ -114,7 +101,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     notFound();
   }
 
-  const storeProfile = await getStoreProfileSafely(product.storeId);
+  const storeProfile = product.storeId ? await getStoreProfileById(product.storeId) : null;
   const resolvedStoreName = storeProfile?.storeName ?? product.storeName;
   const resolvedLocation =
     [storeProfile?.city ?? product.city, storeProfile?.country ?? product.country].filter(Boolean).join(', ') ||
