@@ -18,7 +18,9 @@ test('listing page has core rendering blocks', () => {
 test('product detail page renders key detail sections', () => {
   const source = read('src/app/products/[productId]/page.tsx');
   assert.match(source, /Product details/);
-  assert.match(source, /Visit store page/);
+  assert.match(source, /Store information/);
+  assert.match(source, /View store details/);
+  assert.match(source, /Visit store website/);
   assert.match(source, /Availability:/);
   assert.match(source, /alternates: \{ canonical: canonicalUrl \}/);
 });

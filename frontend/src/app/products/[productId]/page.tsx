@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPublicProductById } from '@/lib/public-products';
+import { getStoreProfileById } from '@/lib/public-stores';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 type ProductPageProps = {
@@ -21,6 +22,14 @@ const buildLocation = (city?: string, country?: string) => {
 const normalizeDisplayCurrency = (currency?: string) => {
   const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
   return normalizedCurrency === 'USD' ? 'GHS' : normalizedCurrency;
+};
+
+const sanitizePhoneForTel = (value?: string) => {
+  if (!value) {
+    return '';
+  }
+
+  return value.replace(/[^\d+]/g, '');
 };
 
 const buildMetadataDescription = (input: {
@@ -92,6 +101,17 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     notFound();
   }
 
+  const storeProfile = product.storeId ? await getStoreProfileById(product.storeId) : null;
+  const resolvedStoreName = storeProfile?.storeName ?? product.storeName;
+  const resolvedLocation =
+    [storeProfile?.city ?? product.city, storeProfile?.country ?? product.country].filter(Boolean).join(', ') ||
+    'Location unavailable';
+  const resolvedStorePhone = storeProfile?.storePhone?.trim() || product.waLink?.trim() || 'Phone unavailable';
+  const storePhoneHref = sanitizePhoneForTel(storeProfile?.storePhone ?? product.waLink);
+  const resolvedStoreId = storeProfile?.storeId ?? product.storeId;
+  const hasStorePage = Boolean(resolvedStoreId);
+  const hasWebsite = Boolean(storeProfile?.websiteUrl);
+
   const productUrl = canonicalUrlForPath(`/products/${encodeURIComponent(productId)}`);
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -102,7 +122,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     ...(product.sku ? { sku: product.sku } : {}),
     brand: {
       '@type': 'Brand',
-      name: product.storeName,
+      name: resolvedStoreName,
     },
     ...(product.categoryKey ? { category: product.categoryKey } : {}),
     offers: {
@@ -128,32 +148,60 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     typeof product.stockCount === 'number' ? (product.stockCount > 0 ? 'In stock' : 'Out of stock') : undefined;
 
   return (
-    <main className="hero" style={{ maxWidth: 880 }}>
+    <main className="productDetailPage">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <p className="eyebrow">Product details</p>
-      <h1>{product.productName}</h1>
-      {product.description ? <p>{product.description}</p> : null}
-      <p>
-        <strong>{product.storeName}</strong>
-        {product.storeId ? (
-          <>
-            {' '}
-            · <Link href={`/stores/${encodeURIComponent(product.storeId)}`}>Visit store page</Link>
-          </>
-        ) : null}
-      </p>
-      <p>{priceLabel}</p>
-      {product.categoryKey && (
+      <section className="productSummaryCard">
+        <div>
+          <p className="eyebrow">Product details</p>
+          <h1>{product.productName}</h1>
+          {product.description ? <p>{product.description}</p> : <p>No description available for this product yet.</p>}
+        </div>
+
+        <div className="productStats">
+          <p>
+            <strong>Price:</strong> {priceLabel}
+          </p>
+          {availabilityLabel ? (
+            <p>
+              <strong>Availability:</strong> {availabilityLabel}
+            </p>
+          ) : null}
+          {product.categoryKey ? (
+            <p>
+              <strong>Category:</strong>{' '}
+              <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
+            </p>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="productStoreCard" aria-label="Store contact details">
+        <h2>Store information</h2>
         <p>
-          Category: <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
+          <strong>Name:</strong> {resolvedStoreName}
         </p>
-      )}
-      {availabilityLabel && <p>Availability: {availabilityLabel}</p>}
-      {product.imageUrls.length > 0 && (
-        <section
-          aria-label="Product images"
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}
-        >
+        <p>
+          <strong>Location:</strong> {resolvedLocation}
+        </p>
+        <p>
+          <strong>Phone:</strong>{' '}
+          {storePhoneHref ? <a href={`tel:${storePhoneHref}`}>{resolvedStorePhone}</a> : <span>{resolvedStorePhone}</span>}
+        </p>
+
+        <div className="productStoreActions">
+          {hasStorePage ? (
+            <Link href={`/stores/${encodeURIComponent(resolvedStoreId ?? '')}`}>View store details</Link>
+          ) : null}
+          {hasWebsite ? (
+            <a href={storeProfile?.websiteUrl} target="_blank" rel="noopener noreferrer">
+              Visit store website
+            </a>
+          ) : null}
+        </div>
+      </section>
+
+      {product.imageUrls.length > 0 ? (
+        <section className="productImageGrid" aria-label="Product images">
           {product.imageUrls.map((imageUrl) => (
             <Image
               key={imageUrl}
@@ -163,11 +211,11 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               width={480}
               height={480}
               sizes="(max-width: 768px) 100vw, 33vw"
-              style={{ width: '100%', height: 'auto', borderRadius: 12 }}
+              style={{ width: '100%', height: 'auto', borderRadius: 14 }}
             />
           ))}
         </section>
-      )}
+      ) : null}
     </main>
   );
 }
