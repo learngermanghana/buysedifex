@@ -99,18 +99,18 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
   return {
     id: doc.name.split('/').at(-1) ?? '',
     storeId: readString(fields, ['storeId']),
-    productName: readString(fields, ['productName', 'name']) ?? 'Untitled item',
-    description: readString(fields, ['description']) ?? '',
+    productName: readString(fields, ['productName', 'name', 'title']) ?? 'Untitled item',
+    description: readString(fields, ['description', 'details']) ?? '',
     imageUrls,
-    price: readNumber(fields, ['price']),
+    price: readNumber(fields, ['price', 'amount']),
     currency: readString(fields, ['currency']),
-    storeName: readString(fields, ['storeName']) ?? 'Unknown store',
+    storeName: readString(fields, ['storeName', 'businessName', 'shopName']) ?? 'Unknown store',
     categoryKey: readString(fields, ['categoryKey', 'category']),
     sku: readString(fields, ['sku']),
-    stockCount: readNumber(fields, ['stockCount']),
+    stockCount: readNumber(fields, ['stockCount', 'stock']),
     city: readString(fields, ['city', 'storeCity', 'town']),
     country: readString(fields, ['country', 'storeCountry']),
-    waLink: readString(fields, ['waLink']),
+    waLink: readString(fields, ['waLink', 'storePhone', 'phone', 'telephone', 'whatsappNumber']),
   };
 };
 
@@ -129,21 +129,36 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     endpoint.searchParams.set('key', firebaseApiKey);
   }
 
-  endpoint.searchParams.set('mask.fieldPaths', 'productName');
-  endpoint.searchParams.set('mask.fieldPaths', 'description');
-  endpoint.searchParams.set('mask.fieldPaths', 'imageUrls');
-  endpoint.searchParams.set('mask.fieldPaths', 'price');
-  endpoint.searchParams.set('mask.fieldPaths', 'currency');
-  endpoint.searchParams.set('mask.fieldPaths', 'storeName');
-  endpoint.searchParams.set('mask.fieldPaths', 'categoryKey');
-  endpoint.searchParams.set('mask.fieldPaths', 'sku');
-  endpoint.searchParams.set('mask.fieldPaths', 'stockCount');
-  endpoint.searchParams.set('mask.fieldPaths', 'city');
-  endpoint.searchParams.set('mask.fieldPaths', 'country');
-  endpoint.searchParams.set('mask.fieldPaths', 'storeId');
-  endpoint.searchParams.set('mask.fieldPaths', 'waLink');
-  endpoint.searchParams.set('mask.fieldPaths', 'storePhone');
-  endpoint.searchParams.set('mask.fieldPaths', 'whatsappNumber');
+  [
+    'productName',
+    'name',
+    'title',
+    'description',
+    'details',
+    'imageUrls',
+    'price',
+    'amount',
+    'currency',
+    'storeName',
+    'businessName',
+    'shopName',
+    'categoryKey',
+    'category',
+    'sku',
+    'stockCount',
+    'stock',
+    'city',
+    'storeCity',
+    'town',
+    'country',
+    'storeCountry',
+    'storeId',
+    'waLink',
+    'storePhone',
+    'phone',
+    'telephone',
+    'whatsappNumber',
+  ].forEach((fieldPath) => endpoint.searchParams.append('mask.fieldPaths', fieldPath));
 
   const response = await fetch(endpoint, {
     next: { revalidate: 300 },
