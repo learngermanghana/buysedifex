@@ -194,7 +194,18 @@ const runPublicProductsQuery = async (structuredQuery: Record<string, unknown>):
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to query publicProducts. Status: ${response.status}`);
+    let details = '';
+    try {
+      const errorBody = (await response.json()) as { error?: { message?: string; status?: string } };
+      const message = errorBody?.error?.message?.trim();
+      const status = errorBody?.error?.status?.trim();
+      details = [status, message].filter(Boolean).join(': ');
+    } catch {
+      details = '';
+    }
+
+    const suffix = details ? ` (${details})` : '';
+    throw new Error(`Failed to query publicProducts. Status: ${response.status}${suffix}`);
   }
 
   return (await response.json()) as FirestoreRunQueryResponse[];
@@ -448,7 +459,13 @@ export const listPublicCategoryKeys = async (limitCount = 600): Promise<string[]
     limit: limitCount,
   };
 
-  const rows = await runPublicProductsQuery(query);
+  let rows: FirestoreRunQueryResponse[] = [];
+  try {
+    rows = await runPublicProductsQuery(query);
+  } catch (error) {
+    console.warn('Unable to list public category keys during static generation.', error);
+    return [];
+  }
 
   return Array.from(
     new Set(
