@@ -81,7 +81,8 @@ export const onStoreUpdated = onDocumentUpdated(STORE_PATH, async (event) => {
     before.category !== after.category ||
     before.city !== after.city ||
     before.country !== after.country ||
-    before.addressLine1 !== after.addressLine1;
+    before.addressLine1 !== after.addressLine1 ||
+    before.verified !== after.verified;
 
   if (visibilityInputsChanged) {
     await rebuildPublicProductsForStore(storeId);

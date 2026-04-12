@@ -36,6 +36,7 @@ export function toPublicProductDoc(input: {
     storeStatus: getEffectiveStoreStatus(store),
     eligibleForBuy: store.eligibleForBuy === true,
     buyOptOut: store.buyOptOut === true,
+    verified: store.verified === true,
     categoryKey,
     storeName,
     storeSlug: normalizeText(store.slug),
