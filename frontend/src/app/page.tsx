@@ -50,6 +50,7 @@ export default function HomePage() {
           </div>
           <nav className="inlineLinks" aria-label="Sedifex information pages">
             <Link href="/about">About</Link>
+            <Link href="/services">Services</Link>
             <Link href="/sell">Sell on Sedifex</Link>
             <Link href="/contact">Contact</Link>
             <Link href="/privacy">Privacy</Link>
