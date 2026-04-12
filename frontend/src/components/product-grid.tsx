@@ -91,7 +91,17 @@ const getStoreCity = (item: PublicProduct) => {
   return rawCity?.trim() || 'City unavailable';
 };
 
-const hasDisplayImage = (item: PublicProduct) => Array.isArray(item.imageUrls) && item.imageUrls.some((url) => Boolean(url?.trim()));
+const isValidImageUrl = (value?: string) => {
+  const normalized = value?.trim();
+  return Boolean(normalized && /^https?:\/\//i.test(normalized));
+};
+
+const getDisplayImageUrl = (item: PublicProduct) => {
+  if (!Array.isArray(item.imageUrls)) return null;
+  return item.imageUrls.find((url) => isValidImageUrl(url))?.trim() ?? null;
+};
+
+const hasDisplayImage = (item: PublicProduct) => Boolean(getDisplayImageUrl(item));
 const isVerifiedStore = (value: PublicProduct['verified']) => {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string') {
@@ -438,7 +448,7 @@ export function ProductGrid() {
                 <article key={item.id} className="card">
                   <div className="imageWrap">
                     <Image
-                      src={item.imageUrls?.[0] ?? 'https://placehold.co/640x640'}
+                      src={getDisplayImageUrl(item) ?? 'https://placehold.co/640x640'}
                       alt={item.imageAlt?.trim() || item.productName || 'Product image'}
                       loading="lazy"
                       width={360}
