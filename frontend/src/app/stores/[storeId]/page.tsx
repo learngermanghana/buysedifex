@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getStoreProfileById } from '@/lib/public-stores';
+import { getStoreProfileById, listPublicStoreIds } from '@/lib/public-stores';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 type StorePageProps = {
@@ -19,6 +19,11 @@ const buildStoreDescription = (storeName: string, city?: string, country?: strin
   const locationText = location ? ` in ${location}` : '';
   return `Shop products from ${storeName}${locationText}. Browse available items and order via WhatsApp on Sedifex.`;
 };
+
+export async function generateStaticParams() {
+  const storeIds = await listPublicStoreIds();
+  return storeIds.map((storeId) => ({ storeId }));
+}
 
 export async function generateMetadata({ params }: StorePageProps): Promise<Metadata> {
   const profile = await getStoreProfileById(params.storeId);

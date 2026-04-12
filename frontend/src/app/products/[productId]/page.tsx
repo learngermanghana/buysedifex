@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { FormattedDescription } from '@/components/formatted-description';
 import { getPublicProductById } from '@/lib/public-products';
 import { getStoreProfileById } from '@/lib/public-stores';
+import { getStoreHref, getStoreRouteId } from '@/lib/store-route';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 type ProductPageProps = {
@@ -109,8 +110,9 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     'Location unavailable';
   const resolvedStorePhone = storeProfile?.storePhone?.trim() || product.waLink?.trim() || 'Phone unavailable';
   const storePhoneHref = sanitizePhoneForTel(storeProfile?.storePhone ?? product.waLink);
-  const resolvedStoreId = storeProfile?.storeId ?? product.storeId;
-  const hasStorePage = Boolean(resolvedStoreId);
+  const resolvedStoreId = getStoreRouteId(storeProfile?.storeId ?? product.storeId, resolvedStoreName);
+  const storeHref = getStoreHref(resolvedStoreId, resolvedStoreName);
+  const hasStorePage = Boolean(storeHref);
   const hasWebsite = Boolean(storeProfile?.websiteUrl);
   const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
 
@@ -197,7 +199,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
         <div className="productStoreActions">
           {hasStorePage ? (
-            <Link href={`/stores/${encodeURIComponent(resolvedStoreId ?? '')}`}>View store details</Link>
+            <Link href={storeHref ?? '#'}>View store details</Link>
           ) : null}
           {hasWebsite ? (
             <a href={storeProfile?.websiteUrl} target="_blank" rel="noopener noreferrer">

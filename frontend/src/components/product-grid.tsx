@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore';
 import { db, firebaseConfigError } from '@/lib/firebase';
 import { FormattedDescription } from '@/components/formatted-description';
+import { getStoreHref } from '@/lib/store-route';
 
 type PublicProduct = {
   id: string;
@@ -414,6 +415,7 @@ export function ProductGrid() {
           : visibleProducts.map((item) => {
               const whatsappLink = buildWhatsAppLink(item);
               const canContactOnWhatsApp = whatsappLink !== '#';
+              const storeHref = getStoreHref(item.storeId, item.storeName);
               const shouldCollapseDescription = (item.description?.trim().length ?? 0) > 260;
               const isExpanded = expandedDescriptionIds.has(item.id);
               const descriptionClassName = `formattedDescription compact ${shouldCollapseDescription && !isExpanded ? 'isCollapsed' : ''}`.trim();
@@ -440,8 +442,8 @@ export function ProductGrid() {
                   )}
                   <div className="meta">
                     <span className="storeIdentity">
-                      {item.storeId ? (
-                        <Link href={`/stores/${encodeURIComponent(item.storeId)}`}>{item.storeName ?? 'Unknown store'}</Link>
+                      {storeHref ? (
+                        <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link>
                       ) : (
                         item.storeName ?? 'Unknown store'
                       )}
