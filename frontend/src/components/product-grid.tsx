@@ -468,6 +468,7 @@ export function ProductGrid() {
                       style={{ width: '100%', height: 'auto' }}
                     />
                   </div>
+                  <p className="itemTypeBadge">Product</p>
                   <h3>{item.productName ?? 'Untitled item'}</h3>
                   <Link href={`/products/${encodeURIComponent(item.id)}`}>View product details</Link>
                   <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
@@ -493,15 +494,21 @@ export function ProductGrid() {
                   </div>
                   <p>City: {getStoreCity(item)}</p>
                   <p>Phone: {getStorePhone(item)}</p>
-                  {canContactOnWhatsApp ? (
-                    <a className="waButton" href={whatsappLink} target="_blank" rel="noreferrer" aria-label={`Contact ${item.storeName ?? 'store'} on WhatsApp about ${item.productName ?? 'this item'}`}>
-                      Contact on WhatsApp
+                  <div className="productStoreActions">
+                    {canContactOnWhatsApp ? (
+                      <a className="waButton" href={whatsappLink} target="_blank" rel="noreferrer" aria-label={`Contact ${item.storeName ?? 'store'} on WhatsApp about ${item.productName ?? 'this item'}`}>
+                        Chat seller
+                      </a>
+                    ) : (
+                      <span className="waButton" aria-disabled="true" title="WhatsApp contact unavailable">
+                        WhatsApp unavailable
+                      </span>
+                    )}
+                    <a className="requestButton" href={`mailto:info@sedifex.com?subject=${encodeURIComponent(`Product request: ${item.productName ?? 'Product'}`)}`}>
+                      Request product
                     </a>
-                  ) : (
-                    <span className="waButton" aria-disabled="true" title="WhatsApp contact unavailable">
-                      WhatsApp unavailable
-                    </span>
-                  )}
+                    <a href="/contact">Ask about delivery</a>
+                  </div>
                 </article>
               );
             })}

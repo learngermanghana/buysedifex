@@ -215,6 +215,22 @@ select:focus {
   line-height: 1.4;
 }
 
+
+.itemTypeBadge {
+  margin: 0;
+  display: inline-flex;
+  width: fit-content;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+}
+
 .meta {
   display: flex;
   justify-content: space-between;

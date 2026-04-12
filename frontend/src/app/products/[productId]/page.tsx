@@ -234,7 +234,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <aside className="stickyProductActions">
         {whatsappHref ? (
           <a className="waButton" href={whatsappHref} target="_blank" rel="noopener noreferrer">
-            Chat on WhatsApp
+            Chat seller
           </a>
         ) : (
           <span className="waButton" aria-disabled="true">
@@ -242,7 +242,10 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           </span>
         )}
         <a className="requestButton" href={requestHref}>
-          Request this product
+          Request product
+        </a>
+        <a className="requestButton" href="/contact">
+          Ask about delivery
         </a>
       </aside>
     </main>

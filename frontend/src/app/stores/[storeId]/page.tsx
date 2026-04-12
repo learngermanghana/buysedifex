@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
     };
   }
 
-  const canonicalPath = `/stores/${params.storeId}`;
+  const canonicalPath = `/store/${params.storeId}`;
   const canonicalUrl = canonicalUrlForPath(canonicalPath);
   const title = buildStoreTitle(profile.storeName, profile.city);
   const description = buildStoreDescription(profile.storeName, profile.city, profile.country);
@@ -80,7 +80,7 @@ export default async function StorePage({ params }: StorePageProps) {
     notFound();
   }
 
-  const canonicalUrl = canonicalUrlForPath(`/stores/${params.storeId}`);
+  const canonicalUrl = canonicalUrlForPath(`/store/${params.storeId}`);
   const hasLocation = Boolean(profile.addressLine1 || profile.city || profile.country);
 
   const organizationType = hasLocation ? 'LocalBusiness' : 'OnlineStore';

@@ -14,6 +14,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: canonicalUrlForPath('/'), changeFrequency: 'daily', priority: 1 },
+    { url: canonicalUrlForPath('/products'), changeFrequency: 'daily', priority: 0.9 },
     { url: canonicalUrlForPath('/about'), changeFrequency: 'weekly', priority: 0.6 },
     { url: canonicalUrlForPath('/services'), changeFrequency: 'weekly', priority: 0.7 },
     { url: canonicalUrlForPath('/for-businesses'), changeFrequency: 'weekly', priority: 0.7 },
@@ -37,7 +38,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   const storeRoutes: MetadataRoute.Sitemap = storeIds.map((id) => ({
-    url: canonicalUrlForPath(`/stores/${encodeURIComponent(id)}`),
+    url: canonicalUrlForPath(`/store/${encodeURIComponent(id)}`),
     changeFrequency: 'daily',
     priority: 0.8,
   }));

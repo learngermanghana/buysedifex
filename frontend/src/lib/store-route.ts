@@ -27,5 +27,5 @@ export const getStoreHref = (storeId?: string, storeName?: string): string | nul
     return null;
   }
 
-  return `/stores/${encodeURIComponent(routeId)}`;
+  return `/store/${encodeURIComponent(routeId)}`;
 };

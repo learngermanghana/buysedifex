@@ -1,18 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProductGrid } from '@/components/product-grid';
-import { PromoCarousel } from '@/components/promo-carousel';
 import { SectionTabs } from '@/components/section-tabs';
-import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
+import { canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
-const title = 'Discover trusted local stores near you';
+const title = 'Sedifex Marketplace | Products and Services';
 const description =
-  'Discover trusted local stores across Ghana, compare prices, and connect with sellers instantly on WhatsApp.';
+  'Browse products and services on Sedifex. Discover trusted businesses, featured listings, and contact providers quickly.';
 
 export const metadata: Metadata = {
   title,
   description,
-  keywords: buildSeoKeywords('beauty products ghana', 'buy beauty products online', 'ghana stores online'),
   alternates: {
     canonical: canonicalUrlForPath('/'),
   },
@@ -40,14 +38,19 @@ export default function HomePage() {
         <div
           className="heroImage"
           role="img"
-          aria-label="Minimal shopping setup with products staged for online browsing"
+          aria-label="Sedifex marketplace products and service providers"
         />
         <div className="heroContent">
-          <p className="eyebrow">Sedifex Market</p>
+          <p className="eyebrow">Sedifex Marketplace</p>
           <h1>Discover trusted local stores near you</h1>
-          <p>Search products, compare prices, and contact verified stores in seconds.</p>
+          <p><strong>Find products and services from trusted businesses.</strong></p>
+          <p>Search instantly, compare options, and contact sellers or providers in one place.</p>
           <form className="heroSearch" role="search">
-            <input type="search" placeholder="Search products, stores, or categories" aria-label="Search products and stores" />
+            <input
+              type="search"
+              placeholder="Search products, services, businesses, or categories"
+              aria-label="Search products and services"
+            />
             <select aria-label="Choose location" defaultValue="Accra">
               <option>Accra</option>
               <option>Kumasi</option>
@@ -55,33 +58,37 @@ export default function HomePage() {
               <option>Tamale</option>
             </select>
           </form>
-          <div className="heroHighlights">
-            <span>🔥 Featured products</span>
-            <span>🏪 Top stores near you</span>
-            <span>📦 Categories</span>
-          </div>
-          <nav className="inlineLinks" aria-label="Sedifex information pages">
-            <Link href="/search">Search &amp; Filter</Link>
+          <div className="inlineLinks" aria-label="Browse marketplace sections">
+            <Link href="/products">Browse Products</Link>
+            <Link href="/services">Browse Services</Link>
+            <Link href="/search">Hero search</Link>
             <Link href="/about">About</Link>
-            <Link href="/services">Services</Link>
-            <Link href="/sell">Sell on Sedifex</Link>
             <Link href="/contact">Contact</Link>
-            <Link href="/privacy">Privacy</Link>
-            <Link href="/terms">Terms</Link>
-          </nav>
+            <Link href="/sell">Sell</Link>
+          </div>
         </div>
       </header>
-      <section className="quickSections" aria-label="Homepage discovery sections">
-        <p>Trending in Accra</p>
-        <p>Recently added</p>
-        <p>Best priced</p>
+
+      <section className="quickSections" aria-label="Homepage sections">
+        <p>Featured Products</p>
+        <p>Featured Services</p>
+        <p>Popular Categories</p>
+        <p>Trusted Businesses</p>
+        <p>How Sedifex Works</p>
       </section>
-      <div className="homeColumns">
-        <PromoCarousel />
-        <div className="productsColumn">
-          <ProductGrid />
-        </div>
-      </div>
+
+      <section aria-label="Featured products">
+        <ProductGrid />
+      </section>
+
+      <section className="infoPage">
+        <h2>How Sedifex Works</h2>
+        <ol>
+          <li>Browse products or services.</li>
+          <li>Open the detail page and review business information.</li>
+          <li>Use the CTA that matches your goal: chat, request, quote, or booking.</li>
+        </ol>
+      </section>
     </main>
   );
 }
