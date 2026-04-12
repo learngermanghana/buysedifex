@@ -141,6 +141,19 @@ const bucketProductsByStore = (items: PublicProduct[]) => {
   return buckets;
 };
 
+const shuffleProducts = (items: PublicProduct[]) => {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const hold = shuffled[index];
+    shuffled[index] = shuffled[swapIndex];
+    shuffled[swapIndex] = hold;
+  }
+
+  return shuffled;
+};
+
 const mixProductsAcrossStores = (items: PublicProduct[]) => {
   const buckets = bucketProductsByStore(items);
   const mixed: PublicProduct[] = [];
@@ -187,7 +200,8 @@ export function ProductGrid() {
       return haystack.includes(text);
     });
 
-    return mixProductsAcrossStores(matchingProducts.filter((product) => hasDisplayImage(product) && isVerifiedStore(product.verified)));
+    const imageReadyProducts = matchingProducts.filter((product) => hasDisplayImage(product) && isVerifiedStore(product.verified));
+    return mixProductsAcrossStores(shuffleProducts(imageReadyProducts));
   }, [products, searchText]);
 
   const toggleDescription = (productId: string) => {

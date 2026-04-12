@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProductGrid } from '@/components/product-grid';
+import { PromoCarousel } from '@/components/promo-carousel';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 const title = 'Promote and shop businesses in Ghana';
@@ -58,7 +59,12 @@ export default function HomePage() {
           </nav>
         </div>
       </header>
-      <ProductGrid />
+      <div className="homeColumns">
+        <PromoCarousel />
+        <div className="productsColumn">
+          <ProductGrid />
+        </div>
+      </div>
     </main>
   );
 }
