@@ -767,4 +767,54 @@ select:focus {
   .promoRail {
     position: static;
   }
+
+  .promoCard {
+    grid-template-columns: minmax(110px, 38%) minmax(0, 1fr);
+    grid-template-areas:
+      'image meta'
+      'actions actions'
+      'controls controls';
+    align-items: start;
+  }
+
+  .promoImageWrap {
+    grid-area: image;
+    aspect-ratio: 1 / 1;
+    min-height: 100%;
+  }
+
+  .promoMeta {
+    grid-area: meta;
+    padding: 0.65rem;
+    gap: 0.35rem;
+  }
+
+  .promoSummary {
+    -webkit-line-clamp: 3;
+  }
+
+  .promoActions {
+    grid-area: actions;
+    padding-top: 0.35rem;
+  }
+
+  .promoControls {
+    grid-area: controls;
+  }
+}
+
+@media (max-width: 520px) {
+  .promoCard {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'image'
+      'meta'
+      'actions'
+      'controls';
+  }
+
+  .promoImageWrap {
+    aspect-ratio: 16 / 9;
+    max-height: 180px;
+  }
 }
