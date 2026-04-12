@@ -21,8 +21,13 @@ const buildStoreDescription = (storeName: string, city?: string, country?: strin
 };
 
 export async function generateStaticParams() {
-  const storeIds = await listPublicStoreIds();
-  return storeIds.map((storeId) => ({ storeId }));
+  try {
+    const storeIds = await listPublicStoreIds();
+    return storeIds.map((storeId) => ({ storeId }));
+  } catch (error) {
+    console.warn('Unable to list public store ids during static generation.', error);
+    return [];
+  }
 }
 
 export async function generateMetadata({ params }: StorePageProps): Promise<Metadata> {
