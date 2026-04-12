@@ -96,18 +96,45 @@ export default async function StorePage({ params }: StorePageProps) {
   };
 
   const categoryKeys = Array.from(new Set(profile.products.map((product) => product.categoryKey).filter(Boolean))) as string[];
+  const normalizedPhone = (profile.storePhone ?? '').replace(/[^\d+]/g, '');
+  const normalizedWhatsapp = (profile.storeWhatsapp ?? '').trim();
+  const whatsappLink =
+    normalizedWhatsapp.startsWith('http://') || normalizedWhatsapp.startsWith('https://')
+      ? normalizedWhatsapp
+      : normalizedPhone
+        ? `https://wa.me/${normalizedPhone.replace(/[^\d]/g, '')}`
+        : '';
+  const mailtoHref = profile.storeEmail ? `mailto:${profile.storeEmail}` : '';
 
   return (
-    <main className="hero" style={{ maxWidth: 920 }}>
+    <main className="storePage">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <p className="eyebrow">Store</p>
-      <h1>
-        {profile.storeName} <span className="verifiedBadge">Verified</span>
-      </h1>
-      <p>City: {profile.city || 'City unavailable'}</p>
-      {profile.country ? <p>Country: {profile.country}</p> : null}
-      {profile.addressLine1 ? <p>{profile.addressLine1}</p> : null}
-      <p>Phone: {profile.storePhone || 'Phone unavailable'}</p>
+      <section className="storeHero">
+        <p className="eyebrow">Store</p>
+        <h1>
+          {profile.storeName} {profile.verified ? <span className="verifiedBadge">Verified</span> : null}
+        </h1>
+        <p>
+          {[profile.city, profile.country].filter(Boolean).join(', ') || 'Location unavailable'}
+          {profile.addressLine1 ? ` · ${profile.addressLine1}` : ''}
+        </p>
+        <div className="productStoreActions">
+          {profile.storePhone ? (
+            <a href={`tel:${normalizedPhone || profile.storePhone}`}>Call {profile.storePhone}</a>
+          ) : (
+            <span aria-disabled="true">Phone unavailable</span>
+          )}
+          {mailtoHref ? <a href={mailtoHref}>Email store</a> : <span aria-disabled="true">Email unavailable</span>}
+          {whatsappLink ? (
+            <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
+              WhatsApp
+            </a>
+          ) : (
+            <span aria-disabled="true">WhatsApp unavailable</span>
+          )}
+        </div>
+      </section>
+
       {profile.storeBannerUrl ? (
         <Image
           src={profile.storeBannerUrl}
@@ -121,7 +148,7 @@ export default async function StorePage({ params }: StorePageProps) {
       ) : null}
 
       {categoryKeys.length > 0 ? (
-        <section aria-label="Store categories">
+        <section className="storeInfoCard" aria-label="Store categories">
           <h2>Categories</h2>
           <ul>
             {categoryKeys.map((category) => (
@@ -133,12 +160,12 @@ export default async function StorePage({ params }: StorePageProps) {
         </section>
       ) : null}
 
-      <section aria-label="Store products">
+      <section className="storeInfoCard" aria-label="Store products">
         <h2>Products from {profile.storeName}</h2>
         <ul>
           {profile.products.map((product) => (
             <li key={product.id}>
-              <Link href={`/products/${encodeURIComponent(product.id)}`}>{product.productName}</Link>
+              {product.productName}
               {product.categoryKey ? (
                 <>
                   {' '}

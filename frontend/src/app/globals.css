@@ -527,6 +527,46 @@ select:focus {
   border-color: #818cf8;
 }
 
+.productStoreActions span[aria-disabled='true'] {
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 0.42rem 0.78rem;
+  color: #64748b;
+  background: #f8fafc;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.storePage {
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.storeHero,
+.storeInfoCard {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 12px 30px -32px #0f172a;
+}
+
+.storeHero h1,
+.storeHero p,
+.storeInfoCard h2,
+.storeInfoCard ul {
+  margin: 0;
+}
+
+.storeInfoCard ul {
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
 .productImageGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

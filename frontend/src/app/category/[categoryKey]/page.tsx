@@ -61,7 +61,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     itemListElement: products.map((product, index) => ({
       '@type': 'ListItem',
       position: (page - 1) * PAGE_SIZE + index + 1,
-      url: canonicalUrlForPath(`/products/${encodeURIComponent(product.id)}`),
+      url: canonicalUrlForPath(`/stores/${encodeURIComponent(product.storeId ?? '')}`),
       name: product.productName,
     })),
   };
@@ -86,7 +86,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           {products.map((product) => (
             <li key={product.id} style={{ listStyle: 'none', border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
               <h2 style={{ fontSize: '1rem', margin: 0 }}>
-                <Link href={`/products/${encodeURIComponent(product.id)}`}>{product.productName}</Link>
+                {product.productName}
               </h2>
               <p style={{ margin: '8px 0 0' }}>
                 {product.storeId ? (

@@ -91,6 +91,15 @@ const getStoreCity = (item: PublicProduct) => {
 };
 
 const hasDisplayImage = (item: PublicProduct) => Array.isArray(item.imageUrls) && item.imageUrls.some((url) => Boolean(url?.trim()));
+const isVerifiedStore = (value: PublicProduct['verified']) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'yes';
+  }
+
+  return false;
+};
 
 const normalizeStoreNamesByStoreId = (items: PublicProduct[]): PublicProduct[] => {
   const canonicalNamesByStoreId = new Map<string, string>();
@@ -177,7 +186,7 @@ export function ProductGrid() {
       return haystack.includes(text);
     });
 
-    return mixProductsAcrossStores(matchingProducts.filter(hasDisplayImage));
+    return mixProductsAcrossStores(matchingProducts.filter((product) => hasDisplayImage(product) && isVerifiedStore(product.verified)));
   }, [products, searchText]);
 
   const toggleDescription = (productId: string) => {
@@ -299,7 +308,7 @@ export function ProductGrid() {
 
       const nextItems = snapshot.docs
         .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-        .filter(hasDisplayImage);
+        .filter((item) => hasDisplayImage(item) && isVerifiedStore(item.verified));
 
       setProducts((current) => (cursor ? [...current, ...nextItems] : nextItems));
       setLastDoc(snapshot.docs.at(-1) ?? null);
@@ -422,9 +431,7 @@ export function ProductGrid() {
                       style={{ width: '100%', height: 'auto' }}
                     />
                   </div>
-                  <h3>
-                    <Link href={`/products/${encodeURIComponent(item.id)}`}>{item.productName ?? 'Untitled item'}</Link>
-                  </h3>
+                  <h3>{item.productName ?? 'Untitled item'}</h3>
                   <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
                   {shouldCollapseDescription && (
                     <button type="button" className="descriptionToggle" onClick={() => toggleDescription(item.id)}>
@@ -438,9 +445,11 @@ export function ProductGrid() {
                       ) : (
                         item.storeName ?? 'Unknown store'
                       )}
-                      <span className="verifiedBadge" aria-label="Verified store">
-                        Verified
-                      </span>
+                      {isVerifiedStore(item.verified) ? (
+                        <span className="verifiedBadge" aria-label="Verified store">
+                          Verified
+                        </span>
+                      ) : null}
                     </span>
                     <strong>{formatPrice(item.price, item.currency)}</strong>
                   </div>

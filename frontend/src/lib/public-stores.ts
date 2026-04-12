@@ -22,7 +22,9 @@ export type StoreProfile = {
   storeId: string;
   storeName: string;
   storeSlug?: string;
+  storeEmail?: string;
   storePhone?: string;
+  storeWhatsapp?: string;
   websiteUrl?: string;
   storeLogoUrl?: string;
   storeBannerUrl?: string;
@@ -50,10 +52,18 @@ type StoreEnrichedProduct = PublicProductDetail & {
   addressLine1?: string;
   sameAs: string[];
   verified?: boolean;
+  storeEmail?: string;
 };
 
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? process.env.FIREBASE_PROJECT_ID;
 const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? process.env.FIREBASE_API_KEY;
+const normalizeRouteId = (value: string): string => {
+  try {
+    return decodeURIComponent(value).trim();
+  } catch {
+    return value.trim();
+  }
+};
 
 const readString = (fields: Record<string, FirestoreValue>, keys: string[]): string | undefined => {
   for (const key of keys) {
@@ -149,6 +159,7 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
     storeLogoUrl: readString(fields, ['storeLogoUrl', 'logoUrl']),
     storeBannerUrl: readString(fields, ['storeBannerUrl', 'bannerUrl']),
     storeWebsiteUrl: readString(fields, ['websiteUrl', 'storeWebsite', 'website']),
+    storeEmail: readString(fields, ['storeEmail', 'email', 'ownerEmail', 'contactEmail']),
     addressLine1: readString(fields, ['addressLine1', 'address']),
     verified: readBoolean(fields, ['verified']),
     sameAs: [
@@ -239,9 +250,93 @@ const runPublicProductsQuery = async (structuredQuery: Record<string, unknown>):
 };
 
 export const getStoreProfileById = async (storeId: string): Promise<StoreProfile | null> => {
-  if (!storeId || !projectId) {
+  const normalizedStoreId = normalizeRouteId(storeId);
+
+  if (!normalizedStoreId || !projectId) {
     return null;
   }
+
+  const readStoreDocumentById = async () => {
+    const endpoint = new URL(
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/stores/${encodeURIComponent(normalizedStoreId)}`,
+    );
+
+    if (firebaseApiKey) {
+      endpoint.searchParams.set('key', firebaseApiKey);
+    }
+
+    [
+      'name',
+      'displayName',
+      'storeName',
+      'slug',
+      'storeSlug',
+      'email',
+      'ownerEmail',
+      'phone',
+      'telephone',
+      'storePhone',
+      'whatsappNumber',
+      'waLink',
+      'websiteUrl',
+      'logoUrl',
+      'storeLogoUrl',
+      'bannerUrl',
+      'storeBannerUrl',
+      'city',
+      'storeCity',
+      'country',
+      'storeCountry',
+      'addressLine1',
+      'address',
+      'instagramUrl',
+      'facebookUrl',
+      'xUrl',
+      'twitterUrl',
+      'tiktokUrl',
+      'youtubeUrl',
+      'verified',
+    ].forEach((fieldPath) => endpoint.searchParams.append('mask.fieldPaths', fieldPath));
+
+    const response = await fetch(endpoint, {
+      next: { revalidate: 300 },
+    });
+
+    if (response.status === 404 || response.status === 403) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to load store ${normalizedStoreId}. Status: ${response.status}`);
+    }
+
+    const document = (await response.json()) as FirestoreDocument;
+    const fields = document.fields ?? {};
+
+    return {
+      storeId: normalizedStoreId,
+      storeName: readString(fields, ['displayName', 'storeName', 'name']) ?? 'Unknown store',
+      storeSlug: readString(fields, ['storeSlug', 'slug']),
+      storeEmail: readString(fields, ['email', 'ownerEmail', 'contactEmail']),
+      storePhone: readString(fields, ['storePhone', 'phone', 'telephone', 'whatsappNumber']),
+      storeWhatsapp: readString(fields, ['waLink', 'whatsappNumber']),
+      websiteUrl: readString(fields, ['websiteUrl', 'website']),
+      storeLogoUrl: readString(fields, ['storeLogoUrl', 'logoUrl']),
+      storeBannerUrl: readString(fields, ['storeBannerUrl', 'bannerUrl']),
+      city: readString(fields, ['city', 'storeCity']),
+      country: readString(fields, ['country', 'storeCountry']),
+      addressLine1: readString(fields, ['addressLine1', 'address']),
+      verified: readBoolean(fields, ['verified']) ?? false,
+      sameAs: [
+        readString(fields, ['instagramUrl']),
+        readString(fields, ['facebookUrl']),
+        readString(fields, ['xUrl', 'twitterUrl']),
+        readString(fields, ['tiktokUrl']),
+        readString(fields, ['youtubeUrl']),
+        readString(fields, ['websiteUrl']),
+      ].filter(isValidHttpUrl),
+    };
+  };
 
   const buildStoreQuery = (fieldPath: 'storeId' | 'storeSlug' | 'storeName', value: string) => ({
     select: {
@@ -283,6 +378,8 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
         { fieldPath: 'tiktokUrl' },
         { fieldPath: 'youtubeUrl' },
         { fieldPath: 'websiteUrl' },
+        { fieldPath: 'email' },
+        { fieldPath: 'ownerEmail' },
         { fieldPath: 'publishedAt' },
         { fieldPath: 'verified' },
       ],
@@ -306,6 +403,13 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
               value: { booleanValue: true },
             },
           },
+          {
+            fieldFilter: {
+              field: { fieldPath: 'verified' },
+              op: 'EQUAL',
+              value: { booleanValue: true },
+            },
+          },
         ],
       },
     },
@@ -314,11 +418,11 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
   });
 
   const fallbackLookups: Array<{ fieldPath: 'storeId' | 'storeSlug' | 'storeName'; value: string }> = [
-    { fieldPath: 'storeId', value: storeId },
-    { fieldPath: 'storeSlug', value: storeId },
+    { fieldPath: 'storeId', value: normalizedStoreId },
+    { fieldPath: 'storeSlug', value: normalizedStoreId },
   ];
 
-  const normalizedStoreName = storeId
+  const normalizedStoreName = normalizedStoreId
     .split('-')
     .map((part) => part.trim())
     .filter((part) => part.length > 0)
@@ -334,7 +438,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     matchedProducts = normalizeStoreNamesByStoreId(
       rows
         .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
-        .filter((item) => item.id && item.productName && item.imageUrls.length > 0),
+        .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && item.verified === true),
     );
 
     if (matchedProducts.length > 0) {
@@ -349,11 +453,13 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
   const head = matchedProducts[0];
   const sameAs = Array.from(new Set(matchedProducts.flatMap((item) => item.sameAs))).filter(isValidHttpUrl);
 
-  return {
-    storeId: head.storeId ?? storeId,
+  const profileFromProducts: StoreProfile = {
+    storeId: head.storeId ?? normalizedStoreId,
     storeName: head.storeName,
     storeSlug: head.storeSlug,
+    storeEmail: head.storeEmail,
     storePhone: head.storePhone,
+    storeWhatsapp: head.waLink,
     websiteUrl: isValidHttpUrl(head.storeWebsiteUrl) ? head.storeWebsiteUrl : undefined,
     storeLogoUrl: isValidHttpUrl(head.storeLogoUrl) ? head.storeLogoUrl : undefined,
     storeBannerUrl: isValidHttpUrl(head.storeBannerUrl) ? head.storeBannerUrl : undefined,
@@ -362,8 +468,35 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     addressLine1: head.addressLine1,
     sameAs,
     products: matchedProducts.map(toPublicProductDetail),
-    verified: true,
+    verified: head.verified === true,
   };
+
+  try {
+    const storeDocument = await readStoreDocumentById();
+    if (!storeDocument) {
+      return profileFromProducts;
+    }
+
+    const mergedSameAs = Array.from(new Set([...storeDocument.sameAs, ...profileFromProducts.sameAs])).filter(isValidHttpUrl);
+    return {
+      ...profileFromProducts,
+      storeName: storeDocument.storeName || profileFromProducts.storeName,
+      storeSlug: storeDocument.storeSlug ?? profileFromProducts.storeSlug,
+      storeEmail: storeDocument.storeEmail ?? profileFromProducts.storeEmail,
+      storePhone: storeDocument.storePhone ?? profileFromProducts.storePhone,
+      storeWhatsapp: storeDocument.storeWhatsapp ?? profileFromProducts.storeWhatsapp,
+      websiteUrl: isValidHttpUrl(storeDocument.websiteUrl) ? storeDocument.websiteUrl : profileFromProducts.websiteUrl,
+      storeLogoUrl: isValidHttpUrl(storeDocument.storeLogoUrl) ? storeDocument.storeLogoUrl : profileFromProducts.storeLogoUrl,
+      storeBannerUrl: isValidHttpUrl(storeDocument.storeBannerUrl) ? storeDocument.storeBannerUrl : profileFromProducts.storeBannerUrl,
+      city: storeDocument.city ?? profileFromProducts.city,
+      country: storeDocument.country ?? profileFromProducts.country,
+      addressLine1: storeDocument.addressLine1 ?? profileFromProducts.addressLine1,
+      verified: storeDocument.verified || profileFromProducts.verified,
+      sameAs: mergedSameAs,
+    };
+  } catch {
+    return profileFromProducts;
+  }
 };
 
 export const getProductsByCategory = async (
@@ -423,6 +556,13 @@ export const getProductsByCategory = async (
               value: { booleanValue: true },
             },
           },
+          {
+            fieldFilter: {
+              field: { fieldPath: 'verified' },
+              op: 'EQUAL',
+              value: { booleanValue: true },
+            },
+          },
         ],
       },
     },
@@ -434,7 +574,7 @@ export const getProductsByCategory = async (
   const rows = await runPublicProductsQuery(query);
   const items = normalizeStoreNamesByStoreId(rows.flatMap((row) => (row.document ? [productFromDocument(row.document)] : [])))
     .map(toPublicProductDetail)
-    .filter((item) => item.id && item.productName && item.imageUrls.length > 0);
+    .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && item.verified === true);
 
   return {
     products: items.slice(0, pageSize),
@@ -455,6 +595,13 @@ export const listPublicCategoryKeys = async (limitCount = 600): Promise<string[]
           {
             fieldFilter: {
               field: { fieldPath: 'isVisible' },
+              op: 'EQUAL',
+              value: { booleanValue: true },
+            },
+          },
+          {
+            fieldFilter: {
+              field: { fieldPath: 'verified' },
               op: 'EQUAL',
               value: { booleanValue: true },
             },
@@ -496,6 +643,13 @@ export const listPublicStoreIds = async (limitCount = 200): Promise<string[]> =>
           {
             fieldFilter: {
               field: { fieldPath: 'isVisible' },
+              op: 'EQUAL',
+              value: { booleanValue: true },
+            },
+          },
+          {
+            fieldFilter: {
+              field: { fieldPath: 'verified' },
               op: 'EQUAL',
               value: { booleanValue: true },
             },
