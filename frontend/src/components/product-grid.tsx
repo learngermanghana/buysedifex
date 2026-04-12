@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore';
 import { db, firebaseConfigError } from '@/lib/firebase';
 import { FormattedDescription } from '@/components/formatted-description';
+import { getProductHref } from '@/lib/product-route';
 import { getStoreHref } from '@/lib/store-route';
 
 type PublicProduct = {
@@ -469,7 +470,7 @@ export function ProductGrid() {
                     />
                   </div>
                   <h3>{item.productName ?? 'Untitled item'}</h3>
-                  <Link href={`/products/${encodeURIComponent(item.id)}`}>View product details</Link>
+                  <Link href={getProductHref(item.id, item.productName)}>View product details</Link>
                   <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
                   {shouldCollapseDescription && (
                     <button type="button" className="descriptionToggle" onClick={() => toggleDescription(item.id)}>

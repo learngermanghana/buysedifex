@@ -256,6 +256,34 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     return null;
   }
 
+  const toStoreProfileFromDocument = (document: FirestoreDocument, fallbackStoreId: string): Omit<StoreProfile, 'products'> => {
+    const fields = document.fields ?? {};
+
+    return {
+      storeId: readString(fields, ['storeId']) ?? fallbackStoreId,
+      storeName: readString(fields, ['displayName', 'storeName', 'name']) ?? 'Unknown store',
+      storeSlug: readString(fields, ['storeSlug', 'slug']),
+      storeEmail: readString(fields, ['email', 'ownerEmail', 'contactEmail']),
+      storePhone: readString(fields, ['storePhone', 'phone', 'telephone', 'whatsappNumber']),
+      storeWhatsapp: readString(fields, ['waLink', 'whatsappNumber']),
+      websiteUrl: readString(fields, ['websiteUrl', 'website']),
+      storeLogoUrl: readString(fields, ['storeLogoUrl', 'logoUrl']),
+      storeBannerUrl: readString(fields, ['storeBannerUrl', 'bannerUrl']),
+      city: readString(fields, ['city', 'storeCity']),
+      country: readString(fields, ['country', 'storeCountry']),
+      addressLine1: readString(fields, ['addressLine1', 'address']),
+      verified: readBoolean(fields, ['verified']) ?? false,
+      sameAs: [
+        readString(fields, ['instagramUrl']),
+        readString(fields, ['facebookUrl']),
+        readString(fields, ['xUrl', 'twitterUrl']),
+        readString(fields, ['tiktokUrl']),
+        readString(fields, ['youtubeUrl']),
+        readString(fields, ['websiteUrl']),
+      ].filter(isValidHttpUrl),
+    };
+  };
+
   const readStoreDocumentById = async () => {
     const endpoint = new URL(
       `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/stores/${encodeURIComponent(normalizedStoreId)}`,
@@ -311,31 +339,24 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     }
 
     const document = (await response.json()) as FirestoreDocument;
-    const fields = document.fields ?? {};
+    return toStoreProfileFromDocument(document, normalizedStoreId);
+  };
 
-    return {
-      storeId: normalizedStoreId,
-      storeName: readString(fields, ['displayName', 'storeName', 'name']) ?? 'Unknown store',
-      storeSlug: readString(fields, ['storeSlug', 'slug']),
-      storeEmail: readString(fields, ['email', 'ownerEmail', 'contactEmail']),
-      storePhone: readString(fields, ['storePhone', 'phone', 'telephone', 'whatsappNumber']),
-      storeWhatsapp: readString(fields, ['waLink', 'whatsappNumber']),
-      websiteUrl: readString(fields, ['websiteUrl', 'website']),
-      storeLogoUrl: readString(fields, ['storeLogoUrl', 'logoUrl']),
-      storeBannerUrl: readString(fields, ['storeBannerUrl', 'bannerUrl']),
-      city: readString(fields, ['city', 'storeCity']),
-      country: readString(fields, ['country', 'storeCountry']),
-      addressLine1: readString(fields, ['addressLine1', 'address']),
-      verified: readBoolean(fields, ['verified']) ?? false,
-      sameAs: [
-        readString(fields, ['instagramUrl']),
-        readString(fields, ['facebookUrl']),
-        readString(fields, ['xUrl', 'twitterUrl']),
-        readString(fields, ['tiktokUrl']),
-        readString(fields, ['youtubeUrl']),
-        readString(fields, ['websiteUrl']),
-      ].filter(isValidHttpUrl),
-    };
+  const readStoreDocumentByField = async (fieldPath: 'storeSlug' | 'slug' | 'storeName', value: string) => {
+    const rows = await runPublicProductsQuery({
+      from: [{ collectionId: 'stores' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath },
+          op: 'EQUAL',
+          value: { stringValue: value },
+        },
+      },
+      limit: 1,
+    });
+
+    const document = rows.find((row) => row.document)?.document;
+    return document ? toStoreProfileFromDocument(document, normalizedStoreId) : null;
   };
 
   const buildStoreQuery = (fieldPath: 'storeId' | 'storeSlug' | 'storeName', value: string) => ({
@@ -446,52 +467,62 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     }
   }
 
-  if (matchedProducts.length === 0) {
-    return null;
-  }
-
-  const head = matchedProducts[0];
-  const sameAs = Array.from(new Set(matchedProducts.flatMap((item) => item.sameAs))).filter(isValidHttpUrl);
-
-  const profileFromProducts: StoreProfile = {
-    storeId: head.storeId ?? normalizedStoreId,
-    storeName: head.storeName,
-    storeSlug: head.storeSlug,
-    storeEmail: head.storeEmail,
-    storePhone: head.storePhone,
-    storeWhatsapp: head.waLink,
-    websiteUrl: isValidHttpUrl(head.storeWebsiteUrl) ? head.storeWebsiteUrl : undefined,
-    storeLogoUrl: isValidHttpUrl(head.storeLogoUrl) ? head.storeLogoUrl : undefined,
-    storeBannerUrl: isValidHttpUrl(head.storeBannerUrl) ? head.storeBannerUrl : undefined,
-    city: head.city,
-    country: head.country,
-    addressLine1: head.addressLine1,
-    sameAs,
-    products: matchedProducts.map(toPublicProductDetail),
-    verified: head.verified === true,
-  };
+  const profileFromProducts: StoreProfile | null =
+    matchedProducts.length === 0
+      ? null
+      : {
+          storeId: matchedProducts[0].storeId ?? normalizedStoreId,
+          storeName: matchedProducts[0].storeName,
+          storeSlug: matchedProducts[0].storeSlug,
+          storeEmail: matchedProducts[0].storeEmail,
+          storePhone: matchedProducts[0].storePhone,
+          storeWhatsapp: matchedProducts[0].waLink,
+          websiteUrl: isValidHttpUrl(matchedProducts[0].storeWebsiteUrl) ? matchedProducts[0].storeWebsiteUrl : undefined,
+          storeLogoUrl: isValidHttpUrl(matchedProducts[0].storeLogoUrl) ? matchedProducts[0].storeLogoUrl : undefined,
+          storeBannerUrl: isValidHttpUrl(matchedProducts[0].storeBannerUrl) ? matchedProducts[0].storeBannerUrl : undefined,
+          city: matchedProducts[0].city,
+          country: matchedProducts[0].country,
+          addressLine1: matchedProducts[0].addressLine1,
+          sameAs: Array.from(new Set(matchedProducts.flatMap((item) => item.sameAs))).filter(isValidHttpUrl),
+          products: matchedProducts.map(toPublicProductDetail),
+          verified: matchedProducts[0].verified === true,
+        };
 
   try {
-    const storeDocument = await readStoreDocumentById();
-    if (!storeDocument) {
+    const storeDocument =
+      (await readStoreDocumentById()) ??
+      (await readStoreDocumentByField('storeSlug', normalizedStoreId)) ??
+      (await readStoreDocumentByField('slug', normalizedStoreId));
+
+    if (!storeDocument && !profileFromProducts) {
+      return null;
+    }
+
+    if (!storeDocument && profileFromProducts) {
       return profileFromProducts;
     }
 
-    const mergedSameAs = Array.from(new Set([...storeDocument.sameAs, ...profileFromProducts.sameAs])).filter(isValidHttpUrl);
+    if (storeDocument && !profileFromProducts) {
+      return { ...storeDocument, products: [] };
+    }
+
+    const mergedProfile = profileFromProducts as StoreProfile;
+    const mergedSameAs = Array.from(new Set([...(storeDocument?.sameAs ?? []), ...mergedProfile.sameAs])).filter(isValidHttpUrl);
     return {
-      ...profileFromProducts,
-      storeName: storeDocument.storeName || profileFromProducts.storeName,
-      storeSlug: storeDocument.storeSlug ?? profileFromProducts.storeSlug,
-      storeEmail: storeDocument.storeEmail ?? profileFromProducts.storeEmail,
-      storePhone: storeDocument.storePhone ?? profileFromProducts.storePhone,
-      storeWhatsapp: storeDocument.storeWhatsapp ?? profileFromProducts.storeWhatsapp,
-      websiteUrl: isValidHttpUrl(storeDocument.websiteUrl) ? storeDocument.websiteUrl : profileFromProducts.websiteUrl,
-      storeLogoUrl: isValidHttpUrl(storeDocument.storeLogoUrl) ? storeDocument.storeLogoUrl : profileFromProducts.storeLogoUrl,
-      storeBannerUrl: isValidHttpUrl(storeDocument.storeBannerUrl) ? storeDocument.storeBannerUrl : profileFromProducts.storeBannerUrl,
-      city: storeDocument.city ?? profileFromProducts.city,
-      country: storeDocument.country ?? profileFromProducts.country,
-      addressLine1: storeDocument.addressLine1 ?? profileFromProducts.addressLine1,
-      verified: storeDocument.verified || profileFromProducts.verified,
+      ...mergedProfile,
+      storeId: storeDocument?.storeId || mergedProfile.storeId,
+      storeName: storeDocument?.storeName || mergedProfile.storeName,
+      storeSlug: storeDocument?.storeSlug ?? mergedProfile.storeSlug,
+      storeEmail: storeDocument?.storeEmail ?? mergedProfile.storeEmail,
+      storePhone: storeDocument?.storePhone ?? mergedProfile.storePhone,
+      storeWhatsapp: storeDocument?.storeWhatsapp ?? mergedProfile.storeWhatsapp,
+      websiteUrl: isValidHttpUrl(storeDocument?.websiteUrl) ? storeDocument?.websiteUrl : mergedProfile.websiteUrl,
+      storeLogoUrl: isValidHttpUrl(storeDocument?.storeLogoUrl) ? storeDocument?.storeLogoUrl : mergedProfile.storeLogoUrl,
+      storeBannerUrl: isValidHttpUrl(storeDocument?.storeBannerUrl) ? storeDocument?.storeBannerUrl : mergedProfile.storeBannerUrl,
+      city: storeDocument?.city ?? mergedProfile.city,
+      country: storeDocument?.country ?? mergedProfile.country,
+      addressLine1: storeDocument?.addressLine1 ?? mergedProfile.addressLine1,
+      verified: Boolean(storeDocument?.verified || mergedProfile.verified),
       sameAs: mergedSameAs,
     };
   } catch {

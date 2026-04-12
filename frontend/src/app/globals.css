@@ -918,4 +918,23 @@ select:focus {
     aspect-ratio: 16 / 9;
     max-height: 180px;
   }
+
+  .promoMeta {
+    padding: 0.75rem 0.75rem 0.45rem;
+  }
+
+  .promoActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .promoActions a {
+    text-align: center;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.82rem;
+  }
+
+  .promoControls {
+    padding-bottom: 0.75rem;
+  }
 }

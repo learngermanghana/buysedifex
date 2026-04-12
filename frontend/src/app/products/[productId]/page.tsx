@@ -6,7 +6,8 @@ import { FormattedDescription } from '@/components/formatted-description';
 import { ProductLeadPanel } from '@/components/product-lead-panel';
 import { getPublicProductById } from '@/lib/public-products';
 import { getStoreProfileById } from '@/lib/public-stores';
-import { getStoreHref, getStoreRouteId } from '@/lib/store-route';
+import { extractProductIdFromRouteParam, getProductHref } from '@/lib/product-route';
+import { getStoreHref } from '@/lib/store-route';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 type ProductPageProps = {
@@ -52,8 +53,8 @@ const buildMetadataDescription = (input: {
 };
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const { productId } = params;
-  const product = await getPublicProductById(productId);
+  const normalizedProductId = extractProductIdFromRouteParam(params.productId);
+  const product = await getPublicProductById(normalizedProductId);
 
   if (!product) {
     return {
@@ -63,7 +64,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     };
   }
 
-  const canonicalPath = `/products/${encodeURIComponent(productId)}`;
+  const canonicalPath = getProductHref(product.id, product.productName);
   const canonicalUrl = canonicalUrlForPath(canonicalPath);
   const title = `${product.productName}${buildLocation(product.city)} | ${product.storeName} | Sedifex`;
   const description = buildMetadataDescription(product);
@@ -97,8 +98,8 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 }
 
 export default async function ProductDetailPage({ params }: ProductPageProps) {
-  const { productId } = params;
-  const product = await getPublicProductById(productId);
+  const normalizedProductId = extractProductIdFromRouteParam(params.productId);
+  const product = await getPublicProductById(normalizedProductId);
 
   if (!product) {
     notFound();
@@ -111,14 +112,13 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     'Location unavailable';
   const resolvedStorePhone = storeProfile?.storePhone?.trim() || product.waLink?.trim() || 'Phone unavailable';
   const storePhoneHref = sanitizePhoneForTel(storeProfile?.storePhone ?? product.waLink);
-  const resolvedStoreId = getStoreRouteId(storeProfile?.storeId ?? product.storeId, resolvedStoreName);
-  const storeHref = getStoreHref(resolvedStoreId ?? undefined, resolvedStoreName);
+  const storeHref = getStoreHref(storeProfile?.storeId ?? product.storeId, resolvedStoreName, storeProfile?.storeSlug);
   const hasStorePage = Boolean(storeHref);
   const hasWebsite = Boolean(storeProfile?.websiteUrl);
   const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
   const sanitizedWhatsapp = (product.waLink ?? storeProfile?.storeWhatsapp ?? storeProfile?.storePhone ?? '').replace(/[^\d]/g, '');
   const whatsappHref = sanitizedWhatsapp ? `https://wa.me/${sanitizedWhatsapp}` : '';
-  const productUrl = canonicalUrlForPath(`/products/${encodeURIComponent(productId)}`);
+  const productUrl = canonicalUrlForPath(getProductHref(product.id, product.productName));
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',

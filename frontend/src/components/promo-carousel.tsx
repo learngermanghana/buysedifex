@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { FirestoreError, collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db, firebaseConfigError } from '@/lib/firebase';
+import { getStoreHref } from '@/lib/store-route';
 
 type StorePromo = {
   id: string;
+  storeId?: string;
   storeName?: string;
   storeSlug?: string;
   verified?: boolean | string;
@@ -37,14 +39,7 @@ const isWithinPromoWindow = (promo: StorePromo, today: string) => {
   return promo.promoStartDate <= today && promo.promoEndDate >= today;
 };
 
-const getStorePath = (promo: StorePromo) => {
-  const slug = promo.storeSlug?.trim();
-  if (slug) {
-    return `/stores/${encodeURIComponent(slug)}`;
-  }
-
-  return null;
-};
+const getStorePath = (promo: StorePromo) => getStoreHref(promo.storeId ?? promo.id, promo.storeName, promo.storeSlug);
 
 export function PromoCarousel() {
   const [promos, setPromos] = useState<StorePromo[]>([]);
