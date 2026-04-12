@@ -13,6 +13,7 @@ export type PublicProductDetail = {
   city?: string;
   country?: string;
   waLink?: string;
+  verified?: boolean;
 };
 
 type FirestoreValue =
@@ -72,6 +73,17 @@ const readStringArray = (fields: Record<string, FirestoreValue>, key: string): s
     .filter(Boolean);
 };
 
+const readBoolean = (fields: Record<string, FirestoreValue>, keys: string[]): boolean | undefined => {
+  for (const key of keys) {
+    const value = fields[key];
+    if (value && 'booleanValue' in value) {
+      return value.booleanValue;
+    }
+  }
+
+  return undefined;
+};
+
 const isValidImageUrl = (value: string): boolean => {
   try {
     const parsed = new URL(value);
@@ -111,6 +123,7 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
     city: readString(fields, ['city', 'storeCity', 'town']),
     country: readString(fields, ['country', 'storeCountry']),
     waLink: readString(fields, ['waLink', 'storePhone', 'phone', 'telephone', 'whatsappNumber']),
+    verified: readBoolean(fields, ['verified']),
   };
 };
 
@@ -158,6 +171,7 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     'phone',
     'telephone',
     'whatsappNumber',
+    'verified',
   ].forEach((fieldPath) => endpoint.searchParams.append('mask.fieldPaths', fieldPath));
 
   const response = await fetch(endpoint, {
@@ -173,7 +187,12 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
   }
 
   const document = (await response.json()) as FirestoreDocument;
-  return productFromDocument(document);
+  const product = productFromDocument(document);
+  if (!product.verified || product.imageUrls.length === 0) {
+    return null;
+  }
+
+  return product;
 };
 
 
@@ -196,10 +215,24 @@ export const listPublicProductIds = async (limitCount = 200): Promise<string[]> 
         select: { fields: [{ fieldPath: 'publishedAt' }] },
         from: [{ collectionId: 'publicProducts' }],
         where: {
-          fieldFilter: {
-            field: { fieldPath: 'isVisible' },
-            op: 'EQUAL',
-            value: { booleanValue: true },
+          compositeFilter: {
+            op: 'AND',
+            filters: [
+              {
+                fieldFilter: {
+                  field: { fieldPath: 'isVisible' },
+                  op: 'EQUAL',
+                  value: { booleanValue: true },
+                },
+              },
+              {
+                fieldFilter: {
+                  field: { fieldPath: 'verified' },
+                  op: 'EQUAL',
+                  value: { booleanValue: true },
+                },
+              },
+            ],
           },
         },
         orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],

@@ -111,6 +111,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const resolvedStoreId = storeProfile?.storeId ?? product.storeId;
   const hasStorePage = Boolean(resolvedStoreId);
   const hasWebsite = Boolean(storeProfile?.websiteUrl);
+  const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
 
   const productUrl = canonicalUrlForPath(`/products/${encodeURIComponent(productId)}`);
   const jsonLd = {
@@ -178,7 +179,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <section className="productStoreCard" aria-label="Store contact details">
         <h2>Store information</h2>
         <p>
-          <strong>Name:</strong> {resolvedStoreName}
+          <strong>Name:</strong> {resolvedStoreName}{' '}
+          {isVerifiedStore ? <span className="verifiedBadge">Verified</span> : null}
         </p>
         <p>
           <strong>Location:</strong> {resolvedLocation}

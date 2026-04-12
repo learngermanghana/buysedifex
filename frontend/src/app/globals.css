@@ -216,6 +216,23 @@ select:focus {
   color: #334155;
 }
 
+.storeIdentity {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.verifiedBadge {
+  background: #ecfeff;
+  border: 1px solid #67e8f9;
+  color: #0f766e;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+}
+
 .waButton,
 .actions button {
   color: #fff;

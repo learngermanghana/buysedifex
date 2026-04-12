@@ -101,7 +101,9 @@ export default async function StorePage({ params }: StorePageProps) {
     <main className="hero" style={{ maxWidth: 920 }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <p className="eyebrow">Store</p>
-      <h1>{profile.storeName}</h1>
+      <h1>
+        {profile.storeName} <span className="verifiedBadge">Verified</span>
+      </h1>
       <p>City: {profile.city || 'City unavailable'}</p>
       {profile.country ? <p>Country: {profile.country}</p> : null}
       {profile.addressLine1 ? <p>{profile.addressLine1}</p> : null}
