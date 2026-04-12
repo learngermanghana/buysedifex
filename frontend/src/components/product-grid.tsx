@@ -91,6 +91,28 @@ const getStoreCity = (item: PublicProduct) => {
 
 const hasDisplayImage = (item: PublicProduct) => Array.isArray(item.imageUrls) && item.imageUrls.some((url) => Boolean(url?.trim()));
 
+const normalizeStoreNamesByStoreId = (items: PublicProduct[]): PublicProduct[] => {
+  const canonicalNamesByStoreId = new Map<string, string>();
+
+  items.forEach((item) => {
+    const storeId = item.storeId?.trim();
+    const storeName = item.storeName?.trim();
+    if (!storeId || !storeName) return;
+    if (!canonicalNamesByStoreId.has(storeId)) {
+      canonicalNamesByStoreId.set(storeId, storeName);
+    }
+  });
+
+  return items.map((item) => {
+    const storeId = item.storeId?.trim();
+    if (!storeId) return item;
+
+    const canonicalStoreName = canonicalNamesByStoreId.get(storeId);
+    if (!canonicalStoreName || canonicalStoreName === item.storeName) return item;
+    return { ...item, storeName: canonicalStoreName };
+  });
+};
+
 const bucketProductsByStore = (items: PublicProduct[]) => {
   const buckets = new Map<string, PublicProduct[]>();
 
@@ -143,7 +165,8 @@ export function ProductGrid() {
 
   const visibleProducts = useMemo(() => {
     const text = searchText.trim().toLowerCase();
-    const matchingProducts = products.filter((product) => {
+    const normalizedProducts = normalizeStoreNamesByStoreId(products);
+    const matchingProducts = normalizedProducts.filter((product) => {
       if (!text) return true;
       const haystack = [product.productName, product.description, product.storeName, product.categoryKey]
         .filter(Boolean)

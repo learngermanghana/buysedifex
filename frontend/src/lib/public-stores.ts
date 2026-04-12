@@ -175,6 +175,28 @@ const toPublicProductDetail = (product: StoreEnrichedProduct): PublicProductDeta
   verified: product.verified,
 });
 
+const normalizeStoreNamesByStoreId = (products: StoreEnrichedProduct[]): StoreEnrichedProduct[] => {
+  const canonicalNamesByStoreId = new Map<string, string>();
+
+  products.forEach((product) => {
+    const storeId = product.storeId?.trim();
+    const storeName = product.storeName?.trim();
+    if (!storeId || !storeName) return;
+    if (!canonicalNamesByStoreId.has(storeId)) {
+      canonicalNamesByStoreId.set(storeId, storeName);
+    }
+  });
+
+  return products.map((product) => {
+    const storeId = product.storeId?.trim();
+    if (!storeId) return product;
+
+    const canonicalStoreName = canonicalNamesByStoreId.get(storeId);
+    if (!canonicalStoreName || canonicalStoreName === product.storeName) return product;
+    return { ...product, storeName: canonicalStoreName };
+  });
+};
+
 const runPublicProductsQuery = async (structuredQuery: Record<string, unknown>): Promise<FirestoreRunQueryResponse[]> => {
   if (!projectId) {
     return [];
@@ -311,9 +333,11 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
   let matchedProducts: StoreEnrichedProduct[] = [];
   for (const lookup of fallbackLookups) {
     const rows = await runPublicProductsQuery(buildStoreQuery(lookup.fieldPath, lookup.value));
-    matchedProducts = rows
-      .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
-      .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && item.verified === true);
+    matchedProducts = normalizeStoreNamesByStoreId(
+      rows
+        .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
+        .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && item.verified === true),
+    );
 
     if (matchedProducts.length > 0) {
       break;
@@ -417,8 +441,7 @@ export const getProductsByCategory = async (
   };
 
   const rows = await runPublicProductsQuery(query);
-  const items = rows
-    .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
+  const items = normalizeStoreNamesByStoreId(rows.flatMap((row) => (row.document ? [productFromDocument(row.document)] : [])))
     .map(toPublicProductDetail)
     .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && item.verified === true);
 
