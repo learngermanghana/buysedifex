@@ -438,6 +438,33 @@ select:focus {
   color: #1d4ed8;
 }
 
+.storeServicesDropdown {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.storeServicesDropdown details {
+  border: 1px solid #dbe4f0;
+  border-radius: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  background: #ffffff;
+}
+
+.storeServicesDropdown summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.storeServicesDropdown details ul {
+  margin-top: 0.65rem;
+}
+
+.storeServicesDropdown details p {
+  margin-top: 0.65rem;
+  color: #475569;
+}
+
 .inlineLinks {
   display: flex;
   flex-wrap: wrap;
