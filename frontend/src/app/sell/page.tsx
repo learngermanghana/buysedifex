@@ -50,10 +50,18 @@ export default function SellPage() {
       <section>
         <h2>Approval flow</h2>
         <ol>
-          <li>Submit your store profile and listing information.</li>
-          <li>Our team reviews store details for quality and trust standards.</li>
-          <li>Approved stores are published and become discoverable across marketplace pages.</li>
+          <li>Email your store profile, listing information, and business registration to info@sedifex.com.</li>
+          <li>Our team reviews your documents and verifies your store for trust and quality standards.</li>
+          <li>Approved stores are published on buy.sedifex.com and become discoverable across marketplace pages.</li>
         </ol>
+      </section>
+
+      <section>
+        <h2>If your store is not approved yet</h2>
+        <p>
+          You can still manage your own products internally using Sedifex while your marketplace application remains under
+          review.
+        </p>
       </section>
 
       <section>

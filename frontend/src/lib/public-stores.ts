@@ -31,6 +31,7 @@ export type StoreProfile = {
   addressLine1?: string;
   sameAs: string[];
   products: PublicProductDetail[];
+  verified: boolean;
 };
 
 
@@ -48,6 +49,7 @@ type StoreEnrichedProduct = PublicProductDetail & {
   storeWebsiteUrl?: string;
   addressLine1?: string;
   sameAs: string[];
+  verified?: boolean;
 };
 
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? process.env.FIREBASE_PROJECT_ID;
@@ -96,6 +98,17 @@ const readStringArray = (fields: Record<string, FirestoreValue>, key: string): s
     .filter((item) => item.length > 0);
 };
 
+const readBoolean = (fields: Record<string, FirestoreValue>, keys: string[]): boolean | undefined => {
+  for (const key of keys) {
+    const value = fields[key];
+    if (value && 'booleanValue' in value) {
+      return value.booleanValue;
+    }
+  }
+
+  return undefined;
+};
+
 const isValidHttpUrl = (input?: string): input is string => {
   if (!input) return false;
 
@@ -132,6 +145,7 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
     storeBannerUrl: readString(fields, ['storeBannerUrl', 'bannerUrl']),
     storeWebsiteUrl: readString(fields, ['websiteUrl', 'storeWebsite', 'website']),
     addressLine1: readString(fields, ['addressLine1', 'address']),
+    verified: readBoolean(fields, ['verified']),
     sameAs: [
       readString(fields, ['instagramUrl']),
       readString(fields, ['facebookUrl']),
@@ -158,6 +172,7 @@ const toPublicProductDetail = (product: StoreEnrichedProduct): PublicProductDeta
   city: product.city,
   country: product.country,
   waLink: product.waLink,
+  verified: product.verified,
 });
 
 const runPublicProductsQuery = async (structuredQuery: Record<string, unknown>): Promise<FirestoreRunQueryResponse[]> => {
@@ -231,6 +246,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
         { fieldPath: 'youtubeUrl' },
         { fieldPath: 'websiteUrl' },
         { fieldPath: 'publishedAt' },
+        { fieldPath: 'verified' },
       ],
     },
     from: [{ collectionId: 'publicProducts' }],
@@ -248,6 +264,13 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
           {
             fieldFilter: {
               field: { fieldPath: 'isVisible' },
+              op: 'EQUAL',
+              value: { booleanValue: true },
+            },
+          },
+          {
+            fieldFilter: {
+              field: { fieldPath: 'verified' },
               op: 'EQUAL',
               value: { booleanValue: true },
             },
@@ -279,7 +302,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     const rows = await runPublicProductsQuery(buildStoreQuery(lookup.fieldPath, lookup.value));
     matchedProducts = rows
       .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
-      .filter((item) => item.id && item.productName && item.imageUrls.length > 0);
+      .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && item.verified === true);
 
     if (matchedProducts.length > 0) {
       break;
@@ -306,6 +329,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     addressLine1: head.addressLine1,
     sameAs,
     products: matchedProducts.map(toPublicProductDetail),
+    verified: true,
   };
 };
 
@@ -344,6 +368,7 @@ export const getProductsByCategory = async (
         { fieldPath: 'storeCountry' },
         { fieldPath: 'waLink' },
         { fieldPath: 'publishedAt' },
+        { fieldPath: 'verified' },
       ],
     },
     from: [{ collectionId: 'publicProducts' }],
@@ -365,6 +390,13 @@ export const getProductsByCategory = async (
               value: { booleanValue: true },
             },
           },
+          {
+            fieldFilter: {
+              field: { fieldPath: 'verified' },
+              op: 'EQUAL',
+              value: { booleanValue: true },
+            },
+          },
         ],
       },
     },
@@ -377,7 +409,7 @@ export const getProductsByCategory = async (
   const items = rows
     .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
     .map(toPublicProductDetail)
-    .filter((item) => item.id && item.productName && item.imageUrls.length > 0);
+    .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && item.verified === true);
 
   return {
     products: items.slice(0, pageSize),
@@ -392,10 +424,24 @@ export const listPublicCategoryKeys = async (limitCount = 600): Promise<string[]
     },
     from: [{ collectionId: 'publicProducts' }],
     where: {
-      fieldFilter: {
-        field: { fieldPath: 'isVisible' },
-        op: 'EQUAL',
-        value: { booleanValue: true },
+      compositeFilter: {
+        op: 'AND',
+        filters: [
+          {
+            fieldFilter: {
+              field: { fieldPath: 'isVisible' },
+              op: 'EQUAL',
+              value: { booleanValue: true },
+            },
+          },
+          {
+            fieldFilter: {
+              field: { fieldPath: 'verified' },
+              op: 'EQUAL',
+              value: { booleanValue: true },
+            },
+          },
+        ],
       },
     },
     orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
@@ -420,10 +466,24 @@ export const listPublicStoreIds = async (limitCount = 200): Promise<string[]> =>
     },
     from: [{ collectionId: 'publicProducts' }],
     where: {
-      fieldFilter: {
-        field: { fieldPath: 'isVisible' },
-        op: 'EQUAL',
-        value: { booleanValue: true },
+      compositeFilter: {
+        op: 'AND',
+        filters: [
+          {
+            fieldFilter: {
+              field: { fieldPath: 'isVisible' },
+              op: 'EQUAL',
+              value: { booleanValue: true },
+            },
+          },
+          {
+            fieldFilter: {
+              field: { fieldPath: 'verified' },
+              op: 'EQUAL',
+              value: { booleanValue: true },
+            },
+          },
+        ],
       },
     },
     orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],

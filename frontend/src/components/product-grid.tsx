@@ -35,6 +35,7 @@ type PublicProduct = {
   storeCity?: string;
   itemType?: string;
   isVisible?: boolean;
+  verified?: boolean;
   featuredRank?: number;
   publishedAt?: { seconds: number };
 };
@@ -150,10 +151,8 @@ export function ProductGrid() {
       return haystack.includes(text);
     });
 
-    const withImages = matchingProducts.filter(hasDisplayImage);
-    const withoutImages = matchingProducts.filter((product) => !hasDisplayImage(product));
-
-    return [...mixProductsAcrossStores(withImages), ...mixProductsAcrossStores(withoutImages)];
+    const approvedProducts = matchingProducts.filter((product) => product.verified === true && hasDisplayImage(product));
+    return mixProductsAcrossStores(approvedProducts);
   }, [products, searchText]);
 
   const fetchCategories = async () => {
@@ -172,6 +171,7 @@ export function ProductGrid() {
         const base = query(
           collection(db, 'publicProducts'),
           where('isVisible', '==', true),
+          where('verified', '==', true),
           orderBy('categoryKey', 'asc'),
           limit(200),
         );
@@ -213,7 +213,7 @@ export function ProductGrid() {
     setDebugInfo(null);
 
     try {
-      const filters: QueryConstraint[] = [where('isVisible', '==', true)];
+      const filters: QueryConstraint[] = [where('isVisible', '==', true), where('verified', '==', true)];
 
       if (selectedCategory !== 'all') {
         filters.push(where('categoryKey', '==', selectedCategory));
@@ -260,7 +260,9 @@ export function ProductGrid() {
         throw new Error('Unable to fetch products with the available indexes.');
       }
 
-      const nextItems = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as PublicProduct[];
+      const nextItems = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
+        .filter((item) => item.verified === true && hasDisplayImage(item));
 
       setProducts((current) => (cursor ? [...current, ...nextItems] : nextItems));
       setLastDoc(snapshot.docs.at(-1) ?? null);
@@ -385,12 +387,15 @@ export function ProductGrid() {
                   </h3>
                   <p>{item.description ?? ''}</p>
                   <div className="meta">
-                    <span>
+                    <span className="storeIdentity">
                       {item.storeId ? (
                         <Link href={`/stores/${encodeURIComponent(item.storeId)}`}>{item.storeName ?? 'Unknown store'}</Link>
                       ) : (
                         item.storeName ?? 'Unknown store'
                       )}
+                      <span className="verifiedBadge" aria-label="Verified store">
+                        Verified
+                      </span>
                     </span>
                     <strong>{formatPrice(item.price, item.currency)}</strong>
                   </div>
