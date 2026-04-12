@@ -66,6 +66,48 @@ test('upsert/delete sync behavior', async () => {
   assert.equal(setCalls, 1);
 });
 
+test('rebuild uses storeId-filtered query', async () => {
+  let whereCalls = 0;
+  mod.__setDbForTests({
+    collection: (name) => {
+      if (name === 'stores') {
+        return {
+          doc: () => ({
+            get: async () => ({
+              exists: true,
+              data: () => ({ storeStatus: 'active', eligibleForBuy: true, buyOptOut: false }),
+            }),
+          }),
+        };
+      }
+
+      if (name === 'products') {
+        return {
+          where: (field, op, value) => {
+            if (field === 'storeId' && op === '==' && value === 'store-1') whereCalls += 1;
+            return { get: async () => ({ empty: true, docs: [], size: 0 }) };
+          },
+        };
+      }
+
+      return {
+        doc: () => ({
+          set: async () => undefined,
+          delete: async () => undefined,
+        }),
+      };
+    },
+    batch: () => ({
+      set: () => undefined,
+      delete: () => undefined,
+      commit: async () => undefined,
+    }),
+  });
+
+  await mod.rebuildPublicProductsForStore('store-1');
+  assert.equal(whereCalls, 1);
+});
+
 
 test('store aliases are normalized for public product docs', () => {
   const doc = t.toPublicProductDoc({

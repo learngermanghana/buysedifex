@@ -4,6 +4,7 @@ export type PublicProductDetail = {
   productName: string;
   description: string;
   imageUrls: string[];
+  imageAlt?: string;
   price?: number;
   currency?: string;
   storeName: string;
@@ -114,6 +115,7 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
     productName: readString(fields, ['productName', 'name', 'title']) ?? 'Untitled item',
     description: readString(fields, ['description', 'details']) ?? '',
     imageUrls,
+    imageAlt: readString(fields, ['imageAlt']),
     price: readNumber(fields, ['price', 'amount']),
     currency: readString(fields, ['currency']),
     storeName: readString(fields, ['storeName', 'businessName', 'shopName']) ?? 'Unknown store',
@@ -149,6 +151,7 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     'description',
     'details',
     'imageUrls',
+    'imageAlt',
     'price',
     'amount',
     'currency',

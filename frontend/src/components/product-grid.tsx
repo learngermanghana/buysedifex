@@ -25,6 +25,7 @@ type PublicProduct = {
   description?: string;
   categoryKey?: string;
   imageUrls?: string[];
+  imageAlt?: string;
   price?: number;
   currency?: string;
   storeName?: string;
@@ -374,7 +375,7 @@ export function ProductGrid() {
                   <div className="imageWrap">
                     <Image
                       src={item.imageUrls?.[0] ?? 'https://placehold.co/640x640'}
-                      alt={item.productName ?? 'Product image'}
+                      alt={item.imageAlt?.trim() || item.productName || 'Product image'}
                       loading="lazy"
                       width={360}
                       height={360}
@@ -402,7 +403,7 @@ export function ProductGrid() {
                   <p>City: {getStoreCity(item)}</p>
                   <p>Phone: {getStorePhone(item)}</p>
                   {canContactOnWhatsApp ? (
-                    <a className="waButton" href={whatsappLink} target="_blank" rel="noreferrer">
+                    <a className="waButton" href={whatsappLink} target="_blank" rel="noreferrer" aria-label={`Contact ${item.storeName ?? 'store'} on WhatsApp about ${item.productName ?? 'this item'}`}>
                       Contact on WhatsApp
                     </a>
                   ) : (
