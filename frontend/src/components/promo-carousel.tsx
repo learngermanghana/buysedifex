@@ -65,17 +65,20 @@ export function PromoCarousel() {
       try {
         const primaryQuery = query(
           collection(db, 'stores'),
-          where('verified', '==', true),
           where('promoStartDate', '<=', today),
           where('promoEndDate', '>=', today),
           orderBy('promoStartDate', 'desc'),
-          limit(10),
+          limit(50),
         );
 
         const snapshot = await getDocs(primaryQuery);
         const items = snapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }) as StorePromo)
-          .filter((item) => Boolean(item.promoTitle?.trim()) && Boolean(item.promoImageUrl?.trim()));
+          .filter(
+            (item) =>
+              isVerifiedStore(item.verified) && Boolean(item.promoTitle?.trim()) && Boolean(item.promoImageUrl?.trim()),
+          )
+          .slice(0, 10);
 
         setPromos(items);
         setError(null);
@@ -89,7 +92,7 @@ export function PromoCarousel() {
         }
 
         try {
-          const fallbackQuery = query(collection(db, 'stores'), where('verified', '==', true), limit(50));
+          const fallbackQuery = query(collection(db, 'stores'), limit(100));
           const snapshot = await getDocs(fallbackQuery);
           const items = snapshot.docs
             .map((doc) => ({ id: doc.id, ...doc.data() }) as StorePromo)
