@@ -172,7 +172,8 @@ select:focus {
   border-radius: 0.95rem;
   border: 1px solid #e2e8f0;
   padding: 0.8rem;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.65rem;
   box-shadow: 0 8px 16px -16px #0f172a;
   transition: transform 0.25s ease, box-shadow 0.25s ease;
@@ -247,6 +248,7 @@ select:focus {
 
 .waButton {
   background: linear-gradient(135deg, #16a34a, #22c55e);
+  margin-top: auto;
 }
 
 .actions button {
@@ -473,6 +475,28 @@ select:focus {
   gap: 0.35rem;
   font-size: 0.9rem;
   line-height: 1.35;
+}
+
+.formattedDescription.compact.isCollapsed {
+  max-height: 8.2rem;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+}
+
+.descriptionToggle {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+.descriptionToggle:hover {
+  text-decoration: underline;
 }
 
 .productStats {

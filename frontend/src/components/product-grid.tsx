@@ -163,6 +163,7 @@ export function ProductGrid() {
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<Set<string>>(new Set());
 
   const visibleProducts = useMemo(() => {
     const text = searchText.trim().toLowerCase();
@@ -178,6 +179,18 @@ export function ProductGrid() {
 
     return mixProductsAcrossStores(matchingProducts.filter(hasDisplayImage));
   }, [products, searchText]);
+
+  const toggleDescription = (productId: string) => {
+    setExpandedDescriptionIds((current) => {
+      const next = new Set(current);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
+    });
+  };
 
   const fetchCategories = async () => {
     if (!db) {
@@ -392,6 +405,9 @@ export function ProductGrid() {
           : visibleProducts.map((item) => {
               const whatsappLink = buildWhatsAppLink(item);
               const canContactOnWhatsApp = whatsappLink !== '#';
+              const shouldCollapseDescription = (item.description?.trim().length ?? 0) > 260;
+              const isExpanded = expandedDescriptionIds.has(item.id);
+              const descriptionClassName = `formattedDescription compact ${shouldCollapseDescription && !isExpanded ? 'isCollapsed' : ''}`.trim();
 
               return (
                 <article key={item.id} className="card">
@@ -409,7 +425,12 @@ export function ProductGrid() {
                   <h3>
                     <Link href={`/products/${encodeURIComponent(item.id)}`}>{item.productName ?? 'Untitled item'}</Link>
                   </h3>
-                  <FormattedDescription text={item.description ?? ''} className="formattedDescription compact" />
+                  <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
+                  {shouldCollapseDescription && (
+                    <button type="button" className="descriptionToggle" onClick={() => toggleDescription(item.id)}>
+                      {isExpanded ? 'View less' : 'View more'}
+                    </button>
+                  )}
                   <div className="meta">
                     <span className="storeIdentity">
                       {item.storeId ? (
