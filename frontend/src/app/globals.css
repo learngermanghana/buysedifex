@@ -83,8 +83,18 @@ body {
 
 .heroSearch {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 180px;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.55rem;
+}
+
+.heroSearch button {
+  border: none;
+  border-radius: 0.65rem;
+  padding: 0.58rem 0.95rem;
+  background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .marketplace {
@@ -918,4 +928,69 @@ select:focus {
     aspect-ratio: 16 / 9;
     max-height: 180px;
   }
+}
+
+
+.homeSection {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1.2rem;
+  background: #ffffffd9;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.homeSection h1,
+.homeSection h2,
+.homeSection h3,
+.homeSection p,
+.homeSection ol {
+  margin: 0;
+}
+
+.launchCardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.8rem;
+}
+
+.launchCard {
+  border: 1px solid #dbe4f0;
+  border-radius: 0.8rem;
+  background: #fff;
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.typeBadge {
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid #818cf8;
+  color: #312e81;
+  background: #eef2ff;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+}
+
+.typeBadge.service {
+  border-color: #0ea5e9;
+  color: #155e75;
+  background: #ecfeff;
+}
+
+.miniCtas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.miniCtas span {
+  font-size: 0.76rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  color: #334155;
 }
