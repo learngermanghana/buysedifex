@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
+import { SectionTabs } from '@/components/section-tabs';
 
 const title = 'Services on Sedifex';
 const description =
@@ -54,6 +55,7 @@ export const metadata: Metadata = {
 export default function ServicesPage() {
   return (
     <main className="container infoPage">
+      <SectionTabs activeTab="services" />
       <p className="eyebrow">Services</p>
       <h1>Available services on Sedifex</h1>
       <p>
