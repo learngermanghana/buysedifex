@@ -111,7 +111,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const resolvedStorePhone = storeProfile?.storePhone?.trim() || product.waLink?.trim() || 'Phone unavailable';
   const storePhoneHref = sanitizePhoneForTel(storeProfile?.storePhone ?? product.waLink);
   const resolvedStoreId = getStoreRouteId(storeProfile?.storeId ?? product.storeId, resolvedStoreName);
-  const storeHref = getStoreHref(resolvedStoreId, resolvedStoreName);
+  const storeHref = getStoreHref(resolvedStoreId ?? undefined, resolvedStoreName);
   const hasStorePage = Boolean(storeHref);
   const hasWebsite = Boolean(storeProfile?.websiteUrl);
   const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
