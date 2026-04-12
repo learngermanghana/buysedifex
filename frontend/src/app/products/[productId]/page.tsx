@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { FormattedDescription } from '@/components/formatted-description';
+import { ProductLeadPanel } from '@/components/product-lead-panel';
 import { getPublicProductById } from '@/lib/public-products';
 import { getStoreProfileById } from '@/lib/public-stores';
 import { getStoreHref, getStoreRouteId } from '@/lib/store-route';
@@ -117,8 +118,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
   const sanitizedWhatsapp = (product.waLink ?? storeProfile?.storeWhatsapp ?? storeProfile?.storePhone ?? '').replace(/[^\d]/g, '');
   const whatsappHref = sanitizedWhatsapp ? `https://wa.me/${sanitizedWhatsapp}` : '';
-  const requestHref = `mailto:info@sedifex.com?subject=${encodeURIComponent(`Product request: ${product.productName}`)}&body=${encodeURIComponent(`Please help me request ${product.productName} from ${resolvedStoreName}. Product ID: ${product.id}`)}`;
-
   const productUrl = canonicalUrlForPath(`/products/${encodeURIComponent(productId)}`);
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -231,20 +230,12 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           ) : null}
         </div>
       </section>
-      <aside className="stickyProductActions">
-        {whatsappHref ? (
-          <a className="waButton" href={whatsappHref} target="_blank" rel="noopener noreferrer">
-            Chat on WhatsApp
-          </a>
-        ) : (
-          <span className="waButton" aria-disabled="true">
-            WhatsApp unavailable
-          </span>
-        )}
-        <a className="requestButton" href={requestHref}>
-          Request this product
-        </a>
-      </aside>
+      <ProductLeadPanel
+        productId={product.id}
+        productName={product.productName}
+        city={storeProfile?.city ?? product.city}
+        whatsappHref={whatsappHref}
+      />
     </main>
   );
 }

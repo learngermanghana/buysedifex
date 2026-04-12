@@ -267,7 +267,8 @@ select:focus {
 }
 
 .waButton:hover,
-.actions button:hover {
+.actions button:hover,
+.requestButton:hover {
   transform: translateY(-1px);
 }
 
@@ -662,6 +663,45 @@ select:focus {
   border: 1px solid #e2e8f0;
   border-radius: 0.9rem;
   padding: 0.65rem;
+}
+
+.requestForm {
+  display: grid;
+  gap: 0.45rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 0.7rem;
+}
+
+.requestForm h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.requestForm input {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  background: #fff;
+}
+
+.requestForm input:focus {
+  outline: 2px solid #818cf8;
+  outline-offset: 1px;
+}
+
+.requestFeedback {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.requestFeedback.success {
+  color: #166534;
+}
+
+.requestFeedback.error {
+  color: #b91c1c;
 }
 
 .quickSections {
