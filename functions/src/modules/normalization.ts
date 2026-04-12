@@ -1,4 +1,4 @@
-import { readFirstNumber, readFirstString, readFirstStringArray, toTitleCase } from '../shared/normalization';
+import { readFirstBoolean, readFirstNumber, readFirstString, readFirstStringArray, toTitleCase } from '../shared/normalization';
 import { type NormalizedProduct, type ProductDoc, type StoreDoc } from './types';
 
 export { normalizeCategory, normalizeText, normalizeWhatsAppNumber, toTitleCase } from '../shared/normalization';
@@ -20,6 +20,7 @@ export function normalizeStore(store: StoreDoc): StoreDoc {
     city: readFirstString(source, ['city', 'storeCity', 'town']),
     country: readFirstString(source, ['country', 'storeCountry']),
     addressLine1: readFirstString(source, ['addressLine1', 'address', 'location']),
+    verified: readFirstBoolean(source, ['verified', 'isVerified']),
   };
 }
 

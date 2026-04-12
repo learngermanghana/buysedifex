@@ -25,6 +25,7 @@ export type StoreDoc = {
   storeCountry?: string;
   addressLine1?: string;
   address?: string;
+  verified?: boolean | string;
   updatedAt?: admin.firestore.Timestamp;
 };
 

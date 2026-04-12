@@ -80,6 +80,11 @@ const readBoolean = (fields: Record<string, FirestoreValue>, keys: string[]): bo
     if (value && 'booleanValue' in value) {
       return value.booleanValue;
     }
+    if (value && 'stringValue' in value) {
+      const normalized = value.stringValue.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+      if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+    }
   }
 
   return undefined;
@@ -191,7 +196,7 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
 
   const document = (await response.json()) as FirestoreDocument;
   const product = productFromDocument(document);
-  if (!product.verified || product.imageUrls.length === 0) {
+  if (product.imageUrls.length === 0) {
     return null;
   }
 
@@ -224,13 +229,6 @@ export const listPublicProductIds = async (limitCount = 200): Promise<string[]> 
               {
                 fieldFilter: {
                   field: { fieldPath: 'isVisible' },
-                  op: 'EQUAL',
-                  value: { booleanValue: true },
-                },
-              },
-              {
-                fieldFilter: {
-                  field: { fieldPath: 'verified' },
                   op: 'EQUAL',
                   value: { booleanValue: true },
                 },

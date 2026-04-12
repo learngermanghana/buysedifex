@@ -122,6 +122,7 @@ test('store aliases are normalized for public product docs', () => {
       storeStatus: 'active',
       eligibleForBuy: true,
       buyOptOut: false,
+      verified: 'true',
     },
     product: { name: 'Rice', itemType: 'product' },
   });
@@ -130,6 +131,7 @@ test('store aliases are normalized for public product docs', () => {
   assert.equal(doc.city, 'Accra');
   assert.equal(doc.country, 'Ghana');
   assert.equal(doc.addressLine1, '123 High St');
+  assert.equal(doc.verified, true);
   assert.match(doc.waLink, /wa\.me\/233501234567/);
 });
 

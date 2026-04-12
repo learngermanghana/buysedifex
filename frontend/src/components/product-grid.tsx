@@ -36,7 +36,7 @@ type PublicProduct = {
   storeCity?: string;
   itemType?: string;
   isVisible?: boolean;
-  verified?: boolean;
+  verified?: boolean | string;
   featuredRank?: number;
   publishedAt?: { seconds: number };
 };
@@ -175,8 +175,7 @@ export function ProductGrid() {
       return haystack.includes(text);
     });
 
-    const approvedProducts = matchingProducts.filter((product) => product.verified === true && hasDisplayImage(product));
-    return mixProductsAcrossStores(approvedProducts);
+    return mixProductsAcrossStores(matchingProducts.filter(hasDisplayImage));
   }, [products, searchText]);
 
   const fetchCategories = async () => {
@@ -195,7 +194,6 @@ export function ProductGrid() {
         const base = query(
           collection(db, 'publicProducts'),
           where('isVisible', '==', true),
-          where('verified', '==', true),
           orderBy('categoryKey', 'asc'),
           limit(200),
         );
@@ -204,7 +202,8 @@ export function ProductGrid() {
         const snapshot = await getDocs(paged);
 
         snapshot.docs.forEach((docItem) => {
-          const category = docItem.data().categoryKey;
+          const data = docItem.data() as PublicProduct;
+          const category = data.categoryKey;
           if (typeof category === 'string' && category.trim().length > 0) {
             all.add(category);
           }
@@ -237,7 +236,7 @@ export function ProductGrid() {
     setDebugInfo(null);
 
     try {
-      const filters: QueryConstraint[] = [where('isVisible', '==', true), where('verified', '==', true)];
+      const filters: QueryConstraint[] = [where('isVisible', '==', true)];
 
       if (selectedCategory !== 'all') {
         filters.push(where('categoryKey', '==', selectedCategory));
@@ -286,7 +285,7 @@ export function ProductGrid() {
 
       const nextItems = snapshot.docs
         .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-        .filter((item) => item.verified === true && hasDisplayImage(item));
+        .filter(hasDisplayImage);
 
       setProducts((current) => (cursor ? [...current, ...nextItems] : nextItems));
       setLastDoc(snapshot.docs.at(-1) ?? null);

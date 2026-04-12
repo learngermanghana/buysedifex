@@ -104,6 +104,11 @@ const readBoolean = (fields: Record<string, FirestoreValue>, keys: string[]): bo
     if (value && 'booleanValue' in value) {
       return value.booleanValue;
     }
+    if (value && 'stringValue' in value) {
+      const normalized = value.stringValue.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+      if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+    }
   }
 
   return undefined;
@@ -301,13 +306,6 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
               value: { booleanValue: true },
             },
           },
-          {
-            fieldFilter: {
-              field: { fieldPath: 'verified' },
-              op: 'EQUAL',
-              value: { booleanValue: true },
-            },
-          },
         ],
       },
     },
@@ -336,7 +334,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     matchedProducts = normalizeStoreNamesByStoreId(
       rows
         .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
-        .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && item.verified === true),
+        .filter((item) => item.id && item.productName && item.imageUrls.length > 0),
     );
 
     if (matchedProducts.length > 0) {
@@ -425,13 +423,6 @@ export const getProductsByCategory = async (
               value: { booleanValue: true },
             },
           },
-          {
-            fieldFilter: {
-              field: { fieldPath: 'verified' },
-              op: 'EQUAL',
-              value: { booleanValue: true },
-            },
-          },
         ],
       },
     },
@@ -443,7 +434,7 @@ export const getProductsByCategory = async (
   const rows = await runPublicProductsQuery(query);
   const items = normalizeStoreNamesByStoreId(rows.flatMap((row) => (row.document ? [productFromDocument(row.document)] : [])))
     .map(toPublicProductDetail)
-    .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && item.verified === true);
+    .filter((item) => item.id && item.productName && item.imageUrls.length > 0);
 
   return {
     products: items.slice(0, pageSize),
@@ -464,13 +455,6 @@ export const listPublicCategoryKeys = async (limitCount = 600): Promise<string[]
           {
             fieldFilter: {
               field: { fieldPath: 'isVisible' },
-              op: 'EQUAL',
-              value: { booleanValue: true },
-            },
-          },
-          {
-            fieldFilter: {
-              field: { fieldPath: 'verified' },
               op: 'EQUAL',
               value: { booleanValue: true },
             },
@@ -512,13 +496,6 @@ export const listPublicStoreIds = async (limitCount = 200): Promise<string[]> =>
           {
             fieldFilter: {
               field: { fieldPath: 'isVisible' },
-              op: 'EQUAL',
-              value: { booleanValue: true },
-            },
-          },
-          {
-            fieldFilter: {
-              field: { fieldPath: 'verified' },
               op: 'EQUAL',
               value: { booleanValue: true },
             },
