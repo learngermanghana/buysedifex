@@ -1,4 +1,4 @@
-const defaultSiteUrl = 'https://buy.sedifex.com';
+const defaultSiteUrl = 'https://www.sedifexmarket.com';
 
 export const getSiteUrl = () => process.env.NEXT_PUBLIC_SITE_URL ?? defaultSiteUrl;
 

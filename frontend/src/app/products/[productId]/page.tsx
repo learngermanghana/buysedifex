@@ -115,6 +115,9 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const hasStorePage = Boolean(storeHref);
   const hasWebsite = Boolean(storeProfile?.websiteUrl);
   const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
+  const sanitizedWhatsapp = (product.waLink ?? storeProfile?.storeWhatsapp ?? storeProfile?.storePhone ?? '').replace(/[^\d]/g, '');
+  const whatsappHref = sanitizedWhatsapp ? `https://wa.me/${sanitizedWhatsapp}` : '';
+  const requestHref = `mailto:info@sedifex.com?subject=${encodeURIComponent(`Product request: ${product.productName}`)}&body=${encodeURIComponent(`Please help me request ${product.productName} from ${resolvedStoreName}. Product ID: ${product.id}`)}`;
 
   const productUrl = canonicalUrlForPath(`/products/${encodeURIComponent(productId)}`);
   const jsonLd = {
@@ -155,9 +158,29 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     <main className="productDetailPage">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <section className="productSummaryCard">
+        {product.imageUrls.length > 0 ? (
+          <section className="productImageGrid" aria-label="Product images">
+            {product.imageUrls.map((imageUrl) => (
+              <Image
+                key={imageUrl}
+                src={imageUrl}
+                alt={product.imageAlt?.trim() || `${product.productName} at ${resolvedStoreName}`}
+                loading="lazy"
+                width={480}
+                height={480}
+                sizes="(max-width: 768px) 100vw, 33vw"
+                style={{ width: '100%', height: 'auto', borderRadius: 14 }}
+              />
+            ))}
+          </section>
+        ) : null}
         <div>
           <p className="eyebrow">Product details</p>
           <h1>{product.productName}</h1>
+          <p className="productTrustLine">
+            {isVerifiedStore ? <span className="verifiedBadge">Verified store</span> : null} 📍 {resolvedLocation} · 🚚 Delivery:
+            Discuss with seller
+          </p>
           {product.description ? (
             <FormattedDescription text={product.description} className="formattedDescription" />
           ) : (
@@ -208,23 +231,20 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           ) : null}
         </div>
       </section>
-
-      {product.imageUrls.length > 0 ? (
-        <section className="productImageGrid" aria-label="Product images">
-          {product.imageUrls.map((imageUrl) => (
-            <Image
-              key={imageUrl}
-              src={imageUrl}
-              alt={product.imageAlt?.trim() || `${product.productName} at ${resolvedStoreName}`}
-              loading="lazy"
-              width={480}
-              height={480}
-              sizes="(max-width: 768px) 100vw, 33vw"
-              style={{ width: '100%', height: 'auto', borderRadius: 14 }}
-            />
-          ))}
-        </section>
-      ) : null}
+      <aside className="stickyProductActions">
+        {whatsappHref ? (
+          <a className="waButton" href={whatsappHref} target="_blank" rel="noopener noreferrer">
+            Chat on WhatsApp
+          </a>
+        ) : (
+          <span className="waButton" aria-disabled="true">
+            WhatsApp unavailable
+          </span>
+        )}
+        <a className="requestButton" href={requestHref}>
+          Request this product
+        </a>
+      </aside>
     </main>
   );
 }

@@ -81,6 +81,12 @@ body {
   font-weight: 600;
 }
 
+.heroSearch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 0.55rem;
+}
+
 .marketplace {
   display: grid;
   gap: 1rem;
@@ -235,7 +241,8 @@ select:focus {
 }
 
 .waButton,
-.actions button {
+.actions button,
+.requestButton {
   color: #fff;
   border-radius: 0.6rem;
   text-decoration: none;
@@ -253,6 +260,10 @@ select:focus {
 
 .actions button {
   background: linear-gradient(135deg, #0f172a, #1d4ed8);
+}
+
+.requestButton {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
 }
 
 .waButton:hover,
@@ -344,6 +355,10 @@ select:focus {
 
   .heroImage {
     min-height: 210px;
+  }
+
+  .heroSearch {
+    grid-template-columns: 1fr;
   }
 
   .toolbar {
@@ -562,6 +577,13 @@ select:focus {
   gap: 0.45rem;
 }
 
+.productTrustLine {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .productStoreActions {
   display: flex;
   flex-wrap: wrap;
@@ -629,6 +651,45 @@ select:focus {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.75rem;
+}
+
+.stickyProductActions {
+  position: sticky;
+  bottom: 0.6rem;
+  display: grid;
+  gap: 0.6rem;
+  background: #ffffffe8;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  padding: 0.65rem;
+}
+
+.quickSections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+}
+
+.quickSections p {
+  margin: 0;
+  border: 1px solid #cbd5e1;
+  background: #ffffffcc;
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.searchPageIntro {
+  margin-bottom: 1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.searchPageIntro h1,
+.searchPageIntro p {
+  margin: 0;
 }
 
 .homeColumns {

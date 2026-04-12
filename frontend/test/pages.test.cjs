@@ -8,8 +8,9 @@ function read(path) {
 
 test('listing page has core rendering blocks', () => {
   const source = read('src/app/page.tsx');
-  assert.match(source, /Discover and promote businesses across Ghana/);
+  assert.match(source, /Discover trusted local stores near you/);
   assert.match(source, /<ProductGrid\s*\/?>/);
+  assert.match(source, /href="\/search"/);
   assert.match(source, /href="\/about"/);
   assert.match(source, /href="\/services"/);
   assert.match(source, /href="\/sell"/);
@@ -41,6 +42,7 @@ test('sitemap and robots routes are present for SEO', () => {
   assert.match(sitemapSource, /MetadataRoute\.Sitemap/);
   assert.match(sitemapSource, /canonicalUrlForPath\('\/about'\)/);
   assert.match(sitemapSource, /canonicalUrlForPath\('\/services'\)/);
+  assert.match(sitemapSource, /canonicalUrlForPath\('\/search'\)/);
   assert.match(sitemapSource, /canonicalUrlForPath\('\/privacy'\)/);
   assert.match(sitemapSource, /canonicalUrlForPath\('\/terms'\)/);
   assert.match(robotsSource, /MetadataRoute\.Robots/);

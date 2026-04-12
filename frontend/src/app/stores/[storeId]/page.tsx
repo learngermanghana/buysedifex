@@ -124,6 +124,15 @@ export default async function StorePage({ params }: StorePageProps) {
         <h1>
           {profile.storeName} {profile.verified ? <span className="verifiedBadge">Verified</span> : null}
         </h1>
+        {profile.storeLogoUrl ? (
+          <Image
+            src={profile.storeLogoUrl}
+            alt={`${profile.storeName} logo`}
+            width={88}
+            height={88}
+            style={{ borderRadius: 999, border: '1px solid #e2e8f0' }}
+          />
+        ) : null}
         <p>
           {[profile.city, profile.country].filter(Boolean).join(', ') || 'Location unavailable'}
           {profile.addressLine1 ? ` · ${profile.addressLine1}` : ''}
@@ -172,6 +181,7 @@ export default async function StorePage({ params }: StorePageProps) {
 
       <section className="storeInfoCard" aria-label="Store products">
         <h2>Products from {profile.storeName}</h2>
+        <p>🚚 Delivery: Discuss with seller · 💳 Payment methods: MoMo, cash, and seller-approved options.</p>
         <ul>
           {profile.products.map((product) => (
             <li key={product.id}>
