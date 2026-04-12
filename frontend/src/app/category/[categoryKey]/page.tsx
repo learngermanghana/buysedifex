@@ -94,6 +94,12 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
                 ) : (
                   product.storeName
                 )}
+                {product.verified ? (
+                  <>
+                    {' '}
+                    <span className="verifiedBadge">Verified</span>
+                  </>
+                ) : null}
               </p>
             </li>
           ))}
