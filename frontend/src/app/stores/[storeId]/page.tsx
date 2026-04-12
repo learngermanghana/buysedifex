@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getStoreProfileById, listPublicStoreIds } from '@/lib/public-stores';
+import { extractStoreIdFromRouteParam, getStoreHref } from '@/lib/store-route';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 type StorePageProps = {
@@ -31,7 +32,8 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: StorePageProps): Promise<Metadata> {
-  const profile = await getStoreProfileById(params.storeId);
+  const routeStoreId = extractStoreIdFromRouteParam(params.storeId);
+  const profile = await getStoreProfileById(routeStoreId || params.storeId);
 
   if (!profile) {
     return {
@@ -41,7 +43,7 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
     };
   }
 
-  const canonicalPath = `/stores/${params.storeId}`;
+  const canonicalPath = getStoreHref(profile.storeId, profile.storeName, profile.storeSlug) ?? `/stores/${encodeURIComponent(params.storeId)}`;
   const canonicalUrl = canonicalUrlForPath(canonicalPath);
   const title = buildStoreTitle(profile.storeName, profile.city);
   const description = buildStoreDescription(profile.storeName, profile.city, profile.country);
@@ -74,13 +76,14 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
 }
 
 export default async function StorePage({ params }: StorePageProps) {
-  const profile = await getStoreProfileById(params.storeId);
+  const routeStoreId = extractStoreIdFromRouteParam(params.storeId);
+  const profile = await getStoreProfileById(routeStoreId || params.storeId);
 
   if (!profile) {
     notFound();
   }
 
-  const canonicalUrl = canonicalUrlForPath(`/stores/${params.storeId}`);
+  const canonicalUrl = canonicalUrlForPath(getStoreHref(profile.storeId, profile.storeName, profile.storeSlug) ?? `/stores/${encodeURIComponent(params.storeId)}`);
   const hasLocation = Boolean(profile.addressLine1 || profile.city || profile.country);
 
   const organizationType = hasLocation ? 'LocalBusiness' : 'OnlineStore';
