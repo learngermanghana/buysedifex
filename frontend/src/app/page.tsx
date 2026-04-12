@@ -1,18 +1,43 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ProductGrid } from '@/components/product-grid';
-import { PromoCarousel } from '@/components/promo-carousel';
-import { SectionTabs } from '@/components/section-tabs';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
-const title = 'Discover trusted local stores near you';
+const title = 'Sedifex: Products and services from trusted businesses';
 const description =
-  'Discover trusted local stores across Ghana, compare prices, and connect with sellers instantly on WhatsApp.';
+  'Browse Products and Services on Sedifex, discover trusted businesses, and start conversations with sellers and providers fast.';
+
+const featuredProducts = [
+  {
+    name: 'Organic Shea Body Butter',
+    business: 'Glow Basket',
+    cta: ['Chat seller', 'Request product', 'Ask about delivery'],
+  },
+  {
+    name: 'Bluetooth Home Speaker',
+    business: 'Apex Gadget Hub',
+    cta: ['Chat seller', 'Request product', 'Ask about delivery'],
+  },
+];
+
+const featuredServices = [
+  {
+    name: 'Home Deep Cleaning',
+    business: 'Sparkline Cleaners',
+    cta: ['Book service', 'Request quote', 'Chat provider'],
+  },
+  {
+    name: 'Bridal Makeup Session',
+    business: 'Ama Artistry Studio',
+    cta: ['Book service', 'Request quote', 'Chat provider'],
+  },
+];
+
+const popularCategories = ['Beauty', 'Electronics', 'Home Care', 'Fashion', 'Repairs', 'Events'];
 
 export const metadata: Metadata = {
   title,
   description,
-  keywords: buildSeoKeywords('beauty products ghana', 'buy beauty products online', 'ghana stores online'),
+  keywords: buildSeoKeywords('products', 'services', 'trusted businesses', 'buy and book online'),
   alternates: {
     canonical: canonicalUrlForPath('/'),
   },
@@ -35,53 +60,87 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <main className="container">
-      <SectionTabs activeTab="products" />
       <header className="hero">
         <div
           className="heroImage"
           role="img"
-          aria-label="Minimal shopping setup with products staged for online browsing"
+          aria-label="Seller and service provider tools used to manage customer requests"
         />
         <div className="heroContent">
-          <p className="eyebrow">Sedifex Market</p>
-          <h1>Discover trusted local stores near you</h1>
-          <p>Search products, compare prices, and contact verified stores in seconds.</p>
+          <p className="eyebrow">Sedifex Marketplace</p>
+          <h1>Hero search for products and services</h1>
+          <p>Find physical items and service offers from trusted businesses in seconds.</p>
           <form className="heroSearch" role="search">
-            <input type="search" placeholder="Search products, stores, or categories" aria-label="Search products and stores" />
-            <select aria-label="Choose location" defaultValue="Accra">
-              <option>Accra</option>
-              <option>Kumasi</option>
-              <option>Takoradi</option>
-              <option>Tamale</option>
-            </select>
+            <input type="search" placeholder="Search products, services, or businesses" aria-label="Search Sedifex" />
+            <button type="submit">Search</button>
           </form>
-          <div className="heroHighlights">
-            <span>🔥 Featured products</span>
-            <span>🏪 Top stores near you</span>
-            <span>📦 Categories</span>
+          <div className="inlineLinks" aria-label="Browse products and services">
+            <Link href="/products">Browse Products</Link>
+            <Link href="/services">Browse Services</Link>
           </div>
-          <nav className="inlineLinks" aria-label="Sedifex information pages">
-            <Link href="/search">Search &amp; Filter</Link>
-            <Link href="/about">About</Link>
-            <Link href="/services">Services</Link>
-            <Link href="/sell">Sell on Sedifex</Link>
-            <Link href="/contact">Contact</Link>
-            <Link href="/privacy">Privacy</Link>
-            <Link href="/terms">Terms</Link>
-          </nav>
         </div>
       </header>
-      <section className="quickSections" aria-label="Homepage discovery sections">
-        <p>Trending in Accra</p>
-        <p>Recently added</p>
-        <p>Best priced</p>
-      </section>
-      <div className="homeColumns">
-        <PromoCarousel />
-        <div className="productsColumn">
-          <ProductGrid />
+
+      <section className="homeSection">
+        <h2>Featured Products</h2>
+        <div className="launchCardGrid">
+          {featuredProducts.map((item) => (
+            <article key={item.name} className="launchCard">
+              <span className="typeBadge">Product</span>
+              <h3>{item.name}</h3>
+              <p>{item.business}</p>
+              <div className="miniCtas">
+                {item.cta.map((label) => (
+                  <span key={label}>{label}</span>
+                ))}
+              </div>
+            </article>
+          ))}
         </div>
-      </div>
+      </section>
+
+      <section className="homeSection">
+        <h2>Featured Services</h2>
+        <div className="launchCardGrid">
+          {featuredServices.map((item) => (
+            <article key={item.name} className="launchCard">
+              <span className="typeBadge service">Service</span>
+              <h3>{item.name}</h3>
+              <p>{item.business}</p>
+              <div className="miniCtas">
+                {item.cta.map((label) => (
+                  <span key={label}>{label}</span>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="homeSection">
+        <h2>Popular Categories</h2>
+        <div className="categories" aria-label="Popular categories">
+          {popularCategories.map((category) => (
+            <Link key={category} href="/products" className="chip">
+              {category}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="homeSection">
+        <h2>Trusted Businesses</h2>
+        <p>Verified businesses are highlighted so buyers can confidently connect and complete deals.</p>
+      </section>
+
+      <section className="homeSection">
+        <h2>How Sedifex Works</h2>
+        <ol>
+          <li>Search and discover products or services.</li>
+          <li>Open a listing and confirm details.</li>
+          <li>Chat, request, or book directly with the business.</li>
+        </ol>
+      </section>
     </main>
   );
 }
