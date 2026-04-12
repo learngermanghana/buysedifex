@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getProductsByCategory, listPublicCategoryKeys } from '@/lib/public-stores';
+import { getStoreHref } from '@/lib/store-route';
 import { buildSeoKeywords, canonicalUrlForPath, categoryNameFromKey, defaultSocialImageUrl } from '@/lib/seo';
 
 type CategoryPageProps = {
@@ -61,7 +62,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     itemListElement: products.map((product, index) => ({
       '@type': 'ListItem',
       position: (page - 1) * PAGE_SIZE + index + 1,
-      url: canonicalUrlForPath(`/stores/${encodeURIComponent(product.storeId ?? '')}`),
+      url: canonicalUrlForPath(getStoreHref(product.storeId, product.storeName) ?? '/'),
       name: product.productName,
     })),
   };
@@ -83,26 +84,30 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
       <section aria-label={`${categoryName} products`}>
         <ul style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-          {products.map((product) => (
-            <li key={product.id} style={{ listStyle: 'none', border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
-              <h2 style={{ fontSize: '1rem', margin: 0 }}>
-                {product.productName}
-              </h2>
-              <p style={{ margin: '8px 0 0' }}>
-                {product.storeId ? (
-                  <Link href={`/stores/${encodeURIComponent(product.storeId)}`}>{product.storeName}</Link>
-                ) : (
-                  product.storeName
-                )}
-                {product.verified ? (
-                  <>
-                    {' '}
-                    <span className="verifiedBadge">Verified</span>
-                  </>
-                ) : null}
-              </p>
-            </li>
-          ))}
+          {products.map((product) => {
+            const storeHref = getStoreHref(product.storeId, product.storeName);
+
+            return (
+              <li key={product.id} style={{ listStyle: 'none', border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
+                <h2 style={{ fontSize: '1rem', margin: 0 }}>
+                  {product.productName}
+                </h2>
+                <p style={{ margin: '8px 0 0' }}>
+                  {storeHref ? (
+                    <Link href={storeHref}>{product.storeName}</Link>
+                  ) : (
+                    product.storeName
+                  )}
+                  {product.verified ? (
+                    <>
+                      {' '}
+                      <span className="verifiedBadge">Verified</span>
+                    </>
+                  ) : null}
+                </p>
+              </li>
+            );
+          })}
         </ul>
       </section>
 
