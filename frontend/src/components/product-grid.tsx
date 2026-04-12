@@ -178,7 +178,9 @@ const mixProductsAcrossStores = (items: PublicProduct[]) => {
 export function ProductGrid() {
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [categories, setCategories] = useState<string[]>(['all']);
+  const [cities, setCities] = useState<string[]>(['all']);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCity, setSelectedCity] = useState<string>('all');
   const [selectedSort, setSelectedSort] = useState<SortOption>('newest');
   const [searchText, setSearchText] = useState<string>('');
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
@@ -192,6 +194,8 @@ export function ProductGrid() {
     const text = searchText.trim().toLowerCase();
     const normalizedProducts = normalizeStoreNamesByStoreId(products);
     const matchingProducts = normalizedProducts.filter((product) => {
+      const cityMatches = selectedCity === 'all' || getStoreCity(product).toLowerCase() === selectedCity.toLowerCase();
+      if (!cityMatches) return false;
       if (!text) return true;
       const haystack = [product.productName, product.description, product.storeName, product.categoryKey]
         .filter(Boolean)
@@ -202,7 +206,7 @@ export function ProductGrid() {
 
     const imageReadyProducts = matchingProducts.filter((product) => hasDisplayImage(product) && isVerifiedStore(product.verified));
     return mixProductsAcrossStores(shuffleProducts(imageReadyProducts));
-  }, [products, searchText]);
+  }, [products, searchText, selectedCity]);
 
   const toggleDescription = (productId: string) => {
     setExpandedDescriptionIds((current) => {
@@ -326,6 +330,11 @@ export function ProductGrid() {
         .filter((item) => hasDisplayImage(item) && isVerifiedStore(item.verified));
 
       setProducts((current) => (cursor ? [...current, ...nextItems] : nextItems));
+      setCities((current) => {
+        const next = new Set(current);
+        nextItems.forEach((item) => next.add(getStoreCity(item)));
+        return Array.from(next).sort((a, b) => a.localeCompare(b));
+      });
       setLastDoc(snapshot.docs.at(-1) ?? null);
     } catch (err) {
       console.error('Failed to fetch products', err);
@@ -381,9 +390,21 @@ export function ProductGrid() {
         <div className="sortWrap">
           <label htmlFor="sort">Sort by</label>
           <select id="sort" value={selectedSort} onChange={(event) => setSelectedSort(event.target.value as SortOption)}>
+            <option value="featured">Popular</option>
             <option value="newest">Newest</option>
-            <option value="price">Price</option>
-            <option value="featured">Featured</option>
+            <option value="price">Cheapest</option>
+          </select>
+        </div>
+      </div>
+      <div className="toolbar">
+        <div className="sortWrap">
+          <label htmlFor="city-filter">City</label>
+          <select id="city-filter" value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>
+            {cities.map((city) => (
+              <option key={city} value={city}>
+                {city === 'all' ? 'All cities' : city}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -448,6 +469,7 @@ export function ProductGrid() {
                     />
                   </div>
                   <h3>{item.productName ?? 'Untitled item'}</h3>
+                  <Link href={`/products/${encodeURIComponent(item.id)}`}>View product details</Link>
                   <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
                   {shouldCollapseDescription && (
                     <button type="button" className="descriptionToggle" onClick={() => toggleDescription(item.id)}>
