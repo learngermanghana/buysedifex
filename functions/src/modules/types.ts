@@ -1,0 +1,73 @@
+import * as admin from 'firebase-admin';
+
+export type StoreDoc = {
+  name?: string;
+  storeName?: string;
+  title?: string;
+  slug?: string;
+  storeSlug?: string;
+  storeStatus?: string;
+  status?: string;
+  eligibleForBuy?: boolean;
+  buyOptOut?: boolean;
+  whatsappNumber?: string;
+  storePhone?: string;
+  phone?: string;
+  telephone?: string;
+  logoUrl?: string;
+  storeLogoUrl?: string;
+  bannerUrl?: string;
+  storeBannerUrl?: string;
+  category?: string;
+  city?: string;
+  storeCity?: string;
+  country?: string;
+  storeCountry?: string;
+  addressLine1?: string;
+  address?: string;
+  updatedAt?: admin.firestore.Timestamp;
+};
+
+export type ProductDoc = {
+  storeId?: string;
+  itemType?: string;
+  shopLink?: string | null;
+  category?: string;
+  name?: string;
+  slug?: string;
+  description?: string;
+  imageUrl?: string | null;
+  imageAlt?: string | null;
+  imageUrls?: string[];
+  price?: number;
+  currency?: string;
+  sku?: string | null;
+  barcode?: string | null;
+  taxRate?: number | null;
+  reorderPoint?: number | null;
+  stockCount?: number | null;
+  expiryDate?: admin.firestore.Timestamp | null;
+  batchNumber?: string | null;
+  manufacturerName?: string | null;
+  productionDate?: admin.firestore.Timestamp | null;
+  showOnReceipt?: boolean;
+  featuredRank?: number;
+  updatedAt?: admin.firestore.Timestamp;
+  createdAt?: admin.firestore.Timestamp;
+  [key: string]: unknown;
+};
+
+export type NormalizedProduct = ProductDoc & {
+  storeId?: string;
+  itemType?: string;
+  shopLink?: string | null;
+  name?: string;
+  slug?: string;
+  description?: string;
+  category?: string;
+  imageUrl?: string | null;
+  imageUrls?: string[];
+  price?: number;
+  currency?: string;
+  featuredRank?: number;
+};

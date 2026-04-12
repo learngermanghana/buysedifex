@@ -5,6 +5,15 @@
  */
 
 import * as admin from 'firebase-admin';
+import {
+  normalizeCategory,
+  normalizeText,
+  normalizeWhatsAppNumber,
+  readFirstNumber,
+  readFirstString,
+  readFirstStringArray,
+  toTitleCase,
+} from '../functions/src/shared/normalization';
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -56,54 +65,6 @@ type NormalizedProduct = ProductDoc & {
 
 const dryRun = process.argv.includes('--dry-run');
 
-function normalizeText(value?: string): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  return trimmed.length ? trimmed : null;
-}
-
-function normalizeCategory(value?: string): string | null {
-  const text = normalizeText(value);
-  return text ? text.toLowerCase() : null;
-}
-
-function normalizeWhatsAppNumber(raw?: string): string | null {
-  const normalized = (raw ?? '').replace(/[^\d]/g, '');
-  return normalized || null;
-}
-
-function readFirstString(source: Record<string, unknown>, keys: string[]): string | undefined {
-  for (const key of keys) {
-    const value = source[key];
-    if (typeof value === 'string' && value.trim().length) return value.trim();
-  }
-  return undefined;
-}
-
-function readFirstNumber(source: Record<string, unknown>, keys: string[]): number | undefined {
-  for (const key of keys) {
-    const value = source[key];
-    if (typeof value === 'number' && Number.isFinite(value)) return value;
-    if (typeof value === 'string') {
-      const parsed = Number(value);
-      if (Number.isFinite(parsed)) return parsed;
-    }
-  }
-  return undefined;
-}
-
-function readFirstStringArray(source: Record<string, unknown>, keys: string[]): string[] | undefined {
-  for (const key of keys) {
-    const value = source[key];
-    if (!Array.isArray(value)) continue;
-    const normalized = value
-      .map((entry) => normalizeText(typeof entry === 'string' ? entry : undefined))
-      .filter((entry): entry is string => Boolean(entry));
-    if (normalized.length) return normalized;
-  }
-  return undefined;
-}
-
 function normalizeProduct(product: ProductDoc): NormalizedProduct {
   const source = product as Record<string, unknown>;
   return {
@@ -111,7 +72,7 @@ function normalizeProduct(product: ProductDoc): NormalizedProduct {
     storeId: readFirstString(source, ['storeId', 'storeID', 'store_id', 'shopId', 'shop_id', 'merchantId', 'merchant_id']),
     itemType: readFirstString(source, ['itemType', 'item_type', 'type', 'kind']) ?? 'product',
     category: readFirstString(source, ['category', 'categoryKey', 'productCategory', 'department']),
-    name: readFirstString(source, ['name', 'productName', 'product_name', 'title', 'itemName']),
+    name: toTitleCase(readFirstString(source, ['name', 'productName', 'product_name', 'title', 'itemName'])) ?? undefined,
     slug: readFirstString(source, ['slug', 'productSlug', 'product_slug']),
     description: readFirstString(source, ['description', 'desc', 'details', 'productDescription']),
     imageUrl: readFirstString(source, ['imageUrl', 'imageURL', 'image', 'photoUrl', 'thumbnailUrl']) ?? undefined,
