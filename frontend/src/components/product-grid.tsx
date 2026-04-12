@@ -17,6 +17,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db, firebaseConfigError } from '@/lib/firebase';
+import { FormattedDescription } from '@/components/formatted-description';
 
 type PublicProduct = {
   id: string;
@@ -408,7 +409,7 @@ export function ProductGrid() {
                   <h3>
                     <Link href={`/products/${encodeURIComponent(item.id)}`}>{item.productName ?? 'Untitled item'}</Link>
                   </h3>
-                  <p>{item.description ?? ''}</p>
+                  <FormattedDescription text={item.description ?? ''} className="formattedDescription compact" />
                   <div className="meta">
                     <span className="storeIdentity">
                       {item.storeId ? (

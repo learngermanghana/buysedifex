@@ -452,6 +452,29 @@ select:focus {
   margin: 0;
 }
 
+.formattedDescription {
+  display: grid;
+  gap: 0.55rem;
+  color: #334155;
+}
+
+.formattedDescription p,
+.formattedDescription ul {
+  margin: 0;
+}
+
+.formattedDescription ul {
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.formattedDescription.compact {
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
 .productStats {
   display: grid;
   gap: 0.45rem;

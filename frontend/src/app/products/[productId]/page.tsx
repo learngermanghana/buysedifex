@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { FormattedDescription } from '@/components/formatted-description';
 import { getPublicProductById } from '@/lib/public-products';
 import { getStoreProfileById } from '@/lib/public-stores';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
@@ -155,7 +156,11 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         <div>
           <p className="eyebrow">Product details</p>
           <h1>{product.productName}</h1>
-          {product.description ? <p>{product.description}</p> : <p>No description available for this product yet.</p>}
+          {product.description ? (
+            <FormattedDescription text={product.description} className="formattedDescription" />
+          ) : (
+            <p>No description available for this product yet.</p>
+          )}
         </div>
 
         <div className="productStats">
