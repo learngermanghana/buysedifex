@@ -138,18 +138,9 @@ const normalizeProducts = (products: IntegrationProductRecord[]): SedifexProduct
     .map(normalizeProduct)
     .filter((product): product is SedifexProduct => Boolean(product));
 
-const isStoreBuyerVisible = (store: IntegrationStoreRecord) => {
-  if (store.eligibleForBuy === false) return false;
-
-  const normalizedStatus = store.status?.trim().toLowerCase();
-  if (!normalizedStatus) return true;
-
-  return !['inactive', 'disabled', 'suspended', 'closed'].includes(normalizedStatus);
-};
-
 const toSafeStoreRecord = (store: IntegrationStoreRecord | null | undefined): SafeStoreRecord | null => {
   const storeId = store?.storeId?.trim();
-  if (!store || !storeId || !isStoreBuyerVisible(store)) return null;
+  if (!store || !storeId) return null;
 
   const phone = store.phone?.trim();
   const city = store.city?.trim();
@@ -193,29 +184,22 @@ const enrichProductsWithStoreData = async (
 
   const storeLookup = new Map<string, SafeStoreRecord | null>(storeEntries);
 
-  return products.reduce<SedifexProduct[]>((accumulator, product) => {
+  return products.map((product) => {
     const safeStore = storeLookup.get(product.storeId);
 
-    if (safeStore === null && storeLookup.has(product.storeId)) {
-      return accumulator;
-    }
-
     if (!safeStore) {
-      accumulator.push(product);
-      return accumulator;
+      return product;
     }
 
-    accumulator.push({
+    return {
       ...product,
       storeName: safeStore.storeName ?? product.storeName,
       city: safeStore.city ?? product.city,
       waLink: safeStore.waLink ?? product.waLink,
       phone: safeStore.phone ?? product.phone,
       addressLine1: safeStore.addressLine1 ?? product.addressLine1,
-    });
-
-    return accumulator;
-  }, []);
+    };
+  });
 };
 
 const parseEnvLine = (line: string) => {
