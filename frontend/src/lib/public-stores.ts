@@ -256,6 +256,24 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     return null;
   }
 
+  const withProfileDefaults = (profile: Partial<StoreProfile> & Pick<StoreProfile, 'storeId' | 'storeName' | 'verified'>): StoreProfile => ({
+    storeId: profile.storeId,
+    storeName: profile.storeName,
+    storeSlug: profile.storeSlug ?? undefined,
+    storeEmail: profile.storeEmail ?? undefined,
+    storePhone: profile.storePhone ?? undefined,
+    storeWhatsapp: profile.storeWhatsapp ?? undefined,
+    websiteUrl: profile.websiteUrl ?? undefined,
+    storeLogoUrl: profile.storeLogoUrl ?? undefined,
+    storeBannerUrl: profile.storeBannerUrl ?? undefined,
+    city: profile.city ?? undefined,
+    country: profile.country ?? undefined,
+    addressLine1: profile.addressLine1 ?? undefined,
+    sameAs: Array.isArray(profile.sameAs) ? profile.sameAs : [],
+    products: Array.isArray(profile.products) ? profile.products : [],
+    verified: profile.verified,
+  });
+
   const toStoreProfileFromDocument = (document: FirestoreDocument, fallbackStoreId: string): Omit<StoreProfile, 'products'> => {
     const fields = document.fields ?? {};
 
@@ -499,16 +517,16 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     }
 
     if (!storeDocument && profileFromProducts) {
-      return profileFromProducts;
+      return withProfileDefaults(profileFromProducts);
     }
 
     if (storeDocument && !profileFromProducts) {
-      return { ...storeDocument, products: [] };
+      return withProfileDefaults({ ...storeDocument, products: [] });
     }
 
     const mergedProfile = profileFromProducts as StoreProfile;
     const mergedSameAs = Array.from(new Set([...(storeDocument?.sameAs ?? []), ...mergedProfile.sameAs])).filter(isValidHttpUrl);
-    return {
+    return withProfileDefaults({
       ...mergedProfile,
       storeId: storeDocument?.storeId || mergedProfile.storeId,
       storeName: storeDocument?.storeName || mergedProfile.storeName,
@@ -524,9 +542,9 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
       addressLine1: storeDocument?.addressLine1 ?? mergedProfile.addressLine1,
       verified: Boolean(storeDocument?.verified || mergedProfile.verified),
       sameAs: mergedSameAs,
-    };
+    });
   } catch {
-    return profileFromProducts;
+    return profileFromProducts ? withProfileDefaults(profileFromProducts) : null;
   }
 };
 

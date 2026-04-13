@@ -85,6 +85,8 @@ export default async function StorePage({ params }: StorePageProps) {
 
   const canonicalUrl = canonicalUrlForPath(getStoreHref(profile.storeId, profile.storeName, profile.storeSlug) ?? `/stores/${encodeURIComponent(params.storeId)}`);
   const hasLocation = Boolean(profile.addressLine1 || profile.city || profile.country);
+  const sameAs = Array.isArray(profile.sameAs) ? profile.sameAs : [];
+  const products = Array.isArray(profile.products) ? profile.products : [];
 
   const organizationType = hasLocation ? 'LocalBusiness' : 'OnlineStore';
   const address = hasLocation
@@ -105,10 +107,10 @@ export default async function StorePage({ params }: StorePageProps) {
     ...(profile.storeBannerUrl ? { image: profile.storeBannerUrl } : {}),
     ...(profile.storePhone ? { telephone: profile.storePhone } : {}),
     ...(address ? { address } : {}),
-    ...(profile.sameAs.length > 0 ? { sameAs: profile.sameAs } : {}),
+    ...(sameAs.length > 0 ? { sameAs } : {}),
   };
 
-  const categoryKeys = Array.from(new Set(profile.products.map((product) => product.categoryKey).filter(Boolean))) as string[];
+  const categoryKeys = Array.from(new Set(products.map((product) => product.categoryKey).filter(Boolean))) as string[];
   const normalizedPhone = (profile.storePhone ?? '').replace(/[^\d+]/g, '');
   const normalizedWhatsapp = (profile.storeWhatsapp ?? '').trim();
   const whatsappLink =
@@ -186,7 +188,7 @@ export default async function StorePage({ params }: StorePageProps) {
         <h2>Products from {profile.storeName}</h2>
         <p>🚚 Delivery: Discuss with seller · 💳 Payment methods: MoMo, cash, and seller-approved options.</p>
         <ul>
-          {profile.products.map((product) => (
+          {products.map((product) => (
             <li key={product.id}>
               {product.productName}
               {product.categoryKey ? (
