@@ -105,6 +105,29 @@ const getIntegrationConfig = () => {
   };
 };
 
+
+
+const getPublicApiBaseUrl = () => {
+  loadBackendIntegrationEnv();
+  return process.env.SEDIFEX_PUBLIC_API_BASE_URL ?? 'https://api.sedifex.com';
+};
+
+const buildPublicEndpoint = (
+  endpointPath: string,
+  query?: Record<string, string | number | undefined>,
+) => {
+  const baseUrl = getPublicApiBaseUrl();
+  const url = new URL(`${baseUrl.replace(/\/$/, '')}${endpointPath}`);
+
+  Object.entries(query ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  return url;
+};
+
 const buildEndpoint = (
   endpointPath: string,
   query?: Record<string, string | number | undefined>,
@@ -174,10 +197,21 @@ export const listIntegrationProducts = async (query?: {
   sort?: SedifexProductSort | string;
   maxPerStore?: number;
 }) => {
-  const payload = await integrationFetch<IntegrationProductsPayload>(
-    '/v1IntegrationProducts',
-    query,
-  );
+  const endpoint = buildPublicEndpoint('/v1/products', query);
+  const response = await fetch(endpoint, {
+    headers: {
+      Accept: 'application/json',
+    },
+    next: { revalidate: 300 },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Sedifex public products request failed (${response.status}) for ${endpoint.pathname}.`,
+    );
+  }
+
+  const payload = (await response.json()) as IntegrationProductsPayload;
 
   return {
     items: payload.items ?? payload.products ?? [],
