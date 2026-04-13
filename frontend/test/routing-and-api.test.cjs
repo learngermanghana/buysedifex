@@ -47,3 +47,12 @@ test('store and product APIs read from Sedifex integration endpoints', () => {
   assert.match(productGridSource, /useState<SortOption>\('store-diverse'\)/);
   assert.match(productGridSource, /<option value="store-diverse">Mixed stores<\/option>/);
 });
+
+
+test('concerns API route exists for secure concern submissions', () => {
+  const concernsRouteSource = read('src/app/api/concerns/route.ts');
+
+  assert.match(concernsRouteSource, /collection\(db, 'concerns'\)/);
+  assert.match(concernsRouteSource, /Concern reporting is not configured/);
+  assert.match(concernsRouteSource, /Invalid concern payload/);
+});

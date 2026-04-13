@@ -63,6 +63,7 @@ test('info and legal routes exist', () => {
   assert.match(sellSource, /Sell on Sedifex/);
   assert.match(contactSource, /info@sedifex\.com/);
   assert.match(contactSource, /0205706589/);
+  assert.match(contactSource, /Report a concern/);
   assert.match(privacySource, /Privacy Policy/);
   assert.match(termsSource, /Terms of Service/);
 });

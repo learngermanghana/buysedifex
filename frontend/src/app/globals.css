@@ -701,14 +701,23 @@ select:focus {
   font-size: 0.95rem;
 }
 
-.requestForm input {
+.requestForm input,
+.requestForm select,
+.requestForm textarea {
   border: 1px solid #cbd5e1;
   border-radius: 0.6rem;
   padding: 0.5rem 0.65rem;
   background: #fff;
+  font: inherit;
 }
 
-.requestForm input:focus {
+.requestForm textarea {
+  resize: vertical;
+}
+
+.requestForm input:focus,
+.requestForm select:focus,
+.requestForm textarea:focus {
   outline: 2px solid #818cf8;
   outline-offset: 1px;
 }
