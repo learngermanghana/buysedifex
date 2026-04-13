@@ -16,9 +16,20 @@ const ENV_FILE_LOCATIONS = [
 ];
 
 type IntegrationProductsPayload = {
-  products?: SedifexProduct[];
-  items?: SedifexProduct[];
+  products?: IntegrationProductRecord[];
+  items?: IntegrationProductRecord[];
   hasMore?: boolean;
+};
+
+type IntegrationProductRecord = Partial<SedifexProduct> & {
+  id?: string;
+  storeId?: string;
+  name?: string;
+  category?: string | null;
+  imageUrl?: string | null;
+  imageUrls?: string[];
+  price?: number;
+  stockCount?: number;
 };
 
 type IntegrationPromoProfile = {
@@ -59,6 +70,39 @@ const toStoreProfile = (profile: IntegrationPromoProfile | null | undefined): Se
     verified: profile.verified,
   };
 };
+
+const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | null => {
+  const id = product.id?.trim();
+  const storeId = product.storeId?.trim();
+  const productName = product.productName?.trim() || product.name?.trim();
+
+  if (!id || !storeId || !productName) return null;
+
+  const normalizedImageUrls = Array.isArray(product.imageUrls)
+    ? product.imageUrls.map((url) => url?.trim()).filter((url): url is string => Boolean(url))
+    : [];
+  const fallbackImageUrl = product.imageUrl?.trim();
+  const imageUrls =
+    normalizedImageUrls.length > 0
+      ? normalizedImageUrls
+      : fallbackImageUrl
+        ? [fallbackImageUrl]
+        : [];
+
+  return {
+    ...product,
+    id,
+    storeId,
+    productName,
+    categoryKey: product.categoryKey ?? product.category ?? undefined,
+    imageUrls,
+    price: typeof product.price === 'number' ? product.price : undefined,
+    stockCount: typeof product.stockCount === 'number' ? product.stockCount : undefined,
+  };
+};
+
+const normalizeProducts = (products: IntegrationProductRecord[]): SedifexProduct[] =>
+  products.map(normalizeProduct).filter((product): product is SedifexProduct => Boolean(product));
 
 const parseEnvLine = (line: string) => {
   const trimmed = line.trim();
@@ -164,7 +208,7 @@ export const getIntegrationProductById = async (productId: string) => {
   );
 
   const products = payload.products ?? payload.items ?? [];
-  return products[0] ?? null;
+  return normalizeProducts(products)[0] ?? null;
 };
 
 export const listIntegrationProducts = async (query?: {
@@ -180,7 +224,7 @@ export const listIntegrationProducts = async (query?: {
     query,
   );
 
-  const allItems = payload.items ?? payload.products ?? [];
+  const allItems = normalizeProducts(payload.items ?? payload.products ?? []);
   const page = Math.max(1, query?.page ?? 1);
   const fallbackPageSize = allItems.length > 0 ? allItems.length : 1;
   const pageSize = Math.max(1, query?.pageSize ?? fallbackPageSize);
@@ -206,17 +250,11 @@ export const listIntegrationCategoryKeys = async () => {
     '/v1IntegrationProducts',
   );
 
-  const products = payload.products ?? payload.items ?? [];
+  const products = normalizeProducts(payload.products ?? payload.items ?? []);
   const categoryKeys = Array.from(
     new Set(
       products
-        .map((item) => {
-          const record = item as SedifexProduct & {
-            categoryKey?: string;
-            category?: string;
-          };
-          return record.categoryKey ?? record.category ?? '';
-        })
+        .map((item) => item.categoryKey ?? '')
         .filter(Boolean),
     ),
   );
@@ -229,7 +267,7 @@ export const listIntegrationStoreIds = async () => {
     '/v1IntegrationProducts',
   );
 
-  const products = payload.products ?? payload.items ?? [];
+  const products = normalizeProducts(payload.products ?? payload.items ?? []);
   const storeIds = Array.from(
     new Set(products.map((item) => item.storeId).filter(Boolean)),
   );
@@ -249,7 +287,7 @@ export const getIntegrationStoreProfile = async (storeId: string) => {
 
   return {
     profile: toStoreProfile(promoPayload?.profile ?? promoPayload?.promo),
-    products: productPayload.products ?? productPayload.items ?? [],
+    products: normalizeProducts(productPayload.products ?? productPayload.items ?? []),
   };
 };
 
