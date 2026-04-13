@@ -17,8 +17,13 @@ const parsePage = (pageParam?: string) => {
 };
 
 export async function generateStaticParams() {
-  const categoryKeys = await listPublicCategoryKeys();
-  return categoryKeys.map((categoryKey) => ({ categoryKey }));
+  try {
+    const categoryKeys = await listPublicCategoryKeys();
+    return categoryKeys.map((categoryKey) => ({ categoryKey }));
+  } catch (error) {
+    console.warn('Unable to list public category keys during static generation.', error);
+    return [];
+  }
 }
 
 export async function generateMetadata({ params, searchParams }: CategoryPageProps): Promise<Metadata> {
