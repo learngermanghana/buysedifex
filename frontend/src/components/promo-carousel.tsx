@@ -69,10 +69,9 @@ export function PromoCarousel() {
             <Image
               src={activePromo.promoImageUrl ?? 'https://placehold.co/640x360'}
               alt={activePromo.promoImageAlt?.trim() || activePromo.promoTitle || 'Store promotion image'}
-              width={640}
-              height={360}
+              fill
               sizes="(max-width: 780px) 100vw, 320px"
-              style={{ width: '100%', height: 'auto' }}
+              style={{ objectFit: 'cover' }}
             />
           </div>
 
