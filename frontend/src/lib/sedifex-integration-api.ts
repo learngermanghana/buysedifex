@@ -203,35 +203,54 @@ const getStoreById = async (storeId: string): Promise<SafeStoreRecord | null> =>
   const normalizedStoreId = storeId.trim();
   if (!normalizedStoreId) return null;
 
+  const resolveStorePayload = async () => {
+    const paths = [`/stores/${encodeURIComponent(normalizedStoreId)}`, `/stores/${encodeURIComponent(normalizedStoreId)}/store`];
+
+    for (const endpointPath of paths) {
+      try {
+        const storePayload = await integrationFetch<{
+          store?: IntegrationStoreRecord | null;
+          data?: IntegrationStoreRecord | null;
+          profile?: IntegrationStoreRecord | null;
+          item?: IntegrationStoreRecord | null;
+        }>(endpointPath);
+
+        const safeStore = toSafeStoreRecord(storePayload.store ?? storePayload.data ?? storePayload.profile ?? storePayload.item);
+        if (safeStore) return safeStore;
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
+  };
+
+  const storeFromStoreEndpoint = await resolveStorePayload();
+
   try {
     const payload = await integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', {
       storeId: normalizedStoreId,
     });
     const fromPromo = toSafeStoreRecord(payload.profile ?? payload.promo ?? payload.items?.[0] ?? payload.promos?.[0]);
-    if (fromPromo?.city || fromPromo?.addressLine1 || fromPromo?.country) {
+
+    if (!storeFromStoreEndpoint) {
       return fromPromo;
     }
 
-    const storePayload = await integrationFetch<{
-      store?: IntegrationStoreRecord | null;
-      data?: IntegrationStoreRecord | null;
-      profile?: IntegrationStoreRecord | null;
-      item?: IntegrationStoreRecord | null;
-    }>(`/stores/${encodeURIComponent(normalizedStoreId)}/store`);
-    const fromStorePath = toSafeStoreRecord(storePayload.store ?? storePayload.data ?? storePayload.profile ?? storePayload.item);
-    return fromStorePath ?? fromPromo;
+    return {
+      ...fromPromo,
+      ...storeFromStoreEndpoint,
+      storeId: storeFromStoreEndpoint.storeId,
+      storeName: storeFromStoreEndpoint.storeName ?? fromPromo?.storeName,
+      storeSlug: storeFromStoreEndpoint.storeSlug ?? fromPromo?.storeSlug,
+      city: storeFromStoreEndpoint.city ?? fromPromo?.city,
+      country: storeFromStoreEndpoint.country ?? fromPromo?.country,
+      phone: storeFromStoreEndpoint.phone ?? fromPromo?.phone,
+      waLink: storeFromStoreEndpoint.phone ?? fromPromo?.waLink,
+      addressLine1: storeFromStoreEndpoint.addressLine1 ?? fromPromo?.addressLine1,
+    };
   } catch {
-    try {
-      const storePayload = await integrationFetch<{
-        store?: IntegrationStoreRecord | null;
-        data?: IntegrationStoreRecord | null;
-        profile?: IntegrationStoreRecord | null;
-        item?: IntegrationStoreRecord | null;
-      }>(`/stores/${encodeURIComponent(normalizedStoreId)}/store`);
-      return toSafeStoreRecord(storePayload.store ?? storePayload.data ?? storePayload.profile ?? storePayload.item);
-    } catch {
-      return null;
-    }
+    return storeFromStoreEndpoint;
   }
 };
 
