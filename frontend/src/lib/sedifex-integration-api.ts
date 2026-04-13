@@ -434,7 +434,11 @@ export const getIntegrationProductById = async (productId: string) => {
   );
 
   const products = payload.products ?? payload.items ?? [];
-  return normalizeProducts(products)[0] ?? null;
+  const normalizedProduct = normalizeProducts(products)[0] ?? null;
+  if (!normalizedProduct) return null;
+
+  const enriched = await enrichProductsWithStoreData([normalizedProduct]);
+  return enriched[0] ?? normalizedProduct;
 };
 
 export const listIntegrationProducts = async (query?: {
@@ -499,18 +503,35 @@ export const listIntegrationStoreIds = async () => {
 };
 
 export const getIntegrationStoreProfile = async (storeId: string) => {
-  const [promoPayload, productPayload] = await Promise.all([
+  const [promoPayload, productPayload, storePayload] = await Promise.all([
     integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', {
       storeId,
     }).catch(() => null),
+    getStoreById(storeId).catch(() => null),
     integrationFetch<IntegrationProductsPayload>('/v1IntegrationProducts', {
       storeId,
     }),
   ]);
 
+  const normalizedProducts = normalizeProducts(productPayload.products ?? productPayload.items ?? []);
+  const enrichedProducts = await enrichProductsWithStoreData(normalizedProducts);
+  const profileFromPromo = toStoreProfile(promoPayload?.profile ?? promoPayload?.promo);
+  const profile: SedifexStoreProfile | null = profileFromPromo ?? (storePayload?.storeName
+    ? {
+        storeId: storePayload.storeId,
+        storeName: storePayload.storeName,
+        storeSlug: storePayload.storeSlug,
+        city: storePayload.city,
+        country: storePayload.country,
+        addressLine1: storePayload.addressLine1,
+        storePhone: storePayload.phone,
+        storeWhatsapp: storePayload.waLink,
+      }
+    : null);
+
   return {
-    profile: toStoreProfile(promoPayload?.profile ?? promoPayload?.promo),
-    products: normalizeProducts(productPayload.products ?? productPayload.items ?? []),
+    profile,
+    products: enrichedProducts,
   };
 };
 
