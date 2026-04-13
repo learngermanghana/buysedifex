@@ -3,6 +3,7 @@ import type {
   SedifexGalleryItem,
   SedifexProduct,
   SedifexProductSort,
+  SedifexStoreProfile,
 } from '@sedifex/integration-types';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,6 +24,9 @@ type IntegrationProductsPayload = {
 type IntegrationPromoProfile = {
   id?: string;
   storeId?: string;
+  storeName?: string;
+  storeSlug?: string;
+  verified?: boolean;
   displayName?: string;
   name?: string;
   promoTitle?: string;
@@ -38,6 +42,22 @@ type IntegrationPromoPayload = {
   promos?: IntegrationPromoProfile[];
   profile?: IntegrationPromoProfile | null;
   promo?: IntegrationPromoProfile | null;
+};
+
+const toStoreProfile = (profile: IntegrationPromoProfile | null | undefined): SedifexStoreProfile | null => {
+  if (!profile) return null;
+
+  const storeId = profile.storeId ?? profile.id ?? '';
+  const storeName = profile.storeName ?? profile.displayName ?? profile.name ?? '';
+  if (!storeId || !storeName) return null;
+
+  return {
+    storeId,
+    storeName,
+    storeSlug: profile.storeSlug ?? profile.promoSlug,
+    websiteUrl: profile.promoWebsiteUrl,
+    verified: profile.verified,
+  };
 };
 
 const parseEnvLine = (line: string) => {
@@ -212,7 +232,7 @@ export const getIntegrationStoreProfile = async (storeId: string) => {
   ]);
 
   return {
-    profile: promoPayload?.profile ?? promoPayload?.promo ?? null,
+    profile: toStoreProfile(promoPayload?.profile ?? promoPayload?.promo),
     products: productPayload.products ?? productPayload.items ?? [],
   };
 };
