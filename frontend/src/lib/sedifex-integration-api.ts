@@ -66,20 +66,28 @@ const normalizeApiVersion = (apiVersion: string | undefined) => {
   return trimmed || 'v1';
 };
 
+const normalizeBaseUrl = (baseUrl: string | undefined) => {
+  const trimmed = (baseUrl ?? '').trim();
+  if (!trimmed) return '';
+
+  return trimmed.replace(/\/integration\/?$/i, '').replace(/\/$/, '');
+};
+
 const buildEndpoint = (
   path: string,
   query?: Record<string, string | number | undefined>,
   options?: { includeApiVersion?: boolean },
 ) => {
   const { baseUrl, apiVersion } = getIntegrationConfig();
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
 
-  if (!baseUrl) {
+  if (!normalizedBaseUrl) {
     throw new Error('SEDIFEX_INTEGRATION_API_BASE_URL is not configured.');
   }
 
   const normalizedVersion = normalizeApiVersion(apiVersion);
   const versionPrefix = options?.includeApiVersion === false ? '' : `/${normalizedVersion}`;
-  const url = new URL(`${baseUrl.replace(/\/$/, '')}${versionPrefix}${path}`);
+  const url = new URL(`${normalizedBaseUrl}${versionPrefix}${path}`);
   Object.entries(query ?? {}).forEach(([key, value]) => {
     if (value !== undefined && value !== '') url.searchParams.set(key, String(value));
   });
