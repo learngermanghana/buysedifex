@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
+import { MainNav } from '@/components/main-nav';
 import { baseSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 import './globals.css';
 
@@ -35,6 +36,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <WebVitalsReporter />
+        <div className="mainNavWrap">
+          <MainNav />
+        </div>
         {children}
       </body>
     </html>

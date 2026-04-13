@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProductGrid } from '@/components/product-grid';
 import { PromoCarousel } from '@/components/promo-carousel';
-import { SectionTabs } from '@/components/section-tabs';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 const title = 'Discover trusted local stores near you';
@@ -35,7 +34,6 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <main className="container">
-      <SectionTabs activeTab="products" />
       <header className="hero">
         <div
           className="heroImage"
