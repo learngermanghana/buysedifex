@@ -9,11 +9,13 @@ npm install
 npm run dev
 ```
 
-Create `.env.local` from `.env.example` and configure:
+Configure the backend integration credentials in `functions/.env.sedifex-web`:
 
 - `SEDIFEX_INTEGRATION_API_BASE_URL`
 - `SEDIFEX_INTEGRATION_API_VERSION`
 - `SEDIFEX_INTEGRATION_API_KEY`
+
+The Next.js server loaders and `/api/integration/*` routes read this backend env file and attach `x-api-key` on outbound requests so the key is not read from frontend runtime code.
 
 ## Integration routes
 

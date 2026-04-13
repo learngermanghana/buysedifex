@@ -6,12 +6,64 @@ import type {
   SedifexPromo,
   SedifexStoreProfile,
 } from '@sedifex/integration-types';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const baseUrl = process.env.SEDIFEX_INTEGRATION_API_BASE_URL;
-const apiKey = process.env.SEDIFEX_INTEGRATION_API_KEY;
-const apiVersion = process.env.SEDIFEX_INTEGRATION_API_VERSION ?? 'v1';
+let hasLoadedBackendIntegrationEnv = false;
+
+const ENV_FILE_LOCATIONS = [
+  path.resolve(process.cwd(), 'functions/.env.sedifex-web'),
+  path.resolve(process.cwd(), '../functions/.env.sedifex-web'),
+];
+
+const parseEnvLine = (line: string) => {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#')) return;
+
+  const equalsIndex = trimmed.indexOf('=');
+  if (equalsIndex <= 0) return;
+
+  const key = trimmed.slice(0, equalsIndex).trim();
+  if (!key) return;
+
+  const rawValue = trimmed.slice(equalsIndex + 1).trim();
+  const unquoted =
+    (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
+    (rawValue.startsWith("'") && rawValue.endsWith("'"))
+      ? rawValue.slice(1, -1)
+      : rawValue;
+
+  if (!process.env[key]) {
+    process.env[key] = unquoted;
+  }
+};
+
+const loadBackendIntegrationEnv = () => {
+  if (hasLoadedBackendIntegrationEnv) return;
+  hasLoadedBackendIntegrationEnv = true;
+
+  for (const envPath of ENV_FILE_LOCATIONS) {
+    if (!fs.existsSync(envPath)) continue;
+
+    const file = fs.readFileSync(envPath, 'utf8');
+    file.split(/\r?\n/).forEach(parseEnvLine);
+    return;
+  }
+};
+
+const getIntegrationConfig = () => {
+  loadBackendIntegrationEnv();
+
+  return {
+    baseUrl: process.env.SEDIFEX_INTEGRATION_API_BASE_URL,
+    apiKey: process.env.SEDIFEX_INTEGRATION_API_KEY,
+    apiVersion: process.env.SEDIFEX_INTEGRATION_API_VERSION ?? 'v1',
+  };
+};
 
 const buildEndpoint = (path: string, query?: Record<string, string | number | undefined>) => {
+  const { baseUrl, apiVersion } = getIntegrationConfig();
+
   if (!baseUrl) {
     throw new Error('SEDIFEX_INTEGRATION_API_BASE_URL is not configured.');
   }
@@ -25,6 +77,7 @@ const buildEndpoint = (path: string, query?: Record<string, string | number | un
 };
 
 const integrationFetch = async <T>(path: string, query?: Record<string, string | number | undefined>): Promise<T> => {
+  const { apiKey } = getIntegrationConfig();
   const endpoint = buildEndpoint(path, query);
 
   if (!apiKey) {
