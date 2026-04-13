@@ -61,14 +61,16 @@ export default function HomePage() {
           </div>
         </div>
       </header>
-      <PromoCarousel />
-      <section className="quickSections" aria-label="Homepage discovery sections">
-        <p>Trending in Accra</p>
-        <p>Recently added</p>
-        <p>Best priced</p>
-      </section>
-      <div className="productsColumn">
-        <ProductGrid />
+      <div className="homeStack">
+        <PromoCarousel />
+        <section className="quickSections" aria-label="Homepage discovery sections">
+          <p>Trending in Accra</p>
+          <p>Recently added</p>
+          <p>Best priced</p>
+        </section>
+        <div className="productsColumn">
+          <ProductGrid />
+        </div>
       </div>
       <footer className="siteFooter" aria-label="Footer navigation">
         <div className="siteFooterInner">

@@ -21,6 +21,36 @@ type ProductGridProps = {
   initialMaxPrice?: string;
 };
 
+type FilterToolbarProps = {
+  searchText: string;
+  selectedSort: SortOption;
+  selectedCity: string;
+  minPrice: string;
+  maxPrice: string;
+  cities: string[];
+  onSearchTextChange: (value: string) => void;
+  onSortChange: (value: SortOption) => void;
+  onCityChange: (value: string) => void;
+  onMinPriceChange: (value: string) => void;
+  onMaxPriceChange: (value: string) => void;
+};
+
+type CategoryChipsProps = {
+  categories: string[];
+  selectedCategory: string;
+  isLoading: boolean;
+  onSelectCategory: (category: string) => void;
+};
+
+type ProductCardProps = {
+  item: PublicProduct;
+  isSaved: boolean;
+  isDescriptionExpanded: boolean;
+  onToggleDescription: (productId: string) => void;
+  onToggleSave: (item: PublicProduct) => void;
+  onProductViewed: (item: PublicProduct) => void;
+};
+
 const PAGE_SIZE = 12;
 const SAVED_IDS_KEY = 'sedifex.savedProductIds';
 const RECENTLY_VIEWED_KEY = 'sedifex.recentlyViewedProducts';
@@ -47,6 +77,162 @@ const toPositivePrice = (value: string) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 };
+
+function FilterToolbar({
+  searchText,
+  selectedSort,
+  selectedCity,
+  minPrice,
+  maxPrice,
+  cities,
+  onSearchTextChange,
+  onSortChange,
+  onCityChange,
+  onMinPriceChange,
+  onMaxPriceChange,
+}: FilterToolbarProps) {
+  return (
+    <>
+      <div className="toolbar">
+        <div className="searchWrap">
+          <label htmlFor="search">Search</label>
+          <input
+            id="search"
+            type="search"
+            value={searchText}
+            onChange={(event) => onSearchTextChange(event.target.value)}
+            placeholder="Search products, services, stores, or categories"
+          />
+        </div>
+        <div className="sortWrap">
+          <label htmlFor="sort">Sort by</label>
+          <select id="sort" value={selectedSort} onChange={(event) => onSortChange(event.target.value as SortOption)}>
+            <option value="store-diverse">Mixed stores</option>
+            <option value="featured">Popular</option>
+            <option value="newest">Newest</option>
+            <option value="price">Cheapest</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="toolbar filterRow3">
+        <div className="sortWrap">
+          <label htmlFor="city-filter">City</label>
+          <select id="city-filter" value={selectedCity} onChange={(event) => onCityChange(event.target.value)}>
+            {cities.map((city) => (
+              <option key={city} value={city}>
+                {city === 'all' ? 'All cities' : city}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="sortWrap">
+          <label htmlFor="min-price">Min price</label>
+          <input id="min-price" type="number" min={0} value={minPrice} onChange={(event) => onMinPriceChange(event.target.value)} placeholder="0" />
+        </div>
+        <div className="sortWrap">
+          <label htmlFor="max-price">Max price</label>
+          <input id="max-price" type="number" min={0} value={maxPrice} onChange={(event) => onMaxPriceChange(event.target.value)} placeholder="500" />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function CategoryChips({ categories, selectedCategory, isLoading, onSelectCategory }: CategoryChipsProps) {
+  return (
+    <div className="categories" role="tablist" aria-label="Product categories">
+      {categories.map((category) => {
+        const active = category === selectedCategory;
+        return (
+          <button
+            type="button"
+            key={category}
+            role="tab"
+            aria-selected={active}
+            className={`chip ${active ? 'active' : ''}`}
+            disabled={isLoading}
+            onClick={() => onSelectCategory(category)}
+          >
+            {category}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProductCard({
+  item,
+  isSaved,
+  isDescriptionExpanded,
+  onToggleDescription,
+  onToggleSave,
+  onProductViewed,
+}: ProductCardProps) {
+  const whatsappLink = buildWhatsAppLink(item);
+  const canContactOnWhatsApp = whatsappLink !== '#';
+  const storeHref = getStoreHref(item.storeId, item.storeName);
+  const shouldCollapseDescription = (item.description?.trim().length ?? 0) > 260;
+  const descriptionClassName = `formattedDescription compact ${shouldCollapseDescription && !isDescriptionExpanded ? 'isCollapsed' : ''}`.trim();
+
+  return (
+    <article className="card">
+      <div className="imageWrap">
+        <Image
+          src={item.imageUrls?.[0] ?? 'https://placehold.co/640x640'}
+          alt={item.imageAlt?.trim() || item.productName || 'Product image'}
+          loading="lazy"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+          style={{ objectFit: 'cover' }}
+        />
+      </div>
+      <h3>{item.productName ?? 'Untitled item'}</h3>
+      <Link href={getProductHref(item.id, item.productName)} onClick={() => onProductViewed(item)}>
+        View product details
+      </Link>
+      <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
+      {shouldCollapseDescription ? (
+        <button type="button" className="descriptionToggle" onClick={() => onToggleDescription(item.id)}>
+          {isDescriptionExpanded ? 'View less' : 'View more'}
+        </button>
+      ) : null}
+      <div className="meta">
+        <span className="storeIdentity">
+          {storeHref ? <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link> : item.storeName ?? 'Unknown store'}
+          {isVerifiedStore(item.verified) ? (
+            <span className="verifiedBadge" aria-label="Verified store">
+              Verified
+            </span>
+          ) : null}
+        </span>
+        <strong>{formatPrice(item.price, item.currency)}</strong>
+      </div>
+      <p>City: {getStoreCity(item)}</p>
+      <p>Phone: {getStorePhone(item)}</p>
+      <button type="button" className="saveButton" onClick={() => onToggleSave(item)}>
+        {isSaved ? '★ Saved' : '☆ Save item'}
+      </button>
+      {canContactOnWhatsApp ? (
+        <a
+          className="waButton"
+          href={whatsappLink}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Contact ${item.storeName ?? 'store'} on WhatsApp about ${item.productName ?? 'this item'}`}
+          onClick={() => trackEvent('whatsapp_click', { productId: item.id, storeId: item.storeId ?? null })}
+        >
+          Contact on WhatsApp
+        </a>
+      ) : (
+        <span className="waButton" aria-disabled="true" title="WhatsApp contact unavailable">
+          WhatsApp unavailable
+        </span>
+      )}
+    </article>
+  );
+}
 
 export function ProductGrid({
   initialSearchText = '',
@@ -257,67 +443,26 @@ export function ProductGrid({
         </div>
       ) : null}
 
-      <div className="toolbar">
-        <div className="searchWrap">
-          <label htmlFor="search">Search</label>
-          <input
-            id="search"
-            type="search"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Search products, services, stores, or categories"
-          />
-        </div>
-        <div className="sortWrap">
-          <label htmlFor="sort">Sort by</label>
-          <select id="sort" value={selectedSort} onChange={(event) => setSelectedSort(event.target.value as SortOption)}>
-            <option value="store-diverse">Mixed stores</option>
-            <option value="featured">Popular</option>
-            <option value="newest">Newest</option>
-            <option value="price">Cheapest</option>
-          </select>
-        </div>
-      </div>
+      <FilterToolbar
+        searchText={searchText}
+        selectedSort={selectedSort}
+        selectedCity={selectedCity}
+        minPrice={minPrice}
+        maxPrice={maxPrice}
+        cities={cities}
+        onSearchTextChange={setSearchText}
+        onSortChange={setSelectedSort}
+        onCityChange={setSelectedCity}
+        onMinPriceChange={setMinPrice}
+        onMaxPriceChange={setMaxPrice}
+      />
 
-      <div className="toolbar filterRow3">
-        <div className="sortWrap">
-          <label htmlFor="city-filter">City</label>
-          <select id="city-filter" value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>
-            {cities.map((city) => (
-              <option key={city} value={city}>
-                {city === 'all' ? 'All cities' : city}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="sortWrap">
-          <label htmlFor="min-price">Min price</label>
-          <input id="min-price" type="number" min={0} value={minPrice} onChange={(event) => setMinPrice(event.target.value)} placeholder="0" />
-        </div>
-        <div className="sortWrap">
-          <label htmlFor="max-price">Max price</label>
-          <input id="max-price" type="number" min={0} value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} placeholder="500" />
-        </div>
-      </div>
-
-      <div className="categories" role="tablist" aria-label="Product categories">
-        {categories.map((category) => {
-          const active = category === selectedCategory;
-          return (
-            <button
-              type="button"
-              key={category}
-              role="tab"
-              aria-selected={active}
-              className={`chip ${active ? 'active' : ''}`}
-              disabled={isLoadingCategories}
-              onClick={() => setSelectedCategory(category)}
-            >
-              {category}
-            </button>
-          );
-        })}
-      </div>
+      <CategoryChips
+        categories={categories}
+        selectedCategory={selectedCategory}
+        isLoading={isLoadingCategories}
+        onSelectCategory={setSelectedCategory}
+      />
 
       {error ? (
         <div className="errorBlock">
@@ -339,71 +484,17 @@ export function ProductGrid({
                 <div className="skeleton skeletonButton" />
               </article>
             ))
-          : visibleProducts.map((item) => {
-              const whatsappLink = buildWhatsAppLink(item);
-              const canContactOnWhatsApp = whatsappLink !== '#';
-              const storeHref = getStoreHref(item.storeId, item.storeName);
-              const shouldCollapseDescription = (item.description?.trim().length ?? 0) > 260;
-              const isExpanded = expandedDescriptionIds.has(item.id);
-              const descriptionClassName = `formattedDescription compact ${shouldCollapseDescription && !isExpanded ? 'isCollapsed' : ''}`.trim();
-
-              return (
-                <article key={item.id} className="card">
-                  <div className="imageWrap">
-                    <Image
-                      src={item.imageUrls?.[0] ?? 'https://placehold.co/640x640'}
-                      alt={item.imageAlt?.trim() || item.productName || 'Product image'}
-                      loading="lazy"
-                      fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                      style={{ objectFit: 'cover' }}
-                    />
-                  </div>
-                  <h3>{item.productName ?? 'Untitled item'}</h3>
-                  <Link href={getProductHref(item.id, item.productName)} onClick={() => onProductViewed(item)}>
-                    View product details
-                  </Link>
-                  <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
-                  {shouldCollapseDescription ? (
-                    <button type="button" className="descriptionToggle" onClick={() => toggleDescription(item.id)}>
-                      {isExpanded ? 'View less' : 'View more'}
-                    </button>
-                  ) : null}
-                  <div className="meta">
-                    <span className="storeIdentity">
-                      {storeHref ? <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link> : item.storeName ?? 'Unknown store'}
-                      {isVerifiedStore(item.verified) ? (
-                        <span className="verifiedBadge" aria-label="Verified store">
-                          Verified
-                        </span>
-                      ) : null}
-                    </span>
-                    <strong>{formatPrice(item.price, item.currency)}</strong>
-                  </div>
-                  <p>City: {getStoreCity(item)}</p>
-                  <p>Phone: {getStorePhone(item)}</p>
-                  <button type="button" className="saveButton" onClick={() => toggleSave(item)}>
-                    {savedIds.has(item.id) ? '★ Saved' : '☆ Save item'}
-                  </button>
-                  {canContactOnWhatsApp ? (
-                    <a
-                      className="waButton"
-                      href={whatsappLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Contact ${item.storeName ?? 'store'} on WhatsApp about ${item.productName ?? 'this item'}`}
-                      onClick={() => trackEvent('whatsapp_click', { productId: item.id, storeId: item.storeId ?? null })}
-                    >
-                      Contact on WhatsApp
-                    </a>
-                  ) : (
-                    <span className="waButton" aria-disabled="true" title="WhatsApp contact unavailable">
-                      WhatsApp unavailable
-                    </span>
-                  )}
-                </article>
-              );
-            })}
+          : visibleProducts.map((item) => (
+              <ProductCard
+                key={item.id}
+                item={item}
+                isSaved={savedIds.has(item.id)}
+                isDescriptionExpanded={expandedDescriptionIds.has(item.id)}
+                onToggleDescription={toggleDescription}
+                onToggleSave={toggleSave}
+                onProductViewed={onProductViewed}
+              />
+            ))}
       </div>
 
       {!isLoading && visibleProducts.length === 0 && !error ? (
