@@ -24,6 +24,7 @@ type IntegrationProductsPayload = {
 type IntegrationProductRecord = Partial<SedifexProduct> & {
   id?: string;
   storeId?: string;
+  storeName?: string;
   name?: string;
   category?: string | null;
   imageUrl?: string | null;
@@ -55,7 +56,9 @@ type IntegrationPromoPayload = {
   promo?: IntegrationPromoProfile | null;
 };
 
-const toStoreProfile = (profile: IntegrationPromoProfile | null | undefined): SedifexStoreProfile | null => {
+const toStoreProfile = (
+  profile: IntegrationPromoProfile | null | undefined,
+): SedifexStoreProfile | null => {
   if (!profile) return null;
 
   const storeId = profile.storeId ?? profile.id ?? '';
@@ -77,12 +80,17 @@ const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | n
   const storeName = product.storeName?.trim();
   const productName = product.productName?.trim() || product.name?.trim();
 
-  if (!id || !storeId || !storeName || !productName) return null;
+  // storeName is optional for all-store marketplace responses
+  if (!id || !storeId || !productName) return null;
 
   const normalizedImageUrls = Array.isArray(product.imageUrls)
-    ? product.imageUrls.map((url) => url?.trim()).filter((url): url is string => Boolean(url))
+    ? product.imageUrls
+        .map((url) => url?.trim())
+        .filter((url): url is string => Boolean(url))
     : [];
+
   const fallbackImageUrl = product.imageUrl?.trim();
+
   const imageUrls =
     normalizedImageUrls.length > 0
       ? normalizedImageUrls
@@ -98,13 +106,16 @@ const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | n
     productName,
     categoryKey: product.categoryKey ?? product.category ?? undefined,
     imageUrls,
+    imageAlt: product.imageAlt ?? productName,
     price: typeof product.price === 'number' ? product.price : undefined,
     stockCount: typeof product.stockCount === 'number' ? product.stockCount : undefined,
   };
 };
 
 const normalizeProducts = (products: IntegrationProductRecord[]): SedifexProduct[] =>
-  products.map(normalizeProduct).filter((product): product is SedifexProduct => Boolean(product));
+  products
+    .map(normalizeProduct)
+    .filter((product): product is SedifexProduct => Boolean(product));
 
 const parseEnvLine = (line: string) => {
   const trimmed = line.trim();
@@ -150,7 +161,6 @@ const getIntegrationConfig = () => {
     contractVersion: process.env.SEDIFEX_INTEGRATION_API_VERSION ?? '2026-04-13',
   };
 };
-
 
 const buildEndpoint = (
   endpointPath: string,
@@ -254,11 +264,7 @@ export const listIntegrationCategoryKeys = async () => {
 
   const products = normalizeProducts(payload.products ?? payload.items ?? []);
   const categoryKeys = Array.from(
-    new Set(
-      products
-        .map((item) => item.categoryKey ?? '')
-        .filter(Boolean),
-    ),
+    new Set(products.map((item) => item.categoryKey ?? '').filter(Boolean)),
   );
 
   return { items: categoryKeys };
