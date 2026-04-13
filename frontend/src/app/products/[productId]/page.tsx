@@ -69,7 +69,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   const title = `${product.productName}${buildLocation(product.city)} | ${product.storeName} | Sedifex`;
   const description = buildMetadataDescription(product);
   const socialImages =
-    product.imageUrls.length > 0 ? product.imageUrls.map((url) => ({ url })) : [{ url: defaultSocialImageUrl() }];
+    product.imageUrls.length > 0 ? product.imageUrls.map((url: string) => ({ url })) : [{ url: defaultSocialImageUrl() }];
 
   return {
     title,
@@ -92,7 +92,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       card: 'summary_large_image',
       title,
       description,
-      images: socialImages.map((image) => image.url),
+      images: socialImages.map((image: { url: string }) => image.url),
     },
   };
 }
@@ -159,7 +159,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <section className="productSummaryCard">
         {product.imageUrls.length > 0 ? (
           <section className="productImageGrid" aria-label="Product images">
-            {product.imageUrls.map((imageUrl) => (
+            {product.imageUrls.map((imageUrl: string) => (
               <Image
                 key={imageUrl}
                 src={imageUrl}
