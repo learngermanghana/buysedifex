@@ -15,7 +15,7 @@ const PAGE_SIZE = 12;
 const normalizeDisplayCurrency = (currency?: string) => ((currency ?? 'GHS').toUpperCase() === 'USD' ? 'GHS' : (currency ?? 'GHS').toUpperCase());
 const formatPrice = (price?: number, currency?: string) => (price == null ? 'Price unavailable' : `${normalizeDisplayCurrency(currency) === 'GHS' ? 'Cedis (GH₵)' : normalizeDisplayCurrency(currency)} ${price.toFixed(2)}`);
 const toWhatsAppPhone = (phone?: string | number) => String(phone ?? '').replace(/[^\d]/g, '');
-const getContactPhone = (item: PublicProduct) => item.waLink ?? '';
+const getContactPhone = (item: PublicProduct) => item.phone ?? item.waLink ?? '';
 const buildWhatsAppLink = (item: PublicProduct) => {
   const phone = toWhatsAppPhone(getContactPhone(item));
   if (!phone) return '#';

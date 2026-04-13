@@ -1,4 +1,5 @@
 :root {
+  --sticky-nav-offset: 3.6rem;
   color-scheme: light;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   background: linear-gradient(170deg, #f8fafc 0%, #eef2ff 42%, #fdf2f8 100%);
@@ -679,7 +680,8 @@ select:focus {
 
 .stickyProductActions {
   position: sticky;
-  bottom: 0.6rem;
+  bottom: 1rem;
+  margin: 0 0.25rem 0.25rem;
   display: grid;
   gap: 0.6rem;
   background: #ffffffe8;
@@ -783,7 +785,7 @@ select:focus {
   display: grid;
   gap: 0.8rem;
   position: sticky;
-  top: 0.8rem;
+  top: calc(var(--sticky-nav-offset) + 0.8rem);
   margin-bottom: 1rem;
 }
 
