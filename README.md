@@ -11,7 +11,7 @@ Buy Sedifex contains a marketplace frontend and optional Firebase support utilit
 
 ## Integration API configuration
 
-Copy `frontend/.env.example` to `frontend/.env.local` and set:
+Set these values in `functions/.env.sedifex-web` so they stay backend-side:
 
 - `SEDIFEX_INTEGRATION_API_BASE_URL`
 - `SEDIFEX_INTEGRATION_API_VERSION`
