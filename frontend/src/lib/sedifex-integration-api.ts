@@ -74,9 +74,10 @@ const toStoreProfile = (profile: IntegrationPromoProfile | null | undefined): Se
 const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | null => {
   const id = product.id?.trim();
   const storeId = product.storeId?.trim();
+  const storeName = product.storeName?.trim();
   const productName = product.productName?.trim() || product.name?.trim();
 
-  if (!id || !storeId || !productName) return null;
+  if (!id || !storeId || !storeName || !productName) return null;
 
   const normalizedImageUrls = Array.isArray(product.imageUrls)
     ? product.imageUrls.map((url) => url?.trim()).filter((url): url is string => Boolean(url))
@@ -93,6 +94,7 @@ const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | n
     ...product,
     id,
     storeId,
+    storeName,
     productName,
     categoryKey: product.categoryKey ?? product.category ?? undefined,
     imageUrls,
