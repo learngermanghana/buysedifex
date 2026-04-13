@@ -3,8 +3,6 @@ import type {
   SedifexGalleryItem,
   SedifexProduct,
   SedifexProductSort,
-  SedifexPromo,
-  SedifexStoreProfile,
 } from '@sedifex/integration-types';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,6 +13,32 @@ const ENV_FILE_LOCATIONS = [
   path.resolve(process.cwd(), 'functions/.env.sedifex-web'),
   path.resolve(process.cwd(), '../functions/.env.sedifex-web'),
 ];
+
+type IntegrationProductsPayload = {
+  products?: SedifexProduct[];
+  items?: SedifexProduct[];
+  hasMore?: boolean;
+};
+
+type IntegrationPromoProfile = {
+  id?: string;
+  storeId?: string;
+  displayName?: string;
+  name?: string;
+  promoTitle?: string;
+  promoSummary?: string;
+  promoStartDate?: string;
+  promoEndDate?: string;
+  promoSlug?: string;
+  promoWebsiteUrl?: string;
+};
+
+type IntegrationPromoPayload = {
+  items?: IntegrationPromoProfile[];
+  promos?: IntegrationPromoProfile[];
+  profile?: IntegrationPromoProfile | null;
+  promo?: IntegrationPromoProfile | null;
+};
 
 const parseEnvLine = (line: string) => {
   const trimmed = line.trim();
@@ -113,39 +137,50 @@ const integrationFetch = async <T>(
 };
 
 export const getIntegrationProductById = async (productId: string) => {
-  const payload = await integrationFetch<{ products?: SedifexProduct[] }>(
+  const payload = await integrationFetch<IntegrationProductsPayload>(
     '/v1IntegrationProducts',
     { productId },
   );
-  return payload.products?.[0] ?? null;
+
+  const products = payload.products ?? payload.items ?? [];
+  return products[0] ?? null;
 };
 
-export const listIntegrationProducts = (query?: {
+export const listIntegrationProducts = async (query?: {
   categoryKey?: string;
   storeId?: string;
   page?: number;
   pageSize?: number;
   sort?: SedifexProductSort | string;
   maxPerStore?: number;
-}) =>
-  integrationFetch<{ products: SedifexProduct[]; items?: SedifexProduct[]; hasMore?: boolean }>(
+}) => {
+  const payload = await integrationFetch<IntegrationProductsPayload>(
     '/v1IntegrationProducts',
     query,
-  ).then((payload) => ({
+  );
+
+  return {
     items: payload.items ?? payload.products ?? [],
     hasMore: payload.hasMore ?? false,
-  }));
+  };
+};
 
 export const listIntegrationCategoryKeys = async () => {
-  const payload = await integrationFetch<{ products?: SedifexProduct[] }>(
+  const payload = await integrationFetch<IntegrationProductsPayload>(
     '/v1IntegrationProducts',
   );
 
-  const products = payload.products ?? [];
+  const products = payload.products ?? payload.items ?? [];
   const categoryKeys = Array.from(
     new Set(
       products
-        .map((item: any) => item.categoryKey ?? item.category ?? '')
+        .map((item) => {
+          const record = item as SedifexProduct & {
+            categoryKey?: string;
+            category?: string;
+          };
+          return record.categoryKey ?? record.category ?? '';
+        })
         .filter(Boolean),
     ),
   );
@@ -154,13 +189,13 @@ export const listIntegrationCategoryKeys = async () => {
 };
 
 export const listIntegrationStoreIds = async () => {
-  const payload = await integrationFetch<{ products?: SedifexProduct[] }>(
+  const payload = await integrationFetch<IntegrationProductsPayload>(
     '/v1IntegrationProducts',
   );
 
-  const products = payload.products ?? [];
+  const products = payload.products ?? payload.items ?? [];
   const storeIds = Array.from(
-    new Set(products.map((item: any) => item.storeId).filter(Boolean)),
+    new Set(products.map((item) => item.storeId).filter(Boolean)),
   );
 
   return { items: storeIds };
@@ -168,19 +203,28 @@ export const listIntegrationStoreIds = async () => {
 
 export const getIntegrationStoreProfile = async (storeId: string) => {
   const [promoPayload, productPayload] = await Promise.all([
-    integrationFetch<any>('/v1IntegrationPromo', { storeId }).catch(() => null),
-    integrationFetch<{ products?: SedifexProduct[] }>('/v1IntegrationProducts', { storeId }),
+    integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', {
+      storeId,
+    }).catch(() => null),
+    integrationFetch<IntegrationProductsPayload>('/v1IntegrationProducts', {
+      storeId,
+    }),
   ]);
 
   return {
     profile: promoPayload?.profile ?? promoPayload?.promo ?? null,
-    products: productPayload.products ?? [],
+    products: productPayload.products ?? productPayload.items ?? [],
   };
 };
 
 export const listIntegrationPromos = async () => {
-  const payload = await integrationFetch<any>('/v1IntegrationPromo');
-  return { items: payload.items ?? payload.promos ?? (payload ? [payload] : []) };
+  const payload = await integrationFetch<IntegrationPromoPayload>(
+    '/v1IntegrationPromo',
+  );
+
+  return {
+    items: payload.items ?? payload.promos ?? (payload.profile ? [payload.profile] : []),
+  };
 };
 
 export const listIntegrationGallery = async (storeId?: string) => {
@@ -188,6 +232,7 @@ export const listIntegrationGallery = async (storeId?: string) => {
     '/integrationGallery',
     storeId ? { storeId } : undefined,
   );
+
   return { items: payload.items ?? [] };
 };
 
@@ -196,5 +241,6 @@ export const listIntegrationCustomers = async (storeId?: string) => {
     '/integrationCustomers',
     storeId ? { storeId } : undefined,
   );
+
   return { items: payload.items ?? [] };
 };
