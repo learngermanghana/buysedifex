@@ -26,13 +26,18 @@ const buildEndpoint = (path: string, query?: Record<string, string | number | un
 
 const integrationFetch = async <T>(path: string, query?: Record<string, string | number | undefined>): Promise<T> => {
   const endpoint = buildEndpoint(path, query);
+
+  if (!apiKey) {
+    throw new Error('SEDIFEX_INTEGRATION_API_KEY is not configured. Set it in your runtime environment (for example Vercel Project Settings → Environment Variables).');
+  }
+
   const response = await fetch(endpoint, {
-    headers: apiKey ? { 'x-api-key': apiKey } : undefined,
+    headers: { 'x-api-key': apiKey },
     next: { revalidate: 300 },
   });
 
   if (!response.ok) {
-    throw new Error(`Sedifex integration request failed (${response.status}) for ${endpoint.pathname}`);
+    throw new Error(`Sedifex integration request failed (${response.status}) for ${endpoint.pathname}. Verify SEDIFEX_INTEGRATION_API_BASE_URL, SEDIFEX_INTEGRATION_API_VERSION, and SEDIFEX_INTEGRATION_API_KEY.`);
   }
 
   return (await response.json()) as T;

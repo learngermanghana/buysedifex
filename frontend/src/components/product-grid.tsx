@@ -90,8 +90,9 @@ export function ProductGrid() {
       setCities((current) => Array.from(new Set([...current, ...nextItems.map(getStoreCity)])).sort((a, b) => a.localeCompare(b)));
       setHasMore(Boolean(body.hasMore));
       setPage(nextPage);
-    } catch {
-      setError('Could not load products from Sedifex integration API.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setError(`Could not load products from Sedifex integration API: ${message}`);
     } finally {
       setIsLoading(false);
     }
