@@ -14,7 +14,7 @@ type StoreServiceGroup = {
 
 const buildStoreServiceGroups = async (): Promise<StoreServiceGroup[]> => {
   try {
-    const storeIds = await listPublicStoreIds(100);
+    const storeIds = await listPublicStoreIds();
     const profiles = await Promise.all(storeIds.map((storeId) => getStoreProfileById(storeId)));
 
     return profiles
