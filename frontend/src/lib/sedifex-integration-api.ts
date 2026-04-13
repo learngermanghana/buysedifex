@@ -503,7 +503,7 @@ export const listIntegrationStoreIds = async () => {
 };
 
 export const getIntegrationStoreProfile = async (storeId: string) => {
-  const [promoPayload, productPayload, storePayload] = await Promise.all([
+  const [promoPayload, storePayload, productsPayload] = await Promise.all([
     integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', {
       storeId,
     }).catch(() => null),
@@ -513,7 +513,7 @@ export const getIntegrationStoreProfile = async (storeId: string) => {
     }),
   ]);
 
-  const normalizedProducts = normalizeProducts(productPayload.products ?? productPayload.items ?? []);
+  const normalizedProducts = normalizeProducts(productsPayload.products ?? productsPayload.items ?? []);
   const enrichedProducts = await enrichProductsWithStoreData(normalizedProducts);
   const profileFromPromo = toStoreProfile(promoPayload?.profile ?? promoPayload?.promo);
   const profile: SedifexStoreProfile | null = profileFromPromo ?? (storePayload?.storeName
