@@ -1,43 +1,12 @@
 'use client';
 
+import type { SedifexPromo } from '@sedifex/integration-types';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { FirestoreError, collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
-import { db, firebaseConfigError } from '@/lib/firebase';
 import { getStoreHref } from '@/lib/store-route';
 
-type StorePromo = {
-  id: string;
-  storeId?: string;
-  storeName?: string;
-  storeSlug?: string;
-  verified?: boolean | string;
-  promoTitle?: string;
-  promoSummary?: string;
-  promoImageUrl?: string;
-  promoImageAlt?: string | null;
-  promoStartDate?: string;
-  promoEndDate?: string;
-  promoTiktokUrl?: string | null;
-  promoWebsiteUrl?: string | null;
-  promoYoutubeUrl?: string | null;
-};
-
-const isVerifiedStore = (value: StorePromo['verified']) => {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    return normalized === 'true' || normalized === '1' || normalized === 'yes';
-  }
-
-  return false;
-};
-
-const isWithinPromoWindow = (promo: StorePromo, today: string) => {
-  if (!promo.promoStartDate || !promo.promoEndDate) return false;
-  return promo.promoStartDate <= today && promo.promoEndDate >= today;
-};
+type StorePromo = SedifexPromo;
 
 const getStorePath = (promo: StorePromo) => getStoreHref(promo.storeId ?? promo.id, promo.storeName, promo.storeSlug);
 
@@ -49,57 +18,14 @@ export function PromoCarousel() {
 
   useEffect(() => {
     const loadPromos = async () => {
-      if (!db) {
-        setError(firebaseConfigError ?? 'Firebase is not configured.');
-        setIsLoading(false);
-        return;
-      }
-
-      const today = new Date().toISOString().slice(0, 10);
-
       try {
-        const primaryQuery = query(
-          collection(db, 'stores'),
-          where('promoStartDate', '<=', today),
-          where('promoEndDate', '>=', today),
-          orderBy('promoStartDate', 'desc'),
-          limit(50),
-        );
-
-        const snapshot = await getDocs(primaryQuery);
-        const items = snapshot.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }) as StorePromo)
-          .filter(
-            (item) =>
-              isVerifiedStore(item.verified) && Boolean(item.promoTitle?.trim()) && Boolean(item.promoImageUrl?.trim()),
-          )
-          .slice(0, 10);
-
-        setPromos(items);
+        const response = await fetch('/api/integration/promos', { cache: 'no-store' });
+        if (!response.ok) throw new Error('Failed to load promos');
+        const body = (await response.json()) as { items?: StorePromo[] };
+        setPromos(Array.isArray(body.items) ? body.items : []);
         setError(null);
-      } catch (err) {
-        const firestoreError = err as FirestoreError;
-
-        if (firestoreError.code !== 'failed-precondition') {
-          setError('Could not load promotions at the moment.');
-          setIsLoading(false);
-          return;
-        }
-
-        try {
-          const fallbackQuery = query(collection(db, 'stores'), limit(100));
-          const snapshot = await getDocs(fallbackQuery);
-          const items = snapshot.docs
-            .map((doc) => ({ id: doc.id, ...doc.data() }) as StorePromo)
-            .filter((item) => isVerifiedStore(item.verified) && isWithinPromoWindow(item, today))
-            .sort((a, b) => (b.promoStartDate ?? '').localeCompare(a.promoStartDate ?? ''))
-            .slice(0, 10);
-
-          setPromos(items);
-          setError(null);
-        } catch {
-          setError('Could not load promotions at the moment.');
-        }
+      } catch {
+        setError('Could not load promotions at the moment.');
       } finally {
         setIsLoading(false);
       }
@@ -133,9 +59,7 @@ export function PromoCarousel() {
         <h2>Verified store deals</h2>
       </div>
 
-      {isLoading ? (
-        <div className="promoCard skeletonPromo" aria-hidden="true" />
-      ) : null}
+      {isLoading ? <div className="promoCard skeletonPromo" aria-hidden="true" /> : null}
 
       {!isLoading && error ? <p className="error">{error}</p> : null}
 

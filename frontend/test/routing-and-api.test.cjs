@@ -31,10 +31,13 @@ test('store routes support slug + id links and id extraction', () => {
   assert.match(promoSource, /getStoreHref\(promo\.storeId \?\? promo\.id, promo\.storeName, promo\.storeSlug\)/);
 });
 
-test('store API lookup includes slug fallback query on stores collection', () => {
+test('store and product APIs read from Sedifex integration endpoints', () => {
   const storesSource = read('src/lib/public-stores.ts');
+  const productsSource = read('src/lib/public-products.ts');
+  const integrationClientSource = read('src/lib/sedifex-integration-api.ts');
 
-  assert.match(storesSource, /from: \[\{ collectionId: 'stores' \}\]/);
-  assert.match(storesSource, /readStoreDocumentByField\('storeSlug', normalizedStoreId\)/);
-  assert.match(storesSource, /readStoreDocumentByField\('slug', normalizedStoreId\)/);
+  assert.match(storesSource, /getIntegrationStoreProfile/);
+  assert.match(productsSource, /getIntegrationProductById/);
+  assert.match(integrationClientSource, /SEDIFEX_INTEGRATION_API_BASE_URL/);
+  assert.match(integrationClientSource, /SEDIFEX_INTEGRATION_API_VERSION/);
 });
