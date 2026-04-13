@@ -42,6 +42,8 @@ test('store and product APIs read from Sedifex integration endpoints', () => {
   assert.match(productsSource, /getIntegrationProductById/);
   assert.match(integrationClientSource, /SEDIFEX_INTEGRATION_API_BASE_URL/);
   assert.match(integrationClientSource, /SEDIFEX_INTEGRATION_API_VERSION/);
+  assert.match(integrationClientSource, /normalizeBaseUrl/);
+  assert.ok(integrationClientSource.includes("replace(/\\/integration\\/?$/i, '').replace(/\\/$/, '')"));
   assert.match(integrationProductsRouteSource, /sort: params\.get\('sort'\) \?\? 'store-diverse'/);
   assert.match(integrationProductsRouteSource, /maxPerStore/);
   assert.match(productGridSource, /useState<SortOption>\('store-diverse'\)/);

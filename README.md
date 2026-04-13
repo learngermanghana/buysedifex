@@ -13,7 +13,7 @@ Buy Sedifex contains a marketplace frontend and optional Firebase support utilit
 
 Set these values in `functions/.env.sedifex-web` so they stay backend-side:
 
-- `SEDIFEX_INTEGRATION_API_BASE_URL`
+- `SEDIFEX_INTEGRATION_API_BASE_URL` (Cloud Functions host, e.g. `https://us-central1-sedifex-web.cloudfunctions.net`; do not include `/integration`)
 - `SEDIFEX_INTEGRATION_API_VERSION`
 - `SEDIFEX_INTEGRATION_API_KEY`
 
