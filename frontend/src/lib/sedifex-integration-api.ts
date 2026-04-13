@@ -36,11 +36,16 @@ type IntegrationProductRecord = Partial<SedifexProduct> & {
 
 type IntegrationStoreRecord = {
   storeId?: string;
+  id?: string;
   displayName?: string | null;
   name?: string | null;
+  storeName?: string | null;
+  workspaceSlug?: string | null;
   storeSlug?: string | null;
   city?: string | null;
+  country?: string | null;
   phone?: string | null;
+  storePhone?: string | null;
   whatsapp?: string | null;
   whatsappNumber?: string | null;
   addressLine1?: string | null;
@@ -51,6 +56,7 @@ type SafeStoreRecord = {
   storeName?: string;
   storeSlug?: string;
   city?: string;
+  country?: string;
   phone?: string;
   waLink?: string;
   addressLine1?: string;
@@ -171,20 +177,22 @@ const normalizeProducts = (products: IntegrationProductRecord[]): SedifexProduct
     .filter((product): product is SedifexProduct => Boolean(product));
 
 const toSafeStoreRecord = (store: IntegrationStoreRecord | null | undefined): SafeStoreRecord | null => {
-  const storeId = cleanString(store?.storeId);
+  const storeId = cleanString(store?.storeId) ?? cleanString(store?.id);
   if (!store || !storeId) return null;
 
-  const phone = cleanString(store.phone);
+  const phone = cleanString(store.phone) ?? cleanString(store.storePhone);
   const city = cleanString(store.city);
+  const country = cleanString(store.country);
   const addressLine1 = cleanString(store.addressLine1);
-  const storeName = cleanString(store.displayName) || cleanString(store.name);
+  const storeName = cleanString(store.displayName) || cleanString(store.name) || cleanString(store.storeName);
   const whatsapp = cleanString(store.whatsapp) || cleanString(store.whatsappNumber);
 
   return {
     storeId,
     storeName: storeName ?? undefined,
-    storeSlug: cleanString(store.storeSlug),
+    storeSlug: cleanString(store.storeSlug) ?? cleanString(store.workspaceSlug),
     city: city ?? undefined,
+    country: country ?? undefined,
     phone: phone ?? undefined,
     waLink: whatsapp ?? phone ?? undefined,
     addressLine1: addressLine1 ?? undefined,
@@ -199,9 +207,31 @@ const getStoreById = async (storeId: string): Promise<SafeStoreRecord | null> =>
     const payload = await integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', {
       storeId: normalizedStoreId,
     });
-    return toSafeStoreRecord(payload.profile ?? payload.promo ?? payload.items?.[0] ?? payload.promos?.[0]);
+    const fromPromo = toSafeStoreRecord(payload.profile ?? payload.promo ?? payload.items?.[0] ?? payload.promos?.[0]);
+    if (fromPromo?.city || fromPromo?.addressLine1 || fromPromo?.country) {
+      return fromPromo;
+    }
+
+    const storePayload = await integrationFetch<{
+      store?: IntegrationStoreRecord | null;
+      data?: IntegrationStoreRecord | null;
+      profile?: IntegrationStoreRecord | null;
+      item?: IntegrationStoreRecord | null;
+    }>(`/stores/${encodeURIComponent(normalizedStoreId)}/store`);
+    const fromStorePath = toSafeStoreRecord(storePayload.store ?? storePayload.data ?? storePayload.profile ?? storePayload.item);
+    return fromStorePath ?? fromPromo;
   } catch {
-    return null;
+    try {
+      const storePayload = await integrationFetch<{
+        store?: IntegrationStoreRecord | null;
+        data?: IntegrationStoreRecord | null;
+        profile?: IntegrationStoreRecord | null;
+        item?: IntegrationStoreRecord | null;
+      }>(`/stores/${encodeURIComponent(normalizedStoreId)}/store`);
+      return toSafeStoreRecord(storePayload.store ?? storePayload.data ?? storePayload.profile ?? storePayload.item);
+    } catch {
+      return null;
+    }
   }
 };
 
@@ -273,6 +303,7 @@ const enrichProductsWithStoreData = async (
       ...product,
       storeName: safeStore.storeName ?? product.storeName,
       city: safeStore.city ?? product.city,
+      country: safeStore.country ?? product.country,
       waLink: safeStore.waLink ?? product.waLink,
       phone: safeStore.phone ?? product.phone,
       addressLine1: safeStore.addressLine1 ?? product.addressLine1,
