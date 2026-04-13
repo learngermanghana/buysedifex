@@ -78,6 +78,7 @@ const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | n
   const id = product.id?.trim();
   const storeId = product.storeId?.trim();
   const storeName = product.storeName?.trim();
+  const normalizedStoreName = storeName ?? '';
   const productName = product.productName?.trim() || product.name?.trim();
 
   // storeName is optional for all-store marketplace responses
@@ -102,7 +103,7 @@ const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | n
     ...product,
     id,
     storeId,
-    storeName,
+    storeName: normalizedStoreName,
     productName,
     categoryKey: product.categoryKey ?? product.category ?? undefined,
     imageUrls,
