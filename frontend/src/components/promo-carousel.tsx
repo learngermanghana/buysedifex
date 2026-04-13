@@ -4,11 +4,19 @@ import type { SedifexPromo } from '@sedifex/integration-types';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { trackEvent } from '@/lib/client-tracking';
 import { getStoreHref } from '@/lib/store-route';
 
 type StorePromo = SedifexPromo;
 
 const getStorePath = (promo: StorePromo) => getStoreHref(promo.storeId ?? promo.id, promo.storeName, promo.storeSlug);
+
+const promoMatchesCity = (promo: StorePromo, city: string) => {
+  if (!city || city === 'all') return false;
+  const normalizedCity = city.trim().toLowerCase();
+  const haystack = [promo.promoSummary, promo.promoTitle, promo.storeName].filter(Boolean).join(' ').toLowerCase();
+  return haystack.includes(normalizedCity);
+};
 
 export function PromoCarousel() {
   const [promos, setPromos] = useState<StorePromo[]>([]);
@@ -22,7 +30,12 @@ export function PromoCarousel() {
         const response = await fetch('/api/integration/promos', { cache: 'no-store' });
         if (!response.ok) throw new Error('Failed to load promos');
         const body = (await response.json()) as { items?: StorePromo[] };
-        setPromos(Array.isArray(body.items) ? body.items : []);
+
+        const preferredCity = typeof window === 'undefined' ? 'all' : window.localStorage.getItem('sedifex.preferredCity') ?? 'all';
+        const sourcePromos = Array.isArray(body.items) ? body.items : [];
+        const cityMatched = sourcePromos.filter((promo) => promoMatchesCity(promo, preferredCity));
+        setPromos(cityMatched.length > 0 ? cityMatched : sourcePromos);
+
         setError(null);
       } catch {
         setError('Could not load promotions at the moment.');
@@ -52,6 +65,11 @@ export function PromoCarousel() {
 
   const activePromo = useMemo(() => promos[activeIndex], [activeIndex, promos]);
 
+  useEffect(() => {
+    if (!activePromo) return;
+    void trackEvent('promo_impression', { promoId: activePromo.id, storeId: activePromo.storeId ?? null, position: activeIndex });
+  }, [activePromo, activeIndex]);
+
   return (
     <aside className="promoRail" aria-label="Latest store promotions">
       <div className="promoRailHeader">
@@ -79,26 +97,28 @@ export function PromoCarousel() {
             <h3>{activePromo.promoTitle ?? 'Latest promotion'}</h3>
             {activePromo.promoSummary ? <p className="promoSummary">{activePromo.promoSummary}</p> : null}
             {activePromo.promoStartDate || activePromo.promoEndDate ? (
-              <p className="promoDates">
-                {[activePromo.promoStartDate, activePromo.promoEndDate].filter(Boolean).join(' - ')}
-              </p>
+              <p className="promoDates">{[activePromo.promoStartDate, activePromo.promoEndDate].filter(Boolean).join(' - ')}</p>
             ) : null}
           </div>
 
           <div className="promoActions">
-            {getStorePath(activePromo) ? <Link href={getStorePath(activePromo) ?? '#'}>Visit store</Link> : null}
+            {getStorePath(activePromo) ? (
+              <Link href={getStorePath(activePromo) ?? '#'} onClick={() => trackEvent('promo_click', { promoId: activePromo.id, channel: 'store' })}>
+                Visit store
+              </Link>
+            ) : null}
             {activePromo.promoWebsiteUrl ? (
-              <a href={activePromo.promoWebsiteUrl} target="_blank" rel="noreferrer">
+              <a href={activePromo.promoWebsiteUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent('promo_click', { promoId: activePromo.id, channel: 'website' })}>
                 Website
               </a>
             ) : null}
             {activePromo.promoTiktokUrl ? (
-              <a href={activePromo.promoTiktokUrl} target="_blank" rel="noreferrer">
+              <a href={activePromo.promoTiktokUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent('promo_click', { promoId: activePromo.id, channel: 'tiktok' })}>
                 TikTok
               </a>
             ) : null}
             {activePromo.promoYoutubeUrl ? (
-              <a href={activePromo.promoYoutubeUrl} target="_blank" rel="noreferrer">
+              <a href={activePromo.promoYoutubeUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent('promo_click', { promoId: activePromo.id, channel: 'youtube' })}>
                 YouTube
               </a>
             ) : null}
@@ -120,9 +140,7 @@ export function PromoCarousel() {
         </article>
       ) : null}
 
-      {!isLoading && !error && promos.length === 0 ? (
-        <p className="promoEmpty">No active promotions yet. Verified stores will appear here automatically.</p>
-      ) : null}
+      {!isLoading && !error && promos.length === 0 ? <p className="promoEmpty">No active promotions yet. Verified stores will appear here automatically.</p> : null}
     </aside>
   );
 }

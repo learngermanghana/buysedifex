@@ -204,7 +204,8 @@ const getStoreById = async (storeId: string): Promise<SafeStoreRecord | null> =>
   if (!normalizedStoreId) return null;
 
   const resolveStorePayload = async () => {
-    const paths = [`/stores/${encodeURIComponent(normalizedStoreId)}`, `/stores/${encodeURIComponent(normalizedStoreId)}/store`];
+    const encodedStoreId = encodeURIComponent(normalizedStoreId);
+    const paths = ['/stores/' + encodedStoreId, '/stores/' + encodedStoreId + '/store'];
 
     for (const endpointPath of paths) {
       try {

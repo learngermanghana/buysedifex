@@ -26,7 +26,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function SearchPage() {
+type SearchPageProps = {
+  searchParams?: {
+    q?: string;
+    category?: string;
+    city?: string;
+    sort?: 'store-diverse' | 'newest' | 'price' | 'featured';
+    minPrice?: string;
+    maxPrice?: string;
+  };
+};
+
+export default function SearchPage({ searchParams }: SearchPageProps) {
   return (
     <main className="container">
       <section className="searchPageIntro">
@@ -34,7 +45,14 @@ export default function SearchPage() {
         <h1>Find products fast</h1>
         <p>Use category, city, and price sorting to discover trusted stores with visible prices and WhatsApp contact.</p>
       </section>
-      <ProductGrid />
+      <ProductGrid
+        initialSearchText={searchParams?.q ?? ''}
+        initialCategory={searchParams?.category ?? 'all'}
+        initialCity={searchParams?.city ?? 'all'}
+        initialSort={searchParams?.sort ?? 'store-diverse'}
+        initialMinPrice={searchParams?.minPrice ?? ''}
+        initialMaxPrice={searchParams?.maxPrice ?? ''}
+      />
     </main>
   );
 }

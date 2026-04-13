@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { persistAnalytics } from '@/lib/server-analytics';
 
 type LeadPayload = {
   productId?: string;
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
     source: 'product-request-form',
   };
 
+  await persistAnalytics('leads', lead);
   console.info('[lead_created]', lead);
 
   return NextResponse.json({ ok: true, lead });
