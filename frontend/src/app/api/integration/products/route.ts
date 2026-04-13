@@ -8,7 +8,8 @@ export async function GET(request: NextRequest) {
       categoryKey: params.get('categoryKey') ?? undefined,
       page: Number(params.get('page') ?? '1'),
       pageSize: Number(params.get('pageSize') ?? '12'),
-      sort: params.get('sort') ?? 'newest',
+      sort: params.get('sort') ?? 'store-diverse',
+      maxPerStore: params.get('maxPerStore') ? Number(params.get('maxPerStore')) : undefined,
     });
 
     return NextResponse.json(response, { status: 200 });

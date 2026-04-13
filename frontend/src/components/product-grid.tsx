@@ -9,7 +9,7 @@ import { getProductHref } from '@/lib/product-route';
 import { getStoreHref } from '@/lib/store-route';
 
 type PublicProduct = SedifexProduct;
-type SortOption = 'newest' | 'price' | 'featured';
+type SortOption = 'store-diverse' | 'newest' | 'price' | 'featured';
 const PAGE_SIZE = 12;
 
 const normalizeDisplayCurrency = (currency?: string) => ((currency ?? 'GHS').toUpperCase() === 'USD' ? 'GHS' : (currency ?? 'GHS').toUpperCase());
@@ -33,7 +33,7 @@ export function ProductGrid() {
   const [cities, setCities] = useState<string[]>(['all']);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedCity, setSelectedCity] = useState<string>('all');
-  const [selectedSort, setSelectedSort] = useState<SortOption>('newest');
+  const [selectedSort, setSelectedSort] = useState<SortOption>('store-diverse');
   const [searchText, setSearchText] = useState<string>('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -107,7 +107,7 @@ export function ProductGrid() {
   }, [selectedCategory, selectedSort]);
 
   return <section className="marketplace">{/* unchanged rendering */}
-      <div className="toolbar"><div className="searchWrap"><label htmlFor="search">Search</label><input id="search" type="search" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Search products, services, stores, or categories"/></div><div className="sortWrap"><label htmlFor="sort">Sort by</label><select id="sort" value={selectedSort} onChange={(event) => setSelectedSort(event.target.value as SortOption)}><option value="featured">Popular</option><option value="newest">Newest</option><option value="price">Cheapest</option></select></div></div>
+      <div className="toolbar"><div className="searchWrap"><label htmlFor="search">Search</label><input id="search" type="search" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Search products, services, stores, or categories"/></div><div className="sortWrap"><label htmlFor="sort">Sort by</label><select id="sort" value={selectedSort} onChange={(event) => setSelectedSort(event.target.value as SortOption)}><option value="store-diverse">Mixed stores</option><option value="featured">Popular</option><option value="newest">Newest</option><option value="price">Cheapest</option></select></div></div>
       <div className="toolbar"><div className="sortWrap"><label htmlFor="city-filter">City</label><select id="city-filter" value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>{cities.map((city) => <option key={city} value={city}>{city === 'all' ? 'All cities' : city}</option>)}</select></div></div>
       <div className="categories" role="tablist" aria-label="Product categories">{categories.map((category) => {const active = category === selectedCategory; return <button type="button" key={category} role="tab" aria-selected={active} className={`chip ${active ? 'active' : ''}`} disabled={isLoadingCategories} onClick={() => setSelectedCategory(category)}>{category}</button>;})}</div>
       {error && <p className="error">{error}</p>}

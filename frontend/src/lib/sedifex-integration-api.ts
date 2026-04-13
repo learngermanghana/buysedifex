@@ -2,6 +2,7 @@ import type {
   SedifexCustomer,
   SedifexGalleryItem,
   SedifexProduct,
+  SedifexProductSort,
   SedifexPromo,
   SedifexStoreProfile,
 } from '@sedifex/integration-types';
@@ -44,7 +45,8 @@ export const listIntegrationProducts = (query?: {
   storeId?: string;
   page?: number;
   pageSize?: number;
-  sort?: string;
+  sort?: SedifexProductSort | string;
+  maxPerStore?: number;
 }) => integrationFetch<{ items: SedifexProduct[]; hasMore: boolean }>(`/products`, query);
 
 export const listIntegrationCategoryKeys = () => integrationFetch<{ items: string[] }>(`/categories`);
