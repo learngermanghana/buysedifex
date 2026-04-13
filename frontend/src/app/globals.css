@@ -513,6 +513,18 @@ select:focus {
   border-color: #818cf8;
 }
 
+.siteFooter {
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafcd6;
+  backdrop-filter: blur(8px);
+}
+
+.siteFooterInner {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
 .productDetailPage {
   max-width: 960px;
   margin: 0 auto;
@@ -762,6 +774,7 @@ select:focus {
   gap: 0.8rem;
   position: sticky;
   top: 0.8rem;
+  margin-bottom: 1rem;
 }
 
 .promoRailHeader {

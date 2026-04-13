@@ -4,31 +4,7 @@ import { canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 import { getStoreProfileById, listPublicStoreIds } from '@/lib/public-stores';
 
 const title = 'Services on Sedifex';
-const description =
-  'Explore the available Sedifex services for businesses and shoppers, including product promotion and WhatsApp-led sales support.';
-
-const platformServices = [
-  {
-    name: 'Product listing and showcase',
-    description:
-      'Create approved product listings with photos, prices, and descriptions so shoppers can discover your offerings quickly.',
-  },
-  {
-    name: 'Business visibility in Ghana',
-    description:
-      'Get listed in a Ghana-focused marketplace where local customers can browse by category and store.',
-  },
-  {
-    name: 'WhatsApp customer connection',
-    description:
-      'Turn product interest into conversations instantly through direct WhatsApp contact from each listing.',
-  },
-  {
-    name: 'Store profile management',
-    description:
-      'Maintain your public store identity with business details, contact channels, and product collection updates.',
-  },
-];
+const description = 'Browse service categories currently published by verified Sedifex stores.';
 
 type StoreServiceGroup = {
   storeId: string;
@@ -99,20 +75,8 @@ export default async function ServicesPage() {
       <p className="eyebrow">Services</p>
       <h1>Available services on Sedifex</h1>
       <p>
-        Sedifex supports Ghanaian businesses and shoppers with practical, WhatsApp-first tools that make discovery and
-        ordering easier.
+        This page shows service categories submitted by active stores and synced from marketplace data.
       </p>
-
-      <section>
-        <h2>What is available now</h2>
-        <ul>
-          {platformServices.map((service) => (
-            <li key={service.name}>
-              <strong>{service.name}:</strong> {service.description}
-            </li>
-          ))}
-        </ul>
-      </section>
 
       <section>
         <h2>Service availability by store</h2>

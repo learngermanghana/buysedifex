@@ -52,7 +52,7 @@ export default function SellPage() {
         <ol>
           <li>Email your store profile, listing information, and business registration to info@sedifex.com.</li>
           <li>Our team reviews your documents and verifies your store for trust and quality standards.</li>
-          <li>Approved stores are published on buy.sedifex.com and become discoverable across marketplace pages.</li>
+          <li>Approved stores are published on www.sedifexmarket.com and become discoverable across marketplace pages.</li>
         </ol>
       </section>
 

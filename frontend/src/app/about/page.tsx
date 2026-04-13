@@ -39,6 +39,16 @@ export default function AboutPage() {
       </p>
 
       <section>
+        <h2>What we do</h2>
+        <ul>
+          <li>Publish approved store catalogs so shoppers can find trusted local sellers quickly.</li>
+          <li>Improve business visibility across marketplace categories and store pages.</li>
+          <li>Connect shoppers and stores directly through WhatsApp for fast ordering conversations.</li>
+          <li>Support store owners with profile setup, product updates, and marketplace onboarding.</li>
+        </ul>
+      </section>
+
+      <section>
         <h2>For shoppers</h2>
         <ul>
           <li>Browse products by category and store from approved businesses.</li>

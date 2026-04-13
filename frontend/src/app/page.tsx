@@ -58,6 +58,19 @@ export default function HomePage() {
             <span>🏪 Top stores near you</span>
             <span>📦 Categories</span>
           </div>
+        </div>
+      </header>
+      <PromoCarousel />
+      <section className="quickSections" aria-label="Homepage discovery sections">
+        <p>Trending in Accra</p>
+        <p>Recently added</p>
+        <p>Best priced</p>
+      </section>
+      <div className="productsColumn">
+        <ProductGrid />
+      </div>
+      <footer className="siteFooter" aria-label="Footer navigation">
+        <div className="siteFooterInner">
           <nav className="inlineLinks" aria-label="Sedifex information pages">
             <Link href="/search">Search &amp; Filter</Link>
             <Link href="/about">About</Link>
@@ -68,18 +81,7 @@ export default function HomePage() {
             <Link href="/terms">Terms</Link>
           </nav>
         </div>
-      </header>
-      <section className="quickSections" aria-label="Homepage discovery sections">
-        <p>Trending in Accra</p>
-        <p>Recently added</p>
-        <p>Best priced</p>
-      </section>
-      <div className="homeColumns">
-        <PromoCarousel />
-        <div className="productsColumn">
-          <ProductGrid />
-        </div>
-      </div>
+      </footer>
     </main>
   );
 }
