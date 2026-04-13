@@ -44,7 +44,17 @@ test('store and product APIs read from Sedifex integration endpoints', () => {
   assert.match(integrationClientSource, /SEDIFEX_INTEGRATION_API_VERSION/);
   assert.match(integrationProductsRouteSource, /sort: params\.get\('sort'\) \?\? 'store-diverse'/);
   assert.match(integrationProductsRouteSource, /maxPerStore/);
+  assert.doesNotMatch(integrationProductsRouteSource, /storeId:/);
   assert.match(productGridSource, /useState<SortOption>\('store-diverse'\)/);
+
+  assert.match(integrationClientSource, /listIntegrationProducts/);
+  assert.match(integrationClientSource, /integrationFetch<IntegrationProductsPayload>/);
+  assert.match(integrationClientSource, /'\/v1IntegrationProducts'/);
+  assert.doesNotMatch(integrationClientSource, /SEDIFEX_PUBLIC_API_BASE_URL/);
+  assert.doesNotMatch(integrationClientSource, /buildPublicEndpoint/);
+  assert.doesNotMatch(integrationClientSource, /'\/v1\/products'/);
+  assert.match(productGridSource, /filter\(\(item\) => hasDisplayImage\(item\)\)/);
+  assert.doesNotMatch(productGridSource, /hasDisplayImage\(item\) && isVerifiedStore\(item\.verified\)/);
   assert.match(productGridSource, /<option value="store-diverse">Mixed stores<\/option>/);
 });
 

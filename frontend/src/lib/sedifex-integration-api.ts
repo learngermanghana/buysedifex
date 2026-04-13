@@ -106,28 +106,6 @@ const getIntegrationConfig = () => {
 };
 
 
-
-const getPublicApiBaseUrl = () => {
-  loadBackendIntegrationEnv();
-  return process.env.SEDIFEX_PUBLIC_API_BASE_URL ?? 'https://api.sedifex.com';
-};
-
-const buildPublicEndpoint = (
-  endpointPath: string,
-  query?: Record<string, string | number | undefined>,
-) => {
-  const baseUrl = getPublicApiBaseUrl();
-  const url = new URL(`${baseUrl.replace(/\/$/, '')}${endpointPath}`);
-
-  Object.entries(query ?? {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') {
-      url.searchParams.set(key, String(value));
-    }
-  });
-
-  return url;
-};
-
 const buildEndpoint = (
   endpointPath: string,
   query?: Record<string, string | number | undefined>,
@@ -197,25 +175,29 @@ export const listIntegrationProducts = async (query?: {
   sort?: SedifexProductSort | string;
   maxPerStore?: number;
 }) => {
-  const endpoint = buildPublicEndpoint('/v1/products', query);
-  const response = await fetch(endpoint, {
-    headers: {
-      Accept: 'application/json',
-    },
-    next: { revalidate: 300 },
-  });
+  const payload = await integrationFetch<IntegrationProductsPayload>(
+    '/v1IntegrationProducts',
+    query,
+  );
 
-  if (!response.ok) {
-    throw new Error(
-      `Sedifex public products request failed (${response.status}) for ${endpoint.pathname}.`,
-    );
+  const allItems = payload.items ?? payload.products ?? [];
+  const page = Math.max(1, query?.page ?? 1);
+  const fallbackPageSize = allItems.length > 0 ? allItems.length : 1;
+  const pageSize = Math.max(1, query?.pageSize ?? fallbackPageSize);
+
+  if (payload.hasMore === undefined) {
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+
+    return {
+      items: allItems.slice(start, end),
+      hasMore: end < allItems.length,
+    };
   }
 
-  const payload = (await response.json()) as IntegrationProductsPayload;
-
   return {
-    items: payload.items ?? payload.products ?? [],
-    hasMore: payload.hasMore ?? false,
+    items: allItems,
+    hasMore: payload.hasMore,
   };
 };
 
