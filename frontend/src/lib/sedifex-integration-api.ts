@@ -61,14 +61,25 @@ const getIntegrationConfig = () => {
   };
 };
 
-const buildEndpoint = (path: string, query?: Record<string, string | number | undefined>) => {
+const normalizeApiVersion = (apiVersion: string | undefined) => {
+  const trimmed = (apiVersion ?? '').trim().replace(/^\/+|\/+$/g, '');
+  return trimmed || 'v1';
+};
+
+const buildEndpoint = (
+  path: string,
+  query?: Record<string, string | number | undefined>,
+  options?: { includeApiVersion?: boolean },
+) => {
   const { baseUrl, apiVersion } = getIntegrationConfig();
 
   if (!baseUrl) {
     throw new Error('SEDIFEX_INTEGRATION_API_BASE_URL is not configured.');
   }
 
-  const url = new URL(`${baseUrl.replace(/\/$/, '')}/${apiVersion}${path}`);
+  const normalizedVersion = normalizeApiVersion(apiVersion);
+  const versionPrefix = options?.includeApiVersion === false ? '' : `/${normalizedVersion}`;
+  const url = new URL(`${baseUrl.replace(/\/$/, '')}${versionPrefix}${path}`);
   Object.entries(query ?? {}).forEach(([key, value]) => {
     if (value !== undefined && value !== '') url.searchParams.set(key, String(value));
   });
@@ -77,17 +88,24 @@ const buildEndpoint = (path: string, query?: Record<string, string | number | un
 };
 
 const integrationFetch = async <T>(path: string, query?: Record<string, string | number | undefined>): Promise<T> => {
-  const { apiKey } = getIntegrationConfig();
-  const endpoint = buildEndpoint(path, query);
+  const { apiKey, apiVersion } = getIntegrationConfig();
+  const endpoint = buildEndpoint(path, query, { includeApiVersion: true });
 
   if (!apiKey) {
     throw new Error('SEDIFEX_INTEGRATION_API_KEY is not configured. Set it in your runtime environment (for example Vercel Project Settings → Environment Variables).');
   }
 
-  const response = await fetch(endpoint, {
+  const requestOptions = {
     headers: { 'x-api-key': apiKey },
     next: { revalidate: 300 },
-  });
+  };
+
+  let response = await fetch(endpoint, requestOptions);
+  const normalizedVersion = normalizeApiVersion(apiVersion);
+  if (!response.ok && response.status === 404 && normalizedVersion) {
+    const fallbackEndpoint = buildEndpoint(path, query, { includeApiVersion: false });
+    response = await fetch(fallbackEndpoint, requestOptions);
+  }
 
   if (!response.ok) {
     throw new Error(`Sedifex integration request failed (${response.status}) for ${endpoint.pathname}. Verify SEDIFEX_INTEGRATION_API_BASE_URL, SEDIFEX_INTEGRATION_API_VERSION, and SEDIFEX_INTEGRATION_API_KEY.`);
