@@ -44,14 +44,15 @@ export default function HomePage() {
           <p className="eyebrow">Sedifex Market</p>
           <h1>Discover trusted local stores near you</h1>
           <p>Search products, compare prices, and contact verified stores in seconds.</p>
-          <form className="heroSearch" role="search">
-            <input type="search" placeholder="Search products, stores, or categories" aria-label="Search products and stores" />
-            <select aria-label="Choose location" defaultValue="Accra">
+          <form className="heroSearch" role="search" action="/search" method="get">
+            <input name="q" type="search" placeholder="Search products, stores, or categories" aria-label="Search products and stores" />
+            <select name="city" aria-label="Choose location" defaultValue="Accra">
               <option>Accra</option>
               <option>Kumasi</option>
               <option>Takoradi</option>
               <option>Tamale</option>
             </select>
+            <button type="submit">Search</button>
           </form>
           <div className="heroHighlights">
             <span>🔥 Featured products</span>
@@ -73,6 +74,8 @@ export default function HomePage() {
         <div className="siteFooterInner">
           <nav className="inlineLinks" aria-label="Sedifex information pages">
             <Link href="/search">Search &amp; Filter</Link>
+            <Link href="/categories">Categories</Link>
+            <Link href="/stores">Stores</Link>
             <Link href="/about">About</Link>
             <Link href="/services">Services</Link>
             <Link href="/sell">Sell on Sedifex</Link>

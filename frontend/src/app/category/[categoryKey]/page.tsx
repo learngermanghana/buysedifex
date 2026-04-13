@@ -61,6 +61,30 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const { products, hasMore } = await getProductsByCategory(params.categoryKey, { page, pageSize: PAGE_SIZE });
   const categoryName = categoryNameFromKey(params.categoryKey) || params.categoryKey;
 
+
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: `How do I buy ${categoryName} products on Sedifex?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Open a product and use the WhatsApp contact button to order directly from the seller.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: `Are ${categoryName} stores verified?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Sedifex marks stores with a Verified badge when applicable on listings and store pages.',
+        },
+      },
+    ],
+  };
+
   const itemListJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
@@ -83,6 +107,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   return (
     <main className="hero" style={{ maxWidth: 980 }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <p className="eyebrow">Category</p>
       <h1>{categoryName}</h1>
       <p>Browse products from verified stores and order directly on WhatsApp.</p>

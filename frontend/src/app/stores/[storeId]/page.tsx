@@ -121,9 +121,34 @@ export default async function StorePage({ params }: StorePageProps) {
         : '';
   const mailtoHref = profile.storeEmail ? `mailto:${profile.storeEmail}` : '';
 
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: `How do I contact ${profile.storeName}?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Use the call, email, or WhatsApp actions available on this page.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: `Does ${profile.storeName} have verified products?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Store and product verification badges are shown on Sedifex when available.',
+        },
+      },
+    ],
+  };
+
+
   return (
     <main className="storePage">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <section className="storeHero">
         <p className="eyebrow">Store</p>
         <h1>

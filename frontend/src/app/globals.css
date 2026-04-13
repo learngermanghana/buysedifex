@@ -124,8 +124,18 @@ body {
 
 .heroSearch {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 180px;
+  grid-template-columns: minmax(0, 1fr) 180px auto;
   gap: 0.55rem;
+}
+
+.heroSearch button {
+  border: none;
+  border-radius: 0.65rem;
+  background: linear-gradient(135deg, #4f46e5, #2563eb);
+  color: #fff;
+  font-weight: 600;
+  padding: 0.58rem 0.9rem;
+  cursor: pointer;
 }
 
 .marketplace {
@@ -207,6 +217,35 @@ select:focus {
   color: #b91c1c;
   margin: 0;
 }
+
+
+.filterRow3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.errorBlock {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.errorBlock button,
+.saveButton {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.55rem;
+  background: #fff;
+  color: #0f172a;
+  padding: 0.38rem 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.saveButton:hover,
+.errorBlock button:hover {
+  background: #eef2ff;
+  border-color: #818cf8;
+}
+
 
 .grid {
   display: grid;
@@ -401,6 +440,10 @@ select:focus {
   }
 
   .heroSearch {
+    grid-template-columns: 1fr;
+  }
+
+  .filterRow3 {
     grid-template-columns: 1fr;
   }
 
