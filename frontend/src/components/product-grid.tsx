@@ -85,7 +85,7 @@ export function ProductGrid() {
       const body = (await response.json()) as { items?: PublicProduct[]; hasMore?: boolean; error?: string };
       if (!response.ok) throw new Error(body.error ?? 'Failed to load products');
 
-      const nextItems = (body.items ?? []).filter((item) => hasDisplayImage(item) && isVerifiedStore(item.verified));
+      const nextItems = (body.items ?? []).filter((item) => hasDisplayImage(item));
       setProducts((current) => (nextPage === 1 ? nextItems : [...current, ...nextItems]));
       setCities((current) => Array.from(new Set([...current, ...nextItems.map(getStoreCity)])).sort((a, b) => a.localeCompare(b)));
       setHasMore(Boolean(body.hasMore));
