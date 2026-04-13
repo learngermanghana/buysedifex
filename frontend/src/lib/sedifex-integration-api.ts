@@ -3,6 +3,7 @@ import type {
   SedifexGalleryItem,
   SedifexProduct,
   SedifexProductSort,
+  SedifexPromo,
   SedifexStoreProfile,
 } from '@sedifex/integration-types';
 import fs from 'node:fs';
@@ -37,80 +38,107 @@ type IntegrationStoreRecord = {
   storeId?: string;
   displayName?: string | null;
   name?: string | null;
+  storeSlug?: string | null;
   city?: string | null;
   phone?: string | null;
+  whatsapp?: string | null;
+  whatsappNumber?: string | null;
   addressLine1?: string | null;
-  status?: string | null;
-  eligibleForBuy?: boolean | null;
 };
 
 type SafeStoreRecord = {
   storeId: string;
   storeName?: string;
+  storeSlug?: string;
   city?: string;
   phone?: string;
   waLink?: string;
   addressLine1?: string;
 };
 
-type IntegrationPromoProfile = {
+type IntegrationPromoRecord = {
   id?: string;
+  promoId?: string;
   storeId?: string;
   storeName?: string;
   storeSlug?: string;
+  city?: string;
+  phone?: string;
+  whatsapp?: string;
+  whatsappNumber?: string;
+  addressLine1?: string;
   verified?: boolean;
   displayName?: string;
   name?: string;
   promoTitle?: string;
+  title?: string;
   promoSummary?: string;
+  summary?: string;
+  description?: string;
+  promoImageUrl?: string;
+  imageUrl?: string;
+  image?: string;
+  promoImageAlt?: string;
   promoStartDate?: string;
   promoEndDate?: string;
   promoSlug?: string;
   promoWebsiteUrl?: string;
+  websiteUrl?: string;
+  promoTiktokUrl?: string;
+  tiktokUrl?: string;
+  promoYoutubeUrl?: string;
+  youtubeUrl?: string;
 };
 
 type IntegrationPromoPayload = {
-  items?: IntegrationPromoProfile[];
-  promos?: IntegrationPromoProfile[];
-  profile?: IntegrationPromoProfile | null;
-  promo?: IntegrationPromoProfile | null;
+  items?: IntegrationPromoRecord[];
+  promos?: IntegrationPromoRecord[];
+  profile?: IntegrationPromoRecord | null;
+  promo?: IntegrationPromoRecord | null;
 };
 
 const toStoreProfile = (
-  profile: IntegrationPromoProfile | null | undefined,
+  profile: IntegrationPromoRecord | null | undefined,
 ): SedifexStoreProfile | null => {
-  if (!profile) return null;
-
-  const storeId = profile.storeId ?? profile.id ?? '';
-  const storeName = profile.storeName ?? profile.displayName ?? profile.name ?? '';
-  if (!storeId || !storeName) return null;
+  const safeStore = toSafeStoreRecord(profile);
+  if (!safeStore?.storeName) return null;
 
   return {
-    storeId,
-    storeName,
-    storeSlug: profile.storeSlug ?? profile.promoSlug,
-    websiteUrl: profile.promoWebsiteUrl,
-    verified: profile.verified,
+    storeId: safeStore.storeId,
+    storeName: safeStore.storeName,
+    storeSlug: safeStore.storeSlug,
+    websiteUrl: profile?.promoWebsiteUrl ?? profile?.websiteUrl,
+    city: safeStore.city,
+    addressLine1: safeStore.addressLine1,
+    storePhone: safeStore.phone,
+    storeWhatsapp: safeStore.waLink,
+    verified: profile?.verified,
   };
 };
 
+const cleanString = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+};
+
 const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | null => {
-  const id = product.id?.trim();
-  const storeId = product.storeId?.trim();
-  const storeName = product.storeName?.trim();
+  const id = cleanString(product.id);
+  const storeId = cleanString(product.storeId);
+  const storeName = cleanString(product.storeName);
   const normalizedStoreName = storeName ?? '';
-  const productName = product.productName?.trim() || product.name?.trim();
+  const productName = cleanString(product.productName) || cleanString(product.name);
 
   // storeName is optional for all-store marketplace responses
   if (!id || !storeId || !productName) return null;
 
   const normalizedImageUrls = Array.isArray(product.imageUrls)
     ? product.imageUrls
-        .map((url) => url?.trim())
+        .map((url) => cleanString(url))
         .filter((url): url is string => Boolean(url))
     : [];
 
-  const fallbackImageUrl = product.imageUrl?.trim();
+  const fallbackImageUrl = cleanString(product.imageUrl);
 
   const imageUrls =
     normalizedImageUrls.length > 0
@@ -125,9 +153,9 @@ const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | n
     storeId,
     storeName: normalizedStoreName,
     productName,
-    categoryKey: product.categoryKey ?? product.category ?? undefined,
+    categoryKey: cleanString(product.categoryKey) ?? cleanString(product.category),
     imageUrls,
-    imageAlt: product.imageAlt ?? productName,
+    imageAlt: cleanString(product.imageAlt) ?? productName,
     price: typeof product.price === 'number' ? product.price : undefined,
     stockCount: typeof product.stockCount === 'number' ? product.stockCount : undefined,
   };
@@ -139,21 +167,23 @@ const normalizeProducts = (products: IntegrationProductRecord[]): SedifexProduct
     .filter((product): product is SedifexProduct => Boolean(product));
 
 const toSafeStoreRecord = (store: IntegrationStoreRecord | null | undefined): SafeStoreRecord | null => {
-  const storeId = store?.storeId?.trim();
+  const storeId = cleanString(store?.storeId);
   if (!store || !storeId) return null;
 
-  const phone = store.phone?.trim();
-  const city = store.city?.trim();
-  const addressLine1 = store.addressLine1?.trim();
-  const storeName = store.displayName?.trim() || store.name?.trim() || undefined;
+  const phone = cleanString(store.phone);
+  const city = cleanString(store.city);
+  const addressLine1 = cleanString(store.addressLine1);
+  const storeName = cleanString(store.displayName) || cleanString(store.name);
+  const whatsapp = cleanString(store.whatsapp) || cleanString(store.whatsappNumber);
 
   return {
     storeId,
-    storeName,
-    city: city || undefined,
-    phone: phone || undefined,
-    waLink: phone || undefined,
-    addressLine1: addressLine1 || undefined,
+    storeName: storeName ?? undefined,
+    storeSlug: cleanString(store.storeSlug),
+    city: city ?? undefined,
+    phone: phone ?? undefined,
+    waLink: whatsapp ?? phone ?? undefined,
+    addressLine1: addressLine1 ?? undefined,
   };
 };
 
@@ -162,13 +192,56 @@ const getStoreById = async (storeId: string): Promise<SafeStoreRecord | null> =>
   if (!normalizedStoreId) return null;
 
   try {
-    const payload = await integrationFetch<IntegrationStoreRecord>(
-      `/stores/${encodeURIComponent(normalizedStoreId)}`,
-    );
-    return toSafeStoreRecord(payload);
+    const payload = await integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', {
+      storeId: normalizedStoreId,
+    });
+    return toSafeStoreRecord(payload.profile ?? payload.promo ?? payload.items?.[0] ?? payload.promos?.[0]);
   } catch {
     return null;
   }
+};
+
+const normalizePromo = (
+  promo: IntegrationPromoRecord,
+  fallbackStoreId?: string,
+): SedifexPromo | null => {
+  const storeId = cleanString(promo.storeId) ?? fallbackStoreId;
+  const id =
+    cleanString(promo.id) ??
+    cleanString(promo.promoId) ??
+    (storeId ? `${storeId}-${cleanString(promo.promoSlug) ?? cleanString(promo.promoTitle) ?? 'promo'}` : undefined);
+
+  if (!id) return null;
+
+  return {
+    id,
+    storeId,
+    storeName: cleanString(promo.storeName) ?? cleanString(promo.displayName) ?? cleanString(promo.name),
+    storeSlug: cleanString(promo.storeSlug) ?? cleanString(promo.promoSlug),
+    verified: promo.verified,
+    promoTitle: cleanString(promo.promoTitle) ?? cleanString(promo.title),
+    promoSummary: cleanString(promo.promoSummary) ?? cleanString(promo.summary) ?? cleanString(promo.description),
+    promoImageUrl: cleanString(promo.promoImageUrl) ?? cleanString(promo.imageUrl) ?? cleanString(promo.image),
+    promoImageAlt: cleanString(promo.promoImageAlt) ?? cleanString(promo.promoTitle) ?? cleanString(promo.title) ?? null,
+    promoStartDate: cleanString(promo.promoStartDate),
+    promoEndDate: cleanString(promo.promoEndDate),
+    promoWebsiteUrl: cleanString(promo.promoWebsiteUrl) ?? cleanString(promo.websiteUrl) ?? null,
+    promoTiktokUrl: cleanString(promo.promoTiktokUrl) ?? cleanString(promo.tiktokUrl) ?? null,
+    promoYoutubeUrl: cleanString(promo.promoYoutubeUrl) ?? cleanString(promo.youtubeUrl) ?? null,
+  };
+};
+
+const normalizePromoPayload = (
+  payload: IntegrationPromoPayload,
+  fallbackStoreId?: string,
+) => {
+  const rawItems = payload.items ?? payload.promos ?? [];
+  const single = payload.profile ?? payload.promo;
+  const combined = rawItems.length > 0 ? rawItems : single ? [single] : [];
+  const items = combined
+    .map((item) => normalizePromo(item, fallbackStoreId))
+    .filter((item): item is SedifexPromo => Boolean(item));
+  return { items };
 };
 
 const enrichProductsWithStoreData = async (
@@ -386,13 +459,38 @@ export const getIntegrationStoreProfile = async (storeId: string) => {
 };
 
 export const listIntegrationPromos = async () => {
-  const payload = await integrationFetch<IntegrationPromoPayload>(
-    '/v1IntegrationPromo',
-  );
+  try {
+    const payload = await integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo');
+    return normalizePromoPayload(payload);
+  } catch (error) {
+    const { items: storeIds } = await listIntegrationStoreIds().catch(() => ({ items: [] as string[] }));
+    if (storeIds.length === 0) {
+      throw error;
+    }
 
-  return {
-    items: payload.items ?? payload.promos ?? (payload.profile ? [payload.profile] : []),
-  };
+    const promoResponses = await Promise.all(
+      storeIds.map(async (storeId) => {
+        try {
+          const payload = await integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', { storeId });
+          return normalizePromoPayload(payload, storeId).items;
+        } catch {
+          return [];
+        }
+      }),
+    );
+
+    const deduped = Array.from(
+      new Map(
+        promoResponses.flat().map((promo) => [promo.id, promo]),
+      ).values(),
+    );
+
+    if (deduped.length > 0) {
+      return { items: deduped };
+    }
+
+    throw error;
+  }
 };
 
 export const listIntegrationGallery = async (storeId?: string) => {

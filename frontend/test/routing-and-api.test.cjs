@@ -50,6 +50,12 @@ test('store and product APIs read from Sedifex integration endpoints', () => {
   assert.match(integrationClientSource, /listIntegrationProducts/);
   assert.match(integrationClientSource, /integrationFetch<IntegrationProductsPayload>/);
   assert.match(integrationClientSource, /'\/v1IntegrationProducts'/);
+  assert.match(integrationClientSource, /normalizeProduct/);
+  assert.match(integrationClientSource, /categoryKey: cleanString\(product\.categoryKey\) \?\? cleanString\(product\.category\)/);
+  assert.match(integrationClientSource, /'\/v1IntegrationPromo'/);
+  assert.match(integrationClientSource, /normalizePromoPayload/);
+  assert.match(integrationClientSource, /listIntegrationStoreIds\(\)/);
+  assert.doesNotMatch(integrationClientSource, /`\/stores\/\$\{encodeURIComponent\(normalizedStoreId\)\}`/);
   assert.doesNotMatch(integrationClientSource, /SEDIFEX_PUBLIC_API_BASE_URL/);
   assert.doesNotMatch(integrationClientSource, /buildPublicEndpoint/);
   assert.doesNotMatch(integrationClientSource, /'\/v1\/products'/);

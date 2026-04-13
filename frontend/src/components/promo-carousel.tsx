@@ -78,10 +78,12 @@ export function PromoCarousel() {
 
           <div className="promoMeta">
             <h3>{activePromo.promoTitle ?? 'Latest promotion'}</h3>
-            <p className="promoSummary">{activePromo.promoSummary ?? 'Discover the latest offer from this verified store.'}</p>
-            <p className="promoDates">
-              {activePromo.promoStartDate} - {activePromo.promoEndDate}
-            </p>
+            {activePromo.promoSummary ? <p className="promoSummary">{activePromo.promoSummary}</p> : null}
+            {activePromo.promoStartDate || activePromo.promoEndDate ? (
+              <p className="promoDates">
+                {[activePromo.promoStartDate, activePromo.promoEndDate].filter(Boolean).join(' - ')}
+              </p>
+            ) : null}
           </div>
 
           <div className="promoActions">
