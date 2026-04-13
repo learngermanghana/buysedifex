@@ -33,6 +33,26 @@ type IntegrationProductRecord = Partial<SedifexProduct> & {
   stockCount?: number;
 };
 
+type IntegrationStoreRecord = {
+  storeId?: string;
+  displayName?: string | null;
+  name?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  addressLine1?: string | null;
+  status?: string | null;
+  eligibleForBuy?: boolean | null;
+};
+
+type SafeStoreRecord = {
+  storeId: string;
+  storeName?: string;
+  city?: string;
+  phone?: string;
+  waLink?: string;
+  addressLine1?: string;
+};
+
 type IntegrationPromoProfile = {
   id?: string;
   storeId?: string;
@@ -117,6 +137,86 @@ const normalizeProducts = (products: IntegrationProductRecord[]): SedifexProduct
   products
     .map(normalizeProduct)
     .filter((product): product is SedifexProduct => Boolean(product));
+
+const isStoreBuyerVisible = (store: IntegrationStoreRecord) => {
+  if (store.eligibleForBuy === false) return false;
+
+  const normalizedStatus = store.status?.trim().toLowerCase();
+  if (!normalizedStatus) return true;
+
+  return !['inactive', 'disabled', 'suspended', 'closed'].includes(normalizedStatus);
+};
+
+const toSafeStoreRecord = (store: IntegrationStoreRecord | null | undefined): SafeStoreRecord | null => {
+  const storeId = store?.storeId?.trim();
+  if (!store || !storeId || !isStoreBuyerVisible(store)) return null;
+
+  const phone = store.phone?.trim();
+  const city = store.city?.trim();
+  const addressLine1 = store.addressLine1?.trim();
+  const storeName = store.displayName?.trim() || store.name?.trim() || undefined;
+
+  return {
+    storeId,
+    storeName,
+    city: city || undefined,
+    phone: phone || undefined,
+    waLink: phone || undefined,
+    addressLine1: addressLine1 || undefined,
+  };
+};
+
+const getStoreById = async (storeId: string): Promise<SafeStoreRecord | null> => {
+  const normalizedStoreId = storeId.trim();
+  if (!normalizedStoreId) return null;
+
+  try {
+    const payload = await integrationFetch<IntegrationStoreRecord>(
+      `/stores/${encodeURIComponent(normalizedStoreId)}`,
+    );
+    return toSafeStoreRecord(payload);
+  } catch {
+    return null;
+  }
+};
+
+const enrichProductsWithStoreData = async (
+  products: SedifexProduct[],
+): Promise<SedifexProduct[]> => {
+  const uniqueStoreIds = Array.from(
+    new Set(products.map((product) => product.storeId?.trim()).filter(Boolean)),
+  );
+
+  const storeEntries = await Promise.all(
+    uniqueStoreIds.map(async (storeId) => [storeId, await getStoreById(storeId)] as const),
+  );
+
+  const storeLookup = new Map<string, SafeStoreRecord | null>(storeEntries);
+
+  return products.reduce<SedifexProduct[]>((accumulator, product) => {
+    const safeStore = storeLookup.get(product.storeId);
+
+    if (safeStore === null && storeLookup.has(product.storeId)) {
+      return accumulator;
+    }
+
+    if (!safeStore) {
+      accumulator.push(product);
+      return accumulator;
+    }
+
+    accumulator.push({
+      ...product,
+      storeName: safeStore.storeName ?? product.storeName,
+      city: safeStore.city ?? product.city,
+      waLink: safeStore.waLink ?? product.waLink,
+      phone: safeStore.phone ?? product.phone,
+      addressLine1: safeStore.addressLine1 ?? product.addressLine1,
+    });
+
+    return accumulator;
+  }, []);
+};
 
 const parseEnvLine = (line: string) => {
   const trimmed = line.trim();
@@ -237,7 +337,8 @@ export const listIntegrationProducts = async (query?: {
     query,
   );
 
-  const allItems = normalizeProducts(payload.items ?? payload.products ?? []);
+  const normalizedItems = normalizeProducts(payload.items ?? payload.products ?? []);
+  const allItems = await enrichProductsWithStoreData(normalizedItems);
   const page = Math.max(1, query?.page ?? 1);
   const fallbackPageSize = allItems.length > 0 ? allItems.length : 1;
   const pageSize = Math.max(1, query?.pageSize ?? fallbackPageSize);
