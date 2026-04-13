@@ -35,9 +35,15 @@ test('store and product APIs read from Sedifex integration endpoints', () => {
   const storesSource = read('src/lib/public-stores.ts');
   const productsSource = read('src/lib/public-products.ts');
   const integrationClientSource = read('src/lib/sedifex-integration-api.ts');
+  const integrationProductsRouteSource = read('src/app/api/integration/products/route.ts');
+  const productGridSource = read('src/components/product-grid.tsx');
 
   assert.match(storesSource, /getIntegrationStoreProfile/);
   assert.match(productsSource, /getIntegrationProductById/);
   assert.match(integrationClientSource, /SEDIFEX_INTEGRATION_API_BASE_URL/);
   assert.match(integrationClientSource, /SEDIFEX_INTEGRATION_API_VERSION/);
+  assert.match(integrationProductsRouteSource, /sort: params\.get\('sort'\) \?\? 'store-diverse'/);
+  assert.match(integrationProductsRouteSource, /maxPerStore/);
+  assert.match(productGridSource, /useState<SortOption>\('store-diverse'\)/);
+  assert.match(productGridSource, /<option value="store-diverse">Mixed stores<\/option>/);
 });

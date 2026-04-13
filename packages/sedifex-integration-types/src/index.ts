@@ -65,3 +65,5 @@ export interface SedifexCustomer {
   city?: string;
   country?: string;
 }
+
+export type SedifexProductSort = 'store-diverse' | 'newest' | 'price' | 'featured';
