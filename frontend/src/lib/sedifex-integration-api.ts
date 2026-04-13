@@ -57,64 +57,68 @@ const getIntegrationConfig = () => {
   return {
     baseUrl: process.env.SEDIFEX_INTEGRATION_API_BASE_URL,
     apiKey: process.env.SEDIFEX_INTEGRATION_API_KEY,
-    apiVersion: process.env.SEDIFEX_INTEGRATION_API_VERSION ?? 'v1',
+    contractVersion: process.env.SEDIFEX_INTEGRATION_API_VERSION ?? '2026-04-13',
   };
 };
 
-const normalizeApiVersion = (apiVersion: string | undefined) => {
-  const trimmed = (apiVersion ?? '').trim().replace(/^\/+|\/+$/g, '');
-  return trimmed || 'v1';
-};
-
 const buildEndpoint = (
-  path: string,
+  endpointPath: string,
   query?: Record<string, string | number | undefined>,
-  options?: { includeApiVersion?: boolean },
 ) => {
-  const { baseUrl, apiVersion } = getIntegrationConfig();
+  const { baseUrl } = getIntegrationConfig();
 
   if (!baseUrl) {
     throw new Error('SEDIFEX_INTEGRATION_API_BASE_URL is not configured.');
   }
 
-  const normalizedVersion = normalizeApiVersion(apiVersion);
-  const versionPrefix = options?.includeApiVersion === false ? '' : `/${normalizedVersion}`;
-  const url = new URL(`${baseUrl.replace(/\/$/, '')}${versionPrefix}${path}`);
+  const url = new URL(`${baseUrl.replace(/\/$/, '')}${endpointPath}`);
   Object.entries(query ?? {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') url.searchParams.set(key, String(value));
+    if (value !== undefined && value !== '') {
+      url.searchParams.set(key, String(value));
+    }
   });
 
   return url;
 };
 
-const integrationFetch = async <T>(path: string, query?: Record<string, string | number | undefined>): Promise<T> => {
-  const { apiKey, apiVersion } = getIntegrationConfig();
-  const endpoint = buildEndpoint(path, query, { includeApiVersion: true });
+const integrationFetch = async <T>(
+  endpointPath: string,
+  query?: Record<string, string | number | undefined>,
+): Promise<T> => {
+  const { apiKey, contractVersion } = getIntegrationConfig();
+  const endpoint = buildEndpoint(endpointPath, query);
 
   if (!apiKey) {
-    throw new Error('SEDIFEX_INTEGRATION_API_KEY is not configured. Set it in your runtime environment (for example Vercel Project Settings → Environment Variables).');
+    throw new Error(
+      'SEDIFEX_INTEGRATION_API_KEY is not configured. Set it in your runtime environment.',
+    );
   }
 
-  const requestOptions = {
-    headers: { 'x-api-key': apiKey },
+  const response = await fetch(endpoint, {
+    headers: {
+      'x-api-key': apiKey,
+      'X-Sedifex-Contract-Version': contractVersion,
+      Accept: 'application/json',
+    },
     next: { revalidate: 300 },
-  };
-
-  let response = await fetch(endpoint, requestOptions);
-  const normalizedVersion = normalizeApiVersion(apiVersion);
-  if (!response.ok && response.status === 404 && normalizedVersion) {
-    const fallbackEndpoint = buildEndpoint(path, query, { includeApiVersion: false });
-    response = await fetch(fallbackEndpoint, requestOptions);
-  }
+  });
 
   if (!response.ok) {
-    throw new Error(`Sedifex integration request failed (${response.status}) for ${endpoint.pathname}. Verify SEDIFEX_INTEGRATION_API_BASE_URL, SEDIFEX_INTEGRATION_API_VERSION, and SEDIFEX_INTEGRATION_API_KEY.`);
+    throw new Error(
+      `Sedifex integration request failed (${response.status}) for ${endpoint.pathname}. Check SEDIFEX_INTEGRATION_API_BASE_URL and SEDIFEX_INTEGRATION_API_KEY.`,
+    );
   }
 
   return (await response.json()) as T;
 };
 
-export const getIntegrationProductById = (productId: string) => integrationFetch<SedifexProduct | null>(`/products/${encodeURIComponent(productId)}`);
+export const getIntegrationProductById = async (productId: string) => {
+  const payload = await integrationFetch<{ products?: SedifexProduct[] }>(
+    '/v1IntegrationProducts',
+    { productId },
+  );
+  return payload.products?.[0] ?? null;
+};
 
 export const listIntegrationProducts = (query?: {
   categoryKey?: string;
@@ -123,15 +127,74 @@ export const listIntegrationProducts = (query?: {
   pageSize?: number;
   sort?: SedifexProductSort | string;
   maxPerStore?: number;
-}) => integrationFetch<{ items: SedifexProduct[]; hasMore: boolean }>(`/products`, query);
+}) =>
+  integrationFetch<{ products: SedifexProduct[]; items?: SedifexProduct[]; hasMore?: boolean }>(
+    '/v1IntegrationProducts',
+    query,
+  ).then((payload) => ({
+    items: payload.items ?? payload.products ?? [],
+    hasMore: payload.hasMore ?? false,
+  }));
 
-export const listIntegrationCategoryKeys = () => integrationFetch<{ items: string[] }>(`/categories`);
+export const listIntegrationCategoryKeys = async () => {
+  const payload = await integrationFetch<{ products?: SedifexProduct[] }>(
+    '/v1IntegrationProducts',
+  );
 
-export const listIntegrationStoreIds = () => integrationFetch<{ items: string[] }>(`/stores/ids`);
+  const products = payload.products ?? [];
+  const categoryKeys = Array.from(
+    new Set(
+      products
+        .map((item: any) => item.categoryKey ?? item.category ?? '')
+        .filter(Boolean),
+    ),
+  );
 
-export const getIntegrationStoreProfile = (storeId: string) =>
-  integrationFetch<{ profile: SedifexStoreProfile | null; products: SedifexProduct[] }>(`/stores/${encodeURIComponent(storeId)}`);
+  return { items: categoryKeys };
+};
 
-export const listIntegrationPromos = () => integrationFetch<{ items: SedifexPromo[] }>(`/promos`, { limit: 10 });
-export const listIntegrationGallery = () => integrationFetch<{ items: SedifexGalleryItem[] }>(`/gallery`);
-export const listIntegrationCustomers = () => integrationFetch<{ items: SedifexCustomer[] }>(`/customers`);
+export const listIntegrationStoreIds = async () => {
+  const payload = await integrationFetch<{ products?: SedifexProduct[] }>(
+    '/v1IntegrationProducts',
+  );
+
+  const products = payload.products ?? [];
+  const storeIds = Array.from(
+    new Set(products.map((item: any) => item.storeId).filter(Boolean)),
+  );
+
+  return { items: storeIds };
+};
+
+export const getIntegrationStoreProfile = async (storeId: string) => {
+  const [promoPayload, productPayload] = await Promise.all([
+    integrationFetch<any>('/v1IntegrationPromo', { storeId }).catch(() => null),
+    integrationFetch<{ products?: SedifexProduct[] }>('/v1IntegrationProducts', { storeId }),
+  ]);
+
+  return {
+    profile: promoPayload?.profile ?? promoPayload?.promo ?? null,
+    products: productPayload.products ?? [],
+  };
+};
+
+export const listIntegrationPromos = async () => {
+  const payload = await integrationFetch<any>('/v1IntegrationPromo');
+  return { items: payload.items ?? payload.promos ?? (payload ? [payload] : []) };
+};
+
+export const listIntegrationGallery = async (storeId?: string) => {
+  const payload = await integrationFetch<{ items?: SedifexGalleryItem[] }>(
+    '/integrationGallery',
+    storeId ? { storeId } : undefined,
+  );
+  return { items: payload.items ?? [] };
+};
+
+export const listIntegrationCustomers = async (storeId?: string) => {
+  const payload = await integrationFetch<{ items?: SedifexCustomer[] }>(
+    '/integrationCustomers',
+    storeId ? { storeId } : undefined,
+  );
+  return { items: payload.items ?? [] };
+};
