@@ -14,6 +14,46 @@ body {
   min-height: 100vh;
 }
 
+.mainNavWrap {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(8px);
+  background: #f8fafcd6;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.mainNav {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.mainNav a {
+  text-decoration: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 0.4rem 0.78rem;
+  color: #1e293b;
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: #fff;
+}
+
+.mainNav a:hover {
+  background: #eef2ff;
+  border-color: #818cf8;
+}
+
+.mainNav a.active {
+  background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+  color: #fff;
+  border-color: transparent;
+}
+
 .container {
   max-width: 1240px;
   margin: 0 auto;
@@ -389,36 +429,6 @@ select:focus {
   }
 }
 
-
-.sectionTabs {
-  display: inline-flex;
-  gap: 0.4rem;
-  padding: 0.3rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 999px;
-  background: #ffffffcc;
-  width: fit-content;
-  margin-bottom: 1rem;
-}
-
-.sectionTabs a {
-  text-decoration: none;
-  border-radius: 999px;
-  padding: 0.38rem 0.85rem;
-  color: #334155;
-  font-size: 0.86rem;
-  font-weight: 600;
-}
-
-.sectionTabs a:hover {
-  background: #eef2ff;
-  color: #1e3a8a;
-}
-
-.sectionTabs a.active {
-  background: linear-gradient(135deg, #4f46e5, #0ea5e9);
-  color: #fff;
-}
 
 .infoPage {
   display: grid;
@@ -905,18 +915,26 @@ select:focus {
 }
 
 @media (max-width: 520px) {
+  .mainNav {
+    padding: 0.6rem 0.75rem;
+  }
+
+  .mainNav a {
+    font-size: 0.82rem;
+    padding: 0.34rem 0.64rem;
+  }
+
   .promoCard {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(96px, 42%) minmax(0, 1fr);
     grid-template-areas:
-      'image'
-      'meta'
-      'actions'
-      'controls';
+      'image meta'
+      'actions actions'
+      'controls controls';
   }
 
   .promoImageWrap {
-    aspect-ratio: 16 / 9;
-    max-height: 180px;
+    aspect-ratio: 1 / 1;
+    max-height: 100%;
   }
 
   .promoMeta {
