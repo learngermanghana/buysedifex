@@ -72,6 +72,7 @@ type IntegrationPromoRecord = {
   name?: string;
   promoTitle?: string;
   title?: string;
+  enabled?: boolean;
   promoSummary?: string;
   summary?: string;
   description?: string;
@@ -81,7 +82,10 @@ type IntegrationPromoRecord = {
   promoImageAlt?: string;
   promoStartDate?: string;
   promoEndDate?: string;
+  startDate?: string;
+  endDate?: string;
   promoSlug?: string;
+  slug?: string;
   promoWebsiteUrl?: string;
   websiteUrl?: string;
   promoTiktokUrl?: string;
@@ -223,8 +227,8 @@ const normalizePromo = (
     promoSummary: cleanString(promo.promoSummary) ?? cleanString(promo.summary) ?? cleanString(promo.description),
     promoImageUrl: cleanString(promo.promoImageUrl) ?? cleanString(promo.imageUrl) ?? cleanString(promo.image),
     promoImageAlt: cleanString(promo.promoImageAlt) ?? cleanString(promo.promoTitle) ?? cleanString(promo.title) ?? null,
-    promoStartDate: cleanString(promo.promoStartDate),
-    promoEndDate: cleanString(promo.promoEndDate),
+    promoStartDate: cleanString(promo.promoStartDate) ?? cleanString(promo.startDate),
+    promoEndDate: cleanString(promo.promoEndDate) ?? cleanString(promo.endDate),
     promoWebsiteUrl: cleanString(promo.promoWebsiteUrl) ?? cleanString(promo.websiteUrl) ?? null,
     promoTiktokUrl: cleanString(promo.promoTiktokUrl) ?? cleanString(promo.tiktokUrl) ?? null,
     promoYoutubeUrl: cleanString(promo.promoYoutubeUrl) ?? cleanString(promo.youtubeUrl) ?? null,
@@ -239,6 +243,7 @@ const normalizePromoPayload = (
   const single = payload.profile ?? payload.promo;
   const combined = rawItems.length > 0 ? rawItems : single ? [single] : [];
   const items = combined
+    .filter((item) => item.enabled !== false)
     .map((item) => normalizePromo(item, fallbackStoreId))
     .filter((item): item is SedifexPromo => Boolean(item));
   return { items };
@@ -459,38 +464,29 @@ export const getIntegrationStoreProfile = async (storeId: string) => {
 };
 
 export const listIntegrationPromos = async () => {
-  try {
-    const payload = await integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo');
-    return normalizePromoPayload(payload);
-  } catch (error) {
-    const { items: storeIds } = await listIntegrationStoreIds().catch(() => ({ items: [] as string[] }));
-    if (storeIds.length === 0) {
-      throw error;
-    }
-
-    const promoResponses = await Promise.all(
-      storeIds.map(async (storeId) => {
-        try {
-          const payload = await integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', { storeId });
-          return normalizePromoPayload(payload, storeId).items;
-        } catch {
-          return [];
-        }
-      }),
-    );
-
-    const deduped = Array.from(
-      new Map(
-        promoResponses.flat().map((promo) => [promo.id, promo]),
-      ).values(),
-    );
-
-    if (deduped.length > 0) {
-      return { items: deduped };
-    }
-
-    throw error;
+  const { items: storeIds } = await listIntegrationStoreIds();
+  if (storeIds.length === 0) {
+    return { items: [] as SedifexPromo[] };
   }
+
+  const promoResponses = await Promise.all(
+    storeIds.map(async (storeId) => {
+      try {
+        const payload = await integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', { storeId });
+        return normalizePromoPayload(payload, storeId).items;
+      } catch {
+        return [];
+      }
+    }),
+  );
+
+  const deduped = Array.from(
+    new Map(
+      promoResponses.flat().map((promo) => [promo.id, promo]),
+    ).values(),
+  );
+
+  return { items: deduped };
 };
 
 export const listIntegrationGallery = async (storeId?: string) => {
