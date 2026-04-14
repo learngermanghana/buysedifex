@@ -31,6 +31,10 @@ export type StoreProfile = {
   city?: string;
   country?: string;
   addressLine1?: string;
+  area?: string;
+  openingHours?: string;
+  latitude?: number;
+  longitude?: number;
   sameAs: string[];
   products: PublicProductDetail[];
   verified: boolean;
@@ -51,7 +55,8 @@ type StoreEnrichedProduct = PublicProductDetail & {
   storeWebsiteUrl?: string;
   addressLine1?: string;
   sameAs: string[];
-  verified?: boolean;
+    verified?: boolean;
+  itemType?: string;
   storeEmail?: string;
   isVisible?: boolean;
   isPublished?: boolean;
@@ -164,6 +169,7 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
     storeEmail: readString(fields, ['storeEmail', 'email', 'ownerEmail', 'contactEmail']),
     addressLine1: readString(fields, ['addressLine1', 'address']),
     verified: readBoolean(fields, ['verified']),
+    itemType: readString(fields, ['itemType', 'type']),
     isVisible: readBoolean(fields, ['isVisible']),
     isPublished: readBoolean(fields, ['isPublished']),
     sameAs: [
@@ -196,6 +202,7 @@ const toPublicProductDetail = (product: StoreEnrichedProduct): PublicProductDeta
   country: product.country,
   waLink: product.waLink,
   verified: product.verified,
+  itemType: product.itemType,
 });
 
 const normalizeStoreNamesByStoreId = (products: StoreEnrichedProduct[]): StoreEnrichedProduct[] => {
@@ -316,6 +323,14 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
       'youtubeUrl',
       'verified',
       'status',
+      'openingHours',
+      'businessHours',
+      'area',
+      'locationArea',
+      'latitude',
+      'lat',
+      'longitude',
+      'lng',
     ].forEach((fieldPath) => endpoint.searchParams.append('mask.fieldPaths', fieldPath));
 
     const response = await fetch(endpoint, {
@@ -346,6 +361,10 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
       city: readString(fields, ['city', 'storeCity']),
       country: readString(fields, ['country', 'storeCountry']),
       addressLine1: readString(fields, ['addressLine1', 'address']),
+      area: readString(fields, ['area', 'locationArea']),
+      openingHours: readString(fields, ['openingHours', 'businessHours']),
+      latitude: readNumber(fields, ['latitude', 'lat']),
+      longitude: readNumber(fields, ['longitude', 'lng']),
       verified: readBoolean(fields, ['verified']) ?? false,
       status: readString(fields, ['status']),
       sameAs: [
@@ -403,6 +422,8 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
         { fieldPath: 'ownerEmail' },
         { fieldPath: 'publishedAt' },
         { fieldPath: 'verified' },
+        { fieldPath: 'itemType' },
+        { fieldPath: 'type' },
         { fieldPath: 'isVisible' },
         { fieldPath: 'isPublished' },
       ],
@@ -499,6 +520,10 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
       city: storeDocument.city,
       country: storeDocument.country,
       addressLine1: storeDocument.addressLine1,
+      area: storeDocument.area,
+      openingHours: storeDocument.openingHours,
+      latitude: storeDocument.latitude,
+      longitude: storeDocument.longitude,
       sameAs: storeDocument.sameAs.filter(isValidHttpUrl),
       products: [],
       verified: true,
@@ -521,6 +546,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     city: head.city,
     country: head.country,
     addressLine1: head.addressLine1,
+    area: head.addressLine1,
     sameAs,
     products: matchedProducts.map(toPublicProductDetail),
     verified: head.verified === true,
@@ -545,6 +571,10 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
       city: storeDocument.city ?? profileFromProducts.city,
       country: storeDocument.country ?? profileFromProducts.country,
       addressLine1: storeDocument.addressLine1 ?? profileFromProducts.addressLine1,
+      area: storeDocument.area ?? profileFromProducts.area,
+      openingHours: storeDocument.openingHours ?? profileFromProducts.openingHours,
+      latitude: storeDocument.latitude ?? profileFromProducts.latitude,
+      longitude: storeDocument.longitude ?? profileFromProducts.longitude,
       verified: storeDocument.verified || profileFromProducts.verified,
       sameAs: mergedSameAs,
     };
@@ -589,6 +619,8 @@ export const getProductsByCategory = async (
         { fieldPath: 'waLink' },
         { fieldPath: 'publishedAt' },
         { fieldPath: 'verified' },
+        { fieldPath: 'itemType' },
+        { fieldPath: 'type' },
         { fieldPath: 'isVisible' },
         { fieldPath: 'isPublished' },
       ],

@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { MainNav } from '@/components/main-nav';
+import { SiteFooter } from '@/components/site-footer';
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
 import { baseSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 import './globals.css';
@@ -35,7 +37,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <WebVitalsReporter />
+        <header className="siteHeader">
+          <div className="container siteHeaderInner">
+            <p className="siteBrand">Sedifex Market</p>
+            <MainNav />
+          </div>
+        </header>
         {children}
+        <div className="container">
+          <SiteFooter />
+        </div>
       </body>
     </html>
   );

@@ -49,7 +49,14 @@ const buildStoreServiceGroups = async (): Promise<StoreServiceGroup[]> => {
         const services = Array.from(
           new Set(
             profile.products
-              .flatMap((product) => (product.categoryKey ? [product.categoryKey] : []))
+              .flatMap((product) => {
+                const itemType = product.itemType?.trim().toLowerCase();
+                if (itemType === 'service') {
+                  return [product.categoryKey?.trim() || 'Service'];
+                }
+
+                return product.categoryKey ? [product.categoryKey] : [];
+              })
               .map((service) => service.trim())
               .filter((service) => service.length > 0),
           ),

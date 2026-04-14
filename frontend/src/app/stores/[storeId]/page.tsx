@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getStoreProfileById, listPublicStoreIds } from '@/lib/public-stores';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
+import { getProductHref } from '@/lib/product-route';
+import { extractStoreIdFromRouteParam } from '@/lib/store-route';
 
 type StorePageProps = {
   params: { storeId: string };
@@ -31,7 +33,8 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: StorePageProps): Promise<Metadata> {
-  const profile = await getStoreProfileById(params.storeId);
+  const normalizedStoreId = extractStoreIdFromRouteParam(params.storeId);
+  const profile = await getStoreProfileById(normalizedStoreId);
 
   if (!profile) {
     return {
@@ -74,7 +77,8 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
 }
 
 export default async function StorePage({ params }: StorePageProps) {
-  const profile = await getStoreProfileById(params.storeId);
+  const normalizedStoreId = extractStoreIdFromRouteParam(params.storeId);
+  const profile = await getStoreProfileById(normalizedStoreId);
 
   if (!profile) {
     notFound();
@@ -115,6 +119,7 @@ export default async function StorePage({ params }: StorePageProps) {
         ? `https://wa.me/${normalizedPhone.replace(/[^\d]/g, '')}`
         : '';
   const mailtoHref = profile.storeEmail ? `mailto:${profile.storeEmail}` : '';
+  const hasCoordinates = Number.isFinite(profile.latitude) && Number.isFinite(profile.longitude);
 
   return (
     <main className="storePage">
@@ -136,7 +141,16 @@ export default async function StorePage({ params }: StorePageProps) {
         <p>
           {[profile.city, profile.country].filter(Boolean).join(', ') || 'Location unavailable'}
           {profile.addressLine1 ? ` · ${profile.addressLine1}` : ''}
+          {profile.area ? ` · Area: ${profile.area}` : ''}
         </p>
+        <p>
+          <strong>Opening hours:</strong> {profile.openingHours ?? 'Contact store for opening hours'}
+        </p>
+        {hasCoordinates ? (
+          <p>
+            <strong>GPS:</strong> {profile.latitude}, {profile.longitude}
+          </p>
+        ) : null}
         <div className="productStoreActions">
           {profile.storePhone ? (
             <a href={`tel:${normalizedPhone || profile.storePhone}`}>Call {profile.storePhone}</a>
@@ -180,12 +194,12 @@ export default async function StorePage({ params }: StorePageProps) {
       ) : null}
 
       <section className="storeInfoCard" aria-label="Store products">
-        <h2>Products from {profile.storeName}</h2>
+        <h2>Active listings from {profile.storeName}</h2>
         <p>🚚 Delivery: Discuss with seller · 💳 Payment methods: MoMo, cash, and seller-approved options.</p>
         <ul>
           {profile.products.map((product) => (
             <li key={product.id}>
-              {product.productName}
+              <Link href={getProductHref(product.id, product.productName)}>{product.productName}</Link>
               {product.categoryKey ? (
                 <>
                   {' '}

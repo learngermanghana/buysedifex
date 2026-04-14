@@ -15,6 +15,7 @@ export type PublicProductDetail = {
   country?: string;
   waLink?: string;
   verified?: boolean;
+  itemType?: string;
 };
 
 type FirestoreValue =
@@ -131,6 +132,7 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
     country: readString(fields, ['country', 'storeCountry']),
     waLink: readString(fields, ['waLink', 'storePhone', 'phone', 'telephone', 'whatsappNumber']),
     verified: readBoolean(fields, ['verified']),
+    itemType: readString(fields, ['itemType', 'type']),
   };
 };
 
@@ -180,6 +182,8 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     'telephone',
     'whatsappNumber',
     'verified',
+    'itemType',
+    'type',
   ].forEach((fieldPath) => endpoint.searchParams.append('mask.fieldPaths', fieldPath));
 
   const response = await fetch(endpoint, {

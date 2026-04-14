@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore';
 import { db, firebaseConfigError } from '@/lib/firebase';
 import { FormattedDescription } from '@/components/formatted-description';
+import { WhatsAppChatButton } from '@/components/whatsapp-chat-button';
 import { getStoreHref } from '@/lib/store-route';
 import { getProductHref } from '@/lib/product-route';
 
@@ -60,8 +61,6 @@ const formatPrice = (price?: number, currency?: string) => {
   return `${currencyLabel} ${price.toFixed(2)}`;
 };
 
-const toWhatsAppPhone = (phone?: string | number) => String(phone ?? '').replace(/[^\d]/g, '');
-
 const getContactPhone = (item: PublicProduct) => {
   const source = item as Record<string, unknown>;
   const candidateKeys = ['phone', 'storePhone', 'telephone', 'whatsappNumber', 'mobile'];
@@ -75,14 +74,10 @@ const getContactPhone = (item: PublicProduct) => {
   return '';
 };
 
-const buildWhatsAppLink = (item: PublicProduct) => {
-  const phone = toWhatsAppPhone(getContactPhone(item));
-  if (!phone) return '#';
-
+const buildWhatsAppMessage = (item: PublicProduct) => {
   const productLabel = item.productName?.trim() || 'this item';
-  const storeLabel = item.storeName?.trim() || 'your store';
-  const message = `Hi! I'm interested in ${productLabel} from ${storeLabel}. (productId=${item.id}, storeId=${item.storeId ?? ''})`;
-  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  const storeLabel = item.storeName?.trim() || 'this shop';
+  return `Hi ${storeLabel}, I'm interested in the ${productLabel} I saw on Sedifex Market.`;
 };
 
 const getStorePhone = (item: PublicProduct) => getContactPhone(item) || 'Phone unavailable';
@@ -476,8 +471,6 @@ export function ProductGrid() {
               </article>
             ))
           : visibleProducts.map((item) => {
-              const whatsappLink = buildWhatsAppLink(item);
-              const canContactOnWhatsApp = whatsappLink !== '#';
               const storeHref = getStoreHref(item.storeId, item.storeName);
               const shouldCollapseDescription = (item.description?.trim().length ?? 0) > 260;
               const isExpanded = expandedDescriptionIds.has(item.id);
@@ -531,15 +524,12 @@ export function ProductGrid() {
                   >
                     Share product
                   </button>
-                  {canContactOnWhatsApp ? (
-                    <a className="waButton" href={whatsappLink} target="_blank" rel="noreferrer" aria-label={`Contact ${item.storeName ?? 'store'} on WhatsApp about ${item.productName ?? 'this item'}`}>
-                      Contact on WhatsApp
-                    </a>
-                  ) : (
-                    <span className="waButton" aria-disabled="true" title="WhatsApp contact unavailable">
-                      WhatsApp unavailable
-                    </span>
-                  )}
+                  <WhatsAppChatButton
+                    phone={getContactPhone(item)}
+                    message={buildWhatsAppMessage(item)}
+                    label="Chat now on WhatsApp"
+                    fallbackLabel="WhatsApp unavailable"
+                  />
                 </article>
               );
             })}
