@@ -7,6 +7,7 @@ import { getPublicProductById } from '@/lib/public-products';
 import { getStoreProfileById } from '@/lib/public-stores';
 import { getStoreHref, getStoreRouteId } from '@/lib/store-route';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
+import { extractProductIdFromRouteParam, getProductHref } from '@/lib/product-route';
 
 type ProductPageProps = {
   params: { productId: string };
@@ -51,8 +52,8 @@ const buildMetadataDescription = (input: {
 };
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const { productId } = params;
-  const product = await getPublicProductById(productId);
+  const normalizedProductId = extractProductIdFromRouteParam(params.productId);
+  const product = await getPublicProductById(normalizedProductId);
 
   if (!product) {
     return {
@@ -62,7 +63,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     };
   }
 
-  const canonicalPath = `/products/${encodeURIComponent(productId)}`;
+  const canonicalPath = getProductHref(product.id, product.productName);
   const canonicalUrl = canonicalUrlForPath(canonicalPath);
   const title = `${product.productName}${buildLocation(product.city)} | ${product.storeName} | Sedifex`;
   const description = buildMetadataDescription(product);
@@ -96,8 +97,8 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 }
 
 export default async function ProductDetailPage({ params }: ProductPageProps) {
-  const { productId } = params;
-  const product = await getPublicProductById(productId);
+  const normalizedProductId = extractProductIdFromRouteParam(params.productId);
+  const product = await getPublicProductById(normalizedProductId);
 
   if (!product) {
     notFound();
@@ -119,7 +120,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const whatsappHref = sanitizedWhatsapp ? `https://wa.me/${sanitizedWhatsapp}` : '';
   const requestHref = `mailto:info@sedifex.com?subject=${encodeURIComponent(`Product request: ${product.productName}`)}&body=${encodeURIComponent(`Please help me request ${product.productName} from ${resolvedStoreName}. Product ID: ${product.id}`)}`;
 
-  const productUrl = canonicalUrlForPath(`/products/${encodeURIComponent(productId)}`);
+  const productUrl = canonicalUrlForPath(getProductHref(product.id, product.productName));
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
