@@ -105,7 +105,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const nextHref = hasMore ? `/category/${encodeURIComponent(params.categoryKey)}?page=${page + 1}` : null;
 
   return (
-    <main className="hero" style={{ maxWidth: 980 }}>
+    <main className="categoryPage">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <p className="eyebrow">Category</p>
@@ -113,16 +113,14 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       <p>Browse products from verified stores and order directly on WhatsApp.</p>
 
       <section aria-label={`${categoryName} products`}>
-        <ul style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+        <ul className="categoryProductsGrid">
           {products.map((product) => {
             const storeHref = getStoreHref(product.storeId, product.storeName);
 
             return (
-              <li key={product.id} style={{ listStyle: 'none', border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
-                <h2 style={{ fontSize: '1rem', margin: 0 }}>
-                  {product.productName}
-                </h2>
-                <p style={{ margin: '8px 0 0' }}>
+              <li key={product.id} className="categoryProductCard">
+                <h2>{product.productName}</h2>
+                <p>
                   {storeHref ? (
                     <Link href={storeHref}>{product.storeName}</Link>
                   ) : (
@@ -141,7 +139,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         </ul>
       </section>
 
-      <nav aria-label="Category pagination" style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+      <nav aria-label="Category pagination" className="categoryPagination">
         {prevHref ? <Link href={prevHref}>Previous page</Link> : <span aria-disabled="true">Previous page</span>}
         {nextHref ? <Link href={nextHref}>Next page</Link> : <span aria-disabled="true">Next page</span>}
       </nav>
