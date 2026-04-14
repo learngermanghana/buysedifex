@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { FormattedDescription } from '@/components/formatted-description';
+import { ShareButton } from '@/components/share-button';
 import { WhatsAppChatButton } from '@/components/whatsapp-chat-button';
 import { getPublicProductById } from '@/lib/public-products';
 import { getStoreProfileById } from '@/lib/public-stores';
@@ -226,6 +227,13 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           {hasStorePage ? (
             <Link href={storeHref ?? '#'}>View store details</Link>
           ) : null}
+          <ShareButton
+            className="secondaryButton"
+            url={getProductHref(product.id, product.productName)}
+            title={product.productName || 'Product on Sedifex'}
+            text={`Check out ${product.productName || 'this product'} on Sedifex.`}
+            label="Share product"
+          />
           {hasWebsite ? (
             <a href={storeProfile?.websiteUrl} target="_blank" rel="noopener noreferrer">
               Visit store website

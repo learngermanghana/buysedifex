@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { ShareButton } from '@/components/share-button';
 import { getStoreProfileById, listPublicStoreIds } from '@/lib/public-stores';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 import { getProductHref } from '@/lib/product-route';
@@ -85,6 +86,7 @@ export default async function StorePage({ params }: StorePageProps) {
   }
 
   const canonicalUrl = canonicalUrlForPath(`/stores/${params.storeId}`);
+  const storePath = `/stores/${params.storeId}`;
   const hasLocation = Boolean(profile.addressLine1 || profile.city || profile.country);
 
   const organizationType = hasLocation ? 'LocalBusiness' : 'OnlineStore';
@@ -165,6 +167,13 @@ export default async function StorePage({ params }: StorePageProps) {
           ) : (
             <span aria-disabled="true">WhatsApp unavailable</span>
           )}
+          <ShareButton
+            className="secondaryButton"
+            url={storePath}
+            title={`${profile.storeName} on Sedifex`}
+            text={`Check out ${profile.storeName} on Sedifex.`}
+            label="Share store"
+          />
         </div>
       </section>
 
