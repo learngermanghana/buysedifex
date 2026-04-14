@@ -197,14 +197,20 @@ const toSafeStoreRecord = (
   store: IntegrationStoreRecord | IntegrationPromoRecord | null | undefined,
 ): SafeStoreRecord | null => {
   const storeId = cleanString(store?.storeId) ?? cleanString(store?.id);
-  if (!storeId) return null;
+  if (!storeId || !store) return null;
 
-  const phone = cleanString(store.phone) ?? cleanString(store.storePhone);
+  const phone =
+    cleanString((store as IntegrationStoreRecord).phone) ??
+    cleanString((store as IntegrationStoreRecord).storePhone) ??
+    cleanString((store as IntegrationPromoRecord).phone);
   const whatsapp =
     cleanString((store as IntegrationStoreRecord).whatsapp) ??
     cleanString((store as IntegrationStoreRecord).whatsappNumber) ??
     cleanString((store as IntegrationPromoRecord).whatsapp) ??
     cleanString((store as IntegrationPromoRecord).whatsappNumber);
+
+  const verifiedStore = (store as IntegrationStoreRecord).verified;
+  const verifiedPromo = (store as IntegrationPromoRecord).verified;
 
   return {
     storeId,
@@ -222,10 +228,10 @@ const toSafeStoreRecord = (
     waLink: whatsapp ?? phone,
     addressLine1: cleanString(store.addressLine1),
     verified:
-      typeof (store as IntegrationStoreRecord).verified === 'boolean'
-        ? (store as IntegrationStoreRecord).verified
-        : typeof (store as IntegrationPromoRecord).verified === 'boolean'
-          ? (store as IntegrationPromoRecord).verified
+      typeof verifiedStore === 'boolean'
+        ? verifiedStore
+        : typeof verifiedPromo === 'boolean'
+          ? verifiedPromo
           : undefined,
   };
 };
@@ -252,10 +258,21 @@ const getStoreById = async (storeId: string): Promise<SafeStoreRecord | null> =>
           }
       >(endpointPath);
 
+      const wrapperPayload = payload as {
+        store?: IntegrationStoreRecord | null;
+        data?: IntegrationStoreRecord | null;
+        profile?: IntegrationStoreRecord | null;
+        item?: IntegrationStoreRecord | null;
+      };
+
       const rawStore =
         'storeId' in payload || 'id' in payload
           ? (payload as IntegrationStoreRecord)
-          : payload.store ?? payload.data ?? payload.profile ?? payload.item ?? null;
+          : wrapperPayload.store ??
+            wrapperPayload.data ??
+            wrapperPayload.profile ??
+            wrapperPayload.item ??
+            null;
 
       const safeStore = toSafeStoreRecord(rawStore);
       if (safeStore) return safeStore;
