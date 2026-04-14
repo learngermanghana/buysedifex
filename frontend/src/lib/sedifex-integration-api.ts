@@ -26,6 +26,10 @@ type IntegrationProductRecord = Partial<SedifexProduct> & {
   id?: string;
   storeId?: string;
   storeName?: string;
+  storeCity?: string;
+  storePhone?: string;
+  storeEmail?: string;
+  websiteLink?: string;
   name?: string;
   category?: string | null;
   imageUrl?: string | null;
@@ -136,11 +140,9 @@ const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | n
   const id = cleanString(product.id);
   const storeId = cleanString(product.storeId);
   const storeName = cleanString(product.storeName);
-  const normalizedStoreName = storeName ?? '';
   const productName = cleanString(product.productName) || cleanString(product.name);
 
-  // storeName is optional for all-store marketplace responses
-  if (!id || !storeId || !productName) return null;
+  if (!id || !productName) return null;
 
   const normalizedImageUrls = Array.isArray(product.imageUrls)
     ? product.imageUrls
@@ -160,10 +162,14 @@ const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | n
   return {
     ...product,
     id,
-    storeId,
-    storeName: normalizedStoreName,
+    storeId: storeId ?? '',
+    storeName: storeName ?? '',
     productName,
     categoryKey: cleanString(product.categoryKey) ?? cleanString(product.category),
+    city: cleanString(product.city) ?? cleanString(product.storeCity),
+    phone: cleanString(product.phone) ?? cleanString(product.storePhone),
+    waLink: cleanString(product.waLink) ?? cleanString(product.storePhone),
+    websiteLink: cleanString(product.websiteLink),
     imageUrls,
     imageAlt: cleanString(product.imageAlt) ?? productName,
     price: typeof product.price === 'number' ? product.price : undefined,
@@ -299,38 +305,6 @@ const normalizePromoPayload = (
   return { items };
 };
 
-const enrichProductsWithStoreData = async (
-  products: SedifexProduct[],
-): Promise<SedifexProduct[]> => {
-  const uniqueStoreIds = Array.from(
-    new Set(products.map((product) => product.storeId?.trim()).filter(Boolean)),
-  );
-
-  const storeEntries = await Promise.all(
-    uniqueStoreIds.map(async (storeId) => [storeId, await getStoreById(storeId)] as const),
-  );
-
-  const storeLookup = new Map<string, SafeStoreRecord | null>(storeEntries);
-
-  return products.map((product) => {
-    const safeStore = storeLookup.get(product.storeId);
-
-    if (!safeStore) {
-      return product;
-    }
-
-    return {
-      ...product,
-      storeName: safeStore.storeName ?? product.storeName,
-      city: safeStore.city ?? product.city,
-      country: safeStore.country ?? product.country,
-      waLink: safeStore.waLink ?? product.waLink,
-      phone: safeStore.phone ?? product.phone,
-      addressLine1: safeStore.addressLine1 ?? product.addressLine1,
-    };
-  });
-};
-
 const parseEnvLine = (line: string) => {
   const trimmed = line.trim();
   if (!trimmed || trimmed.startsWith('#')) return;
@@ -434,11 +408,7 @@ export const getIntegrationProductById = async (productId: string) => {
   );
 
   const products = payload.products ?? payload.items ?? [];
-  const normalizedProduct = normalizeProducts(products)[0] ?? null;
-  if (!normalizedProduct) return null;
-
-  const enriched = await enrichProductsWithStoreData([normalizedProduct]);
-  return enriched[0] ?? normalizedProduct;
+  return normalizeProducts(products)[0] ?? null;
 };
 
 export const listIntegrationProducts = async (query?: {
@@ -454,8 +424,7 @@ export const listIntegrationProducts = async (query?: {
     query,
   );
 
-  const normalizedItems = normalizeProducts(payload.items ?? payload.products ?? []);
-  const allItems = await enrichProductsWithStoreData(normalizedItems);
+  const allItems = normalizeProducts(payload.items ?? payload.products ?? []);
   const page = Math.max(1, query?.page ?? 1);
   const fallbackPageSize = allItems.length > 0 ? allItems.length : 1;
   const pageSize = Math.max(1, query?.pageSize ?? fallbackPageSize);
@@ -514,7 +483,6 @@ export const getIntegrationStoreProfile = async (storeId: string) => {
   ]);
 
   const normalizedProducts = normalizeProducts(productsPayload.products ?? productsPayload.items ?? []);
-  const enrichedProducts = await enrichProductsWithStoreData(normalizedProducts);
   const profileFromPromo = toStoreProfile(promoPayload?.profile ?? promoPayload?.promo);
   const profile: SedifexStoreProfile | null = profileFromPromo ?? (storePayload?.storeName
     ? {
@@ -531,7 +499,7 @@ export const getIntegrationStoreProfile = async (storeId: string) => {
 
   return {
     profile,
-    products: enrichedProducts,
+    products: normalizedProducts,
   };
 };
 
