@@ -1,276 +1,201 @@
 'use client';
 
-import type { SedifexProduct } from '@sedifex/integration-types';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import {
+  FirestoreError,
+  QueryConstraint,
+  QueryDocumentSnapshot,
+  collection,
+  getDocs,
+  limit,
+  documentId,
+  orderBy,
+  query,
+  startAfter,
+  where,
+} from 'firebase/firestore';
+import { db, firebaseConfigError } from '@/lib/firebase';
 import { FormattedDescription } from '@/components/formatted-description';
-import { trackEvent } from '@/lib/client-tracking';
-import { getProductHref } from '@/lib/product-route';
 import { getStoreHref } from '@/lib/store-route';
 
-type PublicProduct = SedifexProduct;
-type SortOption = 'store-diverse' | 'newest' | 'price' | 'featured';
-
-type ProductGridProps = {
-  initialSearchText?: string;
-  initialCategory?: string;
-  initialCity?: string;
-  initialSort?: SortOption;
-  initialMinPrice?: string;
-  initialMaxPrice?: string;
+type PublicProduct = {
+  id: string;
+  storeId?: string;
+  productName?: string;
+  description?: string;
+  categoryKey?: string;
+  imageUrls?: string[];
+  imageAlt?: string;
+  price?: number;
+  currency?: string;
+  storeName?: string;
+  storePhone?: string;
+  phone?: string;
+  telephone?: string;
+  city?: string;
+  storeCity?: string;
+  itemType?: string;
+  isVisible?: boolean;
+  verified?: boolean | string;
+  featuredRank?: number;
+  publishedAt?: { seconds: number };
 };
 
-type FilterToolbarProps = {
-  searchText: string;
-  selectedSort: SortOption;
-  selectedCity: string;
-  minPrice: string;
-  maxPrice: string;
-  cities: string[];
-  onSearchTextChange: (value: string) => void;
-  onSortChange: (value: SortOption) => void;
-  onCityChange: (value: string) => void;
-  onMinPriceChange: (value: string) => void;
-  onMaxPriceChange: (value: string) => void;
-};
-
-type CategoryChipsProps = {
-  categories: string[];
-  selectedCategory: string;
-  isLoading: boolean;
-  onSelectCategory: (category: string) => void;
-};
-
-type ProductCardProps = {
-  item: PublicProduct;
-  isSaved: boolean;
-  isDescriptionExpanded: boolean;
-  onToggleDescription: (productId: string) => void;
-  onToggleSave: (item: PublicProduct) => void;
-  onProductViewed: (item: PublicProduct) => void;
-};
+type SortOption = 'newest' | 'price' | 'featured';
 
 const PAGE_SIZE = 12;
-const SAVED_IDS_KEY = 'sedifex.savedProductIds';
-const RECENTLY_VIEWED_KEY = 'sedifex.recentlyViewedProducts';
-const PRODUCTS_CACHE_KEY = 'sedifex.productsCache';
 
-const normalizeDisplayCurrency = (currency?: string) =>
-  ((currency ?? 'GHS').toUpperCase() === 'USD' ? 'GHS' : (currency ?? 'GHS').toUpperCase());
-const formatPrice = (price?: number, currency?: string) =>
-  price == null ? 'Price unavailable' : `${normalizeDisplayCurrency(currency) === 'GHS' ? 'Cedis (GH₵)' : normalizeDisplayCurrency(currency)} ${price.toFixed(2)}`;
+const normalizeDisplayCurrency = (currency?: string) => {
+  const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
+  return normalizedCurrency === 'USD' ? 'GHS' : normalizedCurrency;
+};
+
+const formatPrice = (price?: number, currency?: string) => {
+  if (price == null) return 'Price unavailable';
+  const displayCurrency = normalizeDisplayCurrency(currency);
+  const currencyLabel = displayCurrency === 'GHS' ? 'Cedis (GH₵)' : displayCurrency;
+  return `${currencyLabel} ${price.toFixed(2)}`;
+};
+
 const toWhatsAppPhone = (phone?: string | number) => String(phone ?? '').replace(/[^\d]/g, '');
-const getContactPhone = (item: PublicProduct) => item.phone ?? item.waLink ?? '';
+
+const getContactPhone = (item: PublicProduct) => {
+  const source = item as Record<string, unknown>;
+  const candidateKeys = ['phone', 'storePhone', 'telephone', 'whatsappNumber', 'mobile'];
+
+  for (const key of candidateKeys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+
+  return '';
+};
+
 const buildWhatsAppLink = (item: PublicProduct) => {
   const phone = toWhatsAppPhone(getContactPhone(item));
   if (!phone) return '#';
-  const message = `Hi! I'm interested in ${item.productName || 'this item'} from ${item.storeName || 'your store'}. (productId=${item.id}, storeId=${item.storeId ?? ''})`;
+
+  const productLabel = item.productName?.trim() || 'this item';
+  const storeLabel = item.storeName?.trim() || 'your store';
+  const message = `Hi! I'm interested in ${productLabel} from ${storeLabel}. (productId=${item.id}, storeId=${item.storeId ?? ''})`;
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 };
-const getStorePhone = (item: PublicProduct) => getContactPhone(item) || 'Phone unavailable';
-const getStoreCity = (item: PublicProduct) => item.city?.trim() || 'City unavailable';
-const isVerifiedStore = (value: PublicProduct['verified']) => Boolean(value);
 
-const toPositivePrice = (value: string) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+const getStorePhone = (item: PublicProduct) => getContactPhone(item) || 'Phone unavailable';
+
+const getStoreCity = (item: PublicProduct) => {
+  const rawCity = item.city ?? item.storeCity;
+  return rawCity?.trim() || 'City unavailable';
 };
 
-function FilterToolbar({
-  searchText,
-  selectedSort,
-  selectedCity,
-  minPrice,
-  maxPrice,
-  cities,
-  onSearchTextChange,
-  onSortChange,
-  onCityChange,
-  onMinPriceChange,
-  onMaxPriceChange,
-}: FilterToolbarProps) {
-  return (
-    <>
-      <div className="toolbar">
-        <div className="searchWrap">
-          <label htmlFor="search">Search</label>
-          <input
-            id="search"
-            type="search"
-            value={searchText}
-            onChange={(event) => onSearchTextChange(event.target.value)}
-            placeholder="Search products, services, stores, or categories"
-          />
-        </div>
-        <div className="sortWrap">
-          <label htmlFor="sort">Sort by</label>
-          <select id="sort" value={selectedSort} onChange={(event) => onSortChange(event.target.value as SortOption)}>
-            <option value="store-diverse">Mixed stores</option>
-            <option value="featured">Popular</option>
-            <option value="newest">Newest</option>
-            <option value="price">Cheapest</option>
-          </select>
-        </div>
-      </div>
+const hasDisplayImage = (item: PublicProduct) => Array.isArray(item.imageUrls) && item.imageUrls.some((url) => Boolean(url?.trim()));
+const isVerifiedStore = (value: PublicProduct['verified']) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'yes';
+  }
 
-      <div className="toolbar filterRow3">
-        <div className="sortWrap">
-          <label htmlFor="city-filter">City</label>
-          <select id="city-filter" value={selectedCity} onChange={(event) => onCityChange(event.target.value)}>
-            {cities.map((city) => (
-              <option key={city} value={city}>
-                {city === 'all' ? 'All cities' : city}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="sortWrap">
-          <label htmlFor="min-price">Min price</label>
-          <input id="min-price" type="number" min={0} value={minPrice} onChange={(event) => onMinPriceChange(event.target.value)} placeholder="0" />
-        </div>
-        <div className="sortWrap">
-          <label htmlFor="max-price">Max price</label>
-          <input id="max-price" type="number" min={0} value={maxPrice} onChange={(event) => onMaxPriceChange(event.target.value)} placeholder="500" />
-        </div>
-      </div>
-    </>
-  );
-}
+  return false;
+};
 
-function CategoryChips({ categories, selectedCategory, isLoading, onSelectCategory }: CategoryChipsProps) {
-  return (
-    <div className="categories" role="tablist" aria-label="Product categories">
-      {categories.map((category) => {
-        const active = category === selectedCategory;
-        return (
-          <button
-            type="button"
-            key={category}
-            role="tab"
-            aria-selected={active}
-            className={`chip ${active ? 'active' : ''}`}
-            disabled={isLoading}
-            onClick={() => onSelectCategory(category)}
-          >
-            {category}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+const normalizeStoreNamesByStoreId = (items: PublicProduct[]): PublicProduct[] => {
+  const canonicalNamesByStoreId = new Map<string, string>();
 
-function ProductCard({
-  item,
-  isSaved,
-  isDescriptionExpanded,
-  onToggleDescription,
-  onToggleSave,
-  onProductViewed,
-}: ProductCardProps) {
-  const whatsappLink = buildWhatsAppLink(item);
-  const canContactOnWhatsApp = whatsappLink !== '#';
-  const storeHref = getStoreHref(item.storeId, item.storeName);
-  const shouldCollapseDescription = (item.description?.trim().length ?? 0) > 260;
-  const descriptionClassName = `formattedDescription compact ${shouldCollapseDescription && !isDescriptionExpanded ? 'isCollapsed' : ''}`.trim();
+  items.forEach((item) => {
+    const storeId = item.storeId?.trim();
+    const storeName = item.storeName?.trim();
+    if (!storeId || !storeName) return;
+    if (!canonicalNamesByStoreId.has(storeId)) {
+      canonicalNamesByStoreId.set(storeId, storeName);
+    }
+  });
 
-  return (
-    <article className="card">
-      <div className="imageWrap">
-        <Image
-          src={item.imageUrls?.[0] ?? 'https://placehold.co/640x640'}
-          alt={item.imageAlt?.trim() || item.productName || 'Product image'}
-          loading="lazy"
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-          style={{ objectFit: 'cover' }}
-        />
-      </div>
-      <h3>{item.productName ?? 'Untitled item'}</h3>
-      <Link href={getProductHref(item.id, item.productName)} onClick={() => onProductViewed(item)}>
-        View product details
-      </Link>
-      <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
-      {shouldCollapseDescription ? (
-        <button type="button" className="descriptionToggle" onClick={() => onToggleDescription(item.id)}>
-          {isDescriptionExpanded ? 'View less' : 'View more'}
-        </button>
-      ) : null}
-      <div className="meta">
-        <span className="storeIdentity">
-          {storeHref ? <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link> : item.storeName ?? 'Unknown store'}
-          {isVerifiedStore(item.verified) ? (
-            <span className="verifiedBadge" aria-label="Verified store">
-              Verified
-            </span>
-          ) : null}
-        </span>
-        <strong>{formatPrice(item.price, item.currency)}</strong>
-      </div>
-      <p>City: {getStoreCity(item)}</p>
-      <p>Phone: {getStorePhone(item)}</p>
-      <button type="button" className="saveButton" onClick={() => onToggleSave(item)}>
-        {isSaved ? '★ Saved' : '☆ Save item'}
-      </button>
-      {canContactOnWhatsApp ? (
-        <a
-          className="waButton"
-          href={whatsappLink}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`Contact ${item.storeName ?? 'store'} on WhatsApp about ${item.productName ?? 'this item'}`}
-          onClick={() => trackEvent('whatsapp_click', { productId: item.id, storeId: item.storeId ?? null })}
-        >
-          Contact on WhatsApp
-        </a>
-      ) : (
-        <span className="waButton" aria-disabled="true" title="WhatsApp contact unavailable">
-          WhatsApp unavailable
-        </span>
-      )}
-    </article>
-  );
-}
+  return items.map((item) => {
+    const storeId = item.storeId?.trim();
+    if (!storeId) return item;
 
-export function ProductGrid({
-  initialSearchText = '',
-  initialCategory = 'all',
-  initialCity = 'all',
-  initialSort = 'store-diverse',
-  initialMinPrice = '',
-  initialMaxPrice = '',
-}: ProductGridProps) {
+    const canonicalStoreName = canonicalNamesByStoreId.get(storeId);
+    if (!canonicalStoreName || canonicalStoreName === item.storeName) return item;
+    return { ...item, storeName: canonicalStoreName };
+  });
+};
+
+const bucketProductsByStore = (items: PublicProduct[]) => {
+  const buckets = new Map<string, PublicProduct[]>();
+
+  items.forEach((item) => {
+    const storeKey = item.storeId?.trim() || item.storeName?.trim() || `unknown-store-${item.id}`;
+    const bucket = buckets.get(storeKey);
+
+    if (bucket) {
+      bucket.push(item);
+    } else {
+      buckets.set(storeKey, [item]);
+    }
+  });
+
+  return buckets;
+};
+
+const shuffleProducts = (items: PublicProduct[]) => {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const hold = shuffled[index];
+    shuffled[index] = shuffled[swapIndex];
+    shuffled[swapIndex] = hold;
+  }
+
+  return shuffled;
+};
+
+const mixProductsAcrossStores = (items: PublicProduct[]) => {
+  const buckets = bucketProductsByStore(items);
+  const mixed: PublicProduct[] = [];
+
+  while (buckets.size > 0) {
+    for (const [storeKey, storeItems] of buckets) {
+      const nextItem = storeItems.shift();
+
+      if (nextItem) {
+        mixed.push(nextItem);
+      }
+
+      if (storeItems.length === 0) {
+        buckets.delete(storeKey);
+      }
+    }
+  }
+
+  return mixed;
+};
+
+export function ProductGrid() {
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [categories, setCategories] = useState<string[]>(['all']);
   const [cities, setCities] = useState<string[]>(['all']);
-  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
-  const [selectedCity, setSelectedCity] = useState<string>(initialCity);
-  const [selectedSort, setSelectedSort] = useState<SortOption>('store-diverse');
-  const [searchText, setSearchText] = useState<string>(initialSearchText);
-  const [minPrice, setMinPrice] = useState<string>(initialMinPrice);
-  const [maxPrice, setMaxPrice] = useState<string>(initialMaxPrice);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCity, setSelectedCity] = useState<string>('all');
+  const [selectedSort, setSelectedSort] = useState<SortOption>('newest');
+  const [searchText, setSearchText] = useState<string>('');
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<Set<string>>(new Set());
-  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
-  const [recentlyViewed, setRecentlyViewed] = useState<PublicProduct[]>([]);
 
   const visibleProducts = useMemo(() => {
     const text = searchText.trim().toLowerCase();
-    const min = toPositivePrice(minPrice);
-    const max = toPositivePrice(maxPrice);
-
-    return products.filter((product) => {
+    const normalizedProducts = normalizeStoreNamesByStoreId(products);
+    const matchingProducts = normalizedProducts.filter((product) => {
       const cityMatches = selectedCity === 'all' || getStoreCity(product).toLowerCase() === selectedCity.toLowerCase();
       if (!cityMatches) return false;
-
-      if (min != null && (product.price ?? 0) < min) return false;
-      if (max != null && (product.price ?? 0) > max) return false;
-
       if (!text) return true;
       const haystack = [product.productName, product.description, product.storeName, product.categoryKey]
         .filter(Boolean)
@@ -278,199 +203,238 @@ export function ProductGrid({
         .toLowerCase();
       return haystack.includes(text);
     });
-  }, [products, searchText, selectedCity, minPrice, maxPrice]);
+
+    const imageReadyProducts = matchingProducts.filter((product) => hasDisplayImage(product) && isVerifiedStore(product.verified));
+    return mixProductsAcrossStores(shuffleProducts(imageReadyProducts));
+  }, [products, searchText, selectedCity]);
 
   const toggleDescription = (productId: string) => {
     setExpandedDescriptionIds((current) => {
       const next = new Set(current);
-      if (next.has(productId)) next.delete(productId);
-      else next.add(productId);
-      return next;
-    });
-  };
-
-  const toggleSave = (item: PublicProduct) => {
-    setSavedIds((current) => {
-      const next = new Set(current);
-      if (next.has(item.id)) next.delete(item.id);
-      else next.add(item.id);
-
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(SAVED_IDS_KEY, JSON.stringify(Array.from(next)));
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
       }
-
-      void trackEvent('save_item', { productId: item.id, saved: next.has(item.id) });
       return next;
     });
-  };
-
-  const onProductViewed = (item: PublicProduct) => {
-    void trackEvent('product_view', { productId: item.id, storeId: item.storeId ?? null });
-
-    if (typeof window === 'undefined') return;
-
-    const next = [item, ...recentlyViewed.filter((current) => current.id !== item.id)].slice(0, 6);
-    setRecentlyViewed(next);
-    window.localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(next));
   };
 
   const fetchCategories = async () => {
+    if (!db) {
+      setError(firebaseConfigError ?? 'Firebase is not configured.');
+      return;
+    }
+
     setIsLoadingCategories(true);
+
     try {
-      const response = await fetch('/api/integration/categories', { cache: 'no-store' });
-      const body = (await response.json()) as { items?: string[] };
-      setCategories(['all', ...((body.items ?? []).sort())]);
-    } catch {
+      const all = new Set<string>();
+      let cursor: QueryDocumentSnapshot | undefined;
+
+      while (true) {
+        const base = query(
+          collection(db, 'publicProducts'),
+          where('isVisible', '==', true),
+          orderBy('categoryKey', 'asc'),
+          limit(200),
+        );
+
+        const paged = cursor ? query(base, startAfter(cursor)) : base;
+        const snapshot = await getDocs(paged);
+
+        snapshot.docs.forEach((docItem) => {
+          const data = docItem.data() as PublicProduct;
+          const category = data.categoryKey;
+          if (typeof category === 'string' && category.trim().length > 0) {
+            all.add(category);
+          }
+        });
+
+        if (snapshot.docs.length < 200) {
+          break;
+        }
+
+        cursor = snapshot.docs.at(-1);
+      }
+
+      setCategories(['all', ...Array.from(all).sort()]);
+    } catch (err) {
+      console.error('Failed to fetch categories', err);
       setCategories(['all']);
     } finally {
       setIsLoadingCategories(false);
     }
   };
 
-  const fetchProducts = async (nextPage = 1) => {
+  const fetchProducts = async (cursor?: QueryDocumentSnapshot) => {
+    if (!db) {
+      setError(firebaseConfigError ?? 'Firebase is not configured.');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
-
-    const cacheKey = `${PRODUCTS_CACHE_KEY}:${selectedCategory}:${selectedSort}:${nextPage}`;
+    setDebugInfo(null);
 
     try {
-      const params = new URLSearchParams({ page: String(nextPage), pageSize: String(PAGE_SIZE), sort: selectedSort });
-      if (selectedCategory !== 'all') params.set('categoryKey', selectedCategory);
-      const response = await fetch(`/api/integration/products?${params.toString()}`, { cache: 'no-store' });
-      const body = (await response.json()) as { items?: PublicProduct[]; hasMore?: boolean; error?: string };
-      if (!response.ok) throw new Error(body.error ?? 'Failed to load products');
+      const filters: QueryConstraint[] = [where('isVisible', '==', true)];
 
-      const nextItems = body.items ?? [];
-      setProducts((current) => (nextPage === 1 ? nextItems : [...current, ...nextItems]));
-      setCities((current) => Array.from(new Set([...current, ...nextItems.map(getStoreCity)])).sort((a, b) => a.localeCompare(b)));
-      setHasMore(Boolean(body.hasMore));
-      setPage(nextPage);
-
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(cacheKey, JSON.stringify({ items: nextItems, hasMore: Boolean(body.hasMore) }));
+      if (selectedCategory !== 'all') {
+        filters.push(where('categoryKey', '==', selectedCategory));
       }
-    } catch (fetchError) {
-      if (typeof window !== 'undefined') {
-        const rawCache = window.localStorage.getItem(cacheKey);
-        if (rawCache) {
-          const cached = JSON.parse(rawCache) as { items?: PublicProduct[]; hasMore?: boolean };
-          const cachedItems = Array.isArray(cached.items) ? cached.items : [];
-          setProducts((current) => (nextPage === 1 ? cachedItems : [...current, ...cachedItems]));
-          setHasMore(Boolean(cached.hasMore));
-          setPage(nextPage);
-          setError('Live data is currently unavailable. Showing last cached results.');
-          setIsLoading(false);
-          return;
+
+      const orderOptions: QueryConstraint[][] =
+        selectedSort === 'price'
+          ? [[orderBy('price', 'asc'), orderBy(documentId(), 'asc')], [orderBy(documentId(), 'asc')]]
+          : selectedSort === 'featured'
+            ? [[orderBy('featuredRank', 'desc'), orderBy(documentId(), 'asc')], [orderBy(documentId(), 'asc')]]
+            : [[orderBy('publishedAt', 'desc')], [orderBy(documentId(), 'asc')]];
+
+      let snapshot = null;
+
+      for (let index = 0; index < orderOptions.length; index += 1) {
+        const ordering = orderOptions[index];
+        try {
+          const baseQuery = query(collection(db, 'publicProducts'), ...filters, ...ordering, limit(PAGE_SIZE));
+          const pagedQuery = cursor ? query(baseQuery, startAfter(cursor)) : baseQuery;
+          const nextSnapshot = await getDocs(pagedQuery);
+
+          const shouldTryFallbackForMissingPublishedAt =
+            selectedSort === 'newest' &&
+            !cursor &&
+            index === 0 &&
+            nextSnapshot.empty &&
+            orderOptions.length > 1;
+
+          if (shouldTryFallbackForMissingPublishedAt) {
+            continue;
+          }
+
+          snapshot = nextSnapshot;
+          break;
+        } catch (queryErr) {
+          const firestoreError = queryErr as FirestoreError;
+          if (firestoreError?.code !== 'failed-precondition') {
+            throw queryErr;
+          }
         }
       }
 
-      const message = fetchError instanceof Error ? fetchError.message : 'Unknown error';
-      setError(`Could not load products from Sedifex integration API: ${message}`);
+      if (!snapshot) {
+        throw new Error('Unable to fetch products with the available indexes.');
+      }
+
+      const nextItems = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
+        .filter((item) => hasDisplayImage(item) && isVerifiedStore(item.verified));
+
+      setProducts((current) => (cursor ? [...current, ...nextItems] : nextItems));
+      setCities((current) => {
+        const next = new Set(current);
+        nextItems.forEach((item) => next.add(getStoreCity(item)));
+        return Array.from(next).sort((a, b) => a.localeCompare(b));
+      });
+      setLastDoc(snapshot.docs.at(-1) ?? null);
+    } catch (err) {
+      console.error('Failed to fetch products', err);
+      const firestoreError = err as FirestoreError;
+      const debugDetails = {
+        operation: 'fetchProducts',
+        selectedCategory,
+        selectedSort,
+        firestoreCode: firestoreError?.code ?? 'unknown',
+        firestoreMessage: firestoreError?.message ?? 'No message provided',
+        firebaseConfigError: firebaseConfigError ?? null,
+      };
+      setDebugInfo(JSON.stringify(debugDetails, null, 2));
+
+      if (firestoreError?.code === 'permission-denied') {
+        setError('Could not load products due to Firestore rules. Allow public read access to publicProducts.');
+      } else if (firestoreError?.code === 'failed-precondition') {
+        setError(
+          'Could not load products. Deploy Firestore indexes and rules with `firebase deploy --only firestore:indexes,firestore:rules`.',
+        );
+      } else {
+        setError('Could not load products. Check debug details below to see the exact Firestore error.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    setSelectedSort(initialSort);
-    setSelectedCategory(initialCategory);
-    setSelectedCity(initialCity);
-    setSearchText(initialSearchText);
-    setMinPrice(initialMinPrice);
-    setMaxPrice(initialMaxPrice);
-  }, [initialSort, initialCategory, initialCity, initialSearchText, initialMinPrice, initialMaxPrice]);
-
-  useEffect(() => {
     fetchCategories();
-
-    if (typeof window === 'undefined') return;
-
-    const rawSaved = window.localStorage.getItem(SAVED_IDS_KEY);
-    if (rawSaved) {
-      setSavedIds(new Set(JSON.parse(rawSaved) as string[]));
-    }
-
-    const rawRecent = window.localStorage.getItem(RECENTLY_VIEWED_KEY);
-    if (rawRecent) {
-      setRecentlyViewed(JSON.parse(rawRecent) as PublicProduct[]);
-    }
   }, []);
 
   useEffect(() => {
     setProducts([]);
-    fetchProducts(1);
+    setLastDoc(null);
+    fetchProducts();
   }, [selectedCategory, selectedSort]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const params = new URLSearchParams(window.location.search);
-    if (searchText.trim()) params.set('q', searchText.trim());
-    else params.delete('q');
-    if (selectedCategory !== 'all') params.set('category', selectedCategory);
-    else params.delete('category');
-    if (selectedCity !== 'all') params.set('city', selectedCity);
-    else params.delete('city');
-    if (selectedSort !== 'store-diverse') params.set('sort', selectedSort);
-    else params.delete('sort');
-    if (minPrice.trim()) params.set('minPrice', minPrice.trim());
-    else params.delete('minPrice');
-    if (maxPrice.trim()) params.set('maxPrice', maxPrice.trim());
-    else params.delete('maxPrice');
-
-    const nextQuery = params.toString();
-    const nextUrl = nextQuery ? `${window.location.pathname}?${nextQuery}` : window.location.pathname;
-    window.history.replaceState(null, '', nextUrl);
-
-    window.localStorage.setItem('sedifex.preferredCity', selectedCity);
-  }, [searchText, selectedCategory, selectedCity, selectedSort, minPrice, maxPrice]);
 
   return (
     <section className="marketplace">
-      {recentlyViewed.length > 0 ? (
-        <div className="toolbar">
-          <div className="sortWrap">
-            <label>Recently viewed</label>
-            <div className="inlineLinks">
-              {recentlyViewed.map((item) => (
-                <Link key={item.id} href={getProductHref(item.id, item.productName)}>
-                  {item.productName}
-                </Link>
-              ))}
-            </div>
-          </div>
+      <div className="toolbar">
+        <div className="searchWrap">
+          <label htmlFor="search">Search</label>
+          <input
+            id="search"
+            type="search"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder="Search products, services, stores, or categories"
+          />
         </div>
-      ) : null}
 
-      <FilterToolbar
-        searchText={searchText}
-        selectedSort={selectedSort}
-        selectedCity={selectedCity}
-        minPrice={minPrice}
-        maxPrice={maxPrice}
-        cities={cities}
-        onSearchTextChange={setSearchText}
-        onSortChange={setSelectedSort}
-        onCityChange={setSelectedCity}
-        onMinPriceChange={setMinPrice}
-        onMaxPriceChange={setMaxPrice}
-      />
-
-      <CategoryChips
-        categories={categories}
-        selectedCategory={selectedCategory}
-        isLoading={isLoadingCategories}
-        onSelectCategory={setSelectedCategory}
-      />
-
-      {error ? (
-        <div className="errorBlock">
-          <p className="error">{error}</p>
-          <button type="button" onClick={() => fetchProducts(1)}>
-            Retry
-          </button>
+        <div className="sortWrap">
+          <label htmlFor="sort">Sort by</label>
+          <select id="sort" value={selectedSort} onChange={(event) => setSelectedSort(event.target.value as SortOption)}>
+            <option value="featured">Popular</option>
+            <option value="newest">Newest</option>
+            <option value="price">Cheapest</option>
+          </select>
         </div>
-      ) : null}
+      </div>
+      <div className="toolbar">
+        <div className="sortWrap">
+          <label htmlFor="city-filter">City</label>
+          <select id="city-filter" value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>
+            {cities.map((city) => (
+              <option key={city} value={city}>
+                {city === 'all' ? 'All cities' : city}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="categories" role="tablist" aria-label="Product categories">
+        {categories.map((category) => {
+          const active = category === selectedCategory;
+          return (
+            <button
+              type="button"
+              key={category}
+              role="tab"
+              aria-selected={active}
+              className={`chip ${active ? 'active' : ''}`}
+              disabled={isLoadingCategories}
+              onClick={() => setSelectedCategory(category)}
+            >
+              {category}
+            </button>
+          );
+        })}
+      </div>
+
+      {error && <p className="error">{error}</p>}
+      {debugInfo && (
+        <details className="error" open>
+          <summary>Debug details</summary>
+          <pre>{debugInfo}</pre>
+        </details>
+      )}
 
       <div className="grid">
         {isLoading && products.length === 0
@@ -483,28 +447,75 @@ export function ProductGrid({
                 <div className="skeleton skeletonButton" />
               </article>
             ))
-          : visibleProducts.map((item) => (
-              <ProductCard
-                key={item.id}
-                item={item}
-                isSaved={savedIds.has(item.id)}
-                isDescriptionExpanded={expandedDescriptionIds.has(item.id)}
-                onToggleDescription={toggleDescription}
-                onToggleSave={toggleSave}
-                onProductViewed={onProductViewed}
-              />
-            ))}
+          : visibleProducts.map((item) => {
+              const whatsappLink = buildWhatsAppLink(item);
+              const canContactOnWhatsApp = whatsappLink !== '#';
+              const storeHref = getStoreHref(item.storeId, item.storeName);
+              const shouldCollapseDescription = (item.description?.trim().length ?? 0) > 260;
+              const isExpanded = expandedDescriptionIds.has(item.id);
+              const descriptionClassName = `formattedDescription compact ${shouldCollapseDescription && !isExpanded ? 'isCollapsed' : ''}`.trim();
+
+              return (
+                <article key={item.id} className="card">
+                  <div className="imageWrap">
+                    <Image
+                      src={item.imageUrls?.[0] ?? 'https://placehold.co/640x640'}
+                      alt={item.imageAlt?.trim() || item.productName || 'Product image'}
+                      loading="lazy"
+                      width={360}
+                      height={360}
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                      style={{ width: '100%', height: 'auto' }}
+                    />
+                  </div>
+                  <h3>{item.productName ?? 'Untitled item'}</h3>
+                  <Link href={`/products/${encodeURIComponent(item.id)}`}>View product details</Link>
+                  <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
+                  {shouldCollapseDescription && (
+                    <button type="button" className="descriptionToggle" onClick={() => toggleDescription(item.id)}>
+                      {isExpanded ? 'View less' : 'View more'}
+                    </button>
+                  )}
+                  <div className="meta">
+                    <span className="storeIdentity">
+                      {storeHref ? (
+                        <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link>
+                      ) : (
+                        item.storeName ?? 'Unknown store'
+                      )}
+                      {isVerifiedStore(item.verified) ? (
+                        <span className="verifiedBadge" aria-label="Verified store">
+                          Verified
+                        </span>
+                      ) : null}
+                    </span>
+                    <strong>{formatPrice(item.price, item.currency)}</strong>
+                  </div>
+                  <p>City: {getStoreCity(item)}</p>
+                  <p>Phone: {getStorePhone(item)}</p>
+                  {canContactOnWhatsApp ? (
+                    <a className="waButton" href={whatsappLink} target="_blank" rel="noreferrer" aria-label={`Contact ${item.storeName ?? 'store'} on WhatsApp about ${item.productName ?? 'this item'}`}>
+                      Contact on WhatsApp
+                    </a>
+                  ) : (
+                    <span className="waButton" aria-disabled="true" title="WhatsApp contact unavailable">
+                      WhatsApp unavailable
+                    </span>
+                  )}
+                </article>
+              );
+            })}
       </div>
 
-      {!isLoading && visibleProducts.length === 0 && !error ? (
+      {!isLoading && visibleProducts.length === 0 && !error && (
         <div className="emptyState">
           <h3>No items found</h3>
           <p>Try a different search term, category, or sort option.</p>
         </div>
-      ) : null}
+      )}
 
       <div className="actions">
-        <button type="button" disabled={!hasMore || isLoading} onClick={() => fetchProducts(page + 1)}>
+        <button type="button" disabled={!lastDoc || isLoading} onClick={() => fetchProducts(lastDoc ?? undefined)}>
           {isLoading && products.length > 0 ? 'Loading more...' : 'Load more products'}
         </button>
       </div>

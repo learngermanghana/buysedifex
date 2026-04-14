@@ -3,7 +3,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getStoreProfileById, listPublicStoreIds } from '@/lib/public-stores';
-import { extractStoreIdFromRouteParam, getStoreHref } from '@/lib/store-route';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 type StorePageProps = {
@@ -32,8 +31,7 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: StorePageProps): Promise<Metadata> {
-  const routeStoreId = extractStoreIdFromRouteParam(params.storeId);
-  const profile = await getStoreProfileById(routeStoreId || params.storeId);
+  const profile = await getStoreProfileById(params.storeId);
 
   if (!profile) {
     return {
@@ -43,7 +41,7 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
     };
   }
 
-  const canonicalPath = getStoreHref(profile.storeId, profile.storeName, profile.storeSlug) ?? `/stores/${encodeURIComponent(params.storeId)}`;
+  const canonicalPath = `/stores/${params.storeId}`;
   const canonicalUrl = canonicalUrlForPath(canonicalPath);
   const title = buildStoreTitle(profile.storeName, profile.city);
   const description = buildStoreDescription(profile.storeName, profile.city, profile.country);
@@ -76,17 +74,14 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
 }
 
 export default async function StorePage({ params }: StorePageProps) {
-  const routeStoreId = extractStoreIdFromRouteParam(params.storeId);
-  const profile = await getStoreProfileById(routeStoreId || params.storeId);
+  const profile = await getStoreProfileById(params.storeId);
 
   if (!profile) {
     notFound();
   }
 
-  const canonicalUrl = canonicalUrlForPath(getStoreHref(profile.storeId, profile.storeName, profile.storeSlug) ?? `/stores/${encodeURIComponent(params.storeId)}`);
+  const canonicalUrl = canonicalUrlForPath(`/stores/${params.storeId}`);
   const hasLocation = Boolean(profile.addressLine1 || profile.city || profile.country);
-  const sameAs = Array.isArray(profile.sameAs) ? profile.sameAs : [];
-  const products = Array.isArray(profile.products) ? profile.products : [];
 
   const organizationType = hasLocation ? 'LocalBusiness' : 'OnlineStore';
   const address = hasLocation
@@ -107,10 +102,10 @@ export default async function StorePage({ params }: StorePageProps) {
     ...(profile.storeBannerUrl ? { image: profile.storeBannerUrl } : {}),
     ...(profile.storePhone ? { telephone: profile.storePhone } : {}),
     ...(address ? { address } : {}),
-    ...(sameAs.length > 0 ? { sameAs } : {}),
+    ...(profile.sameAs.length > 0 ? { sameAs: profile.sameAs } : {}),
   };
 
-  const categoryKeys = Array.from(new Set(products.map((product) => product.categoryKey).filter(Boolean))) as string[];
+  const categoryKeys = Array.from(new Set(profile.products.map((product) => product.categoryKey).filter(Boolean))) as string[];
   const normalizedPhone = (profile.storePhone ?? '').replace(/[^\d+]/g, '');
   const normalizedWhatsapp = (profile.storeWhatsapp ?? '').trim();
   const whatsappLink =
@@ -121,34 +116,9 @@ export default async function StorePage({ params }: StorePageProps) {
         : '';
   const mailtoHref = profile.storeEmail ? `mailto:${profile.storeEmail}` : '';
 
-  const faqSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: [
-      {
-        '@type': 'Question',
-        name: `How do I contact ${profile.storeName}?`,
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: 'Use the call, email, or WhatsApp actions available on this page.',
-        },
-      },
-      {
-        '@type': 'Question',
-        name: `Does ${profile.storeName} have verified products?`,
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: 'Store and product verification badges are shown on Sedifex when available.',
-        },
-      },
-    ],
-  };
-
-
   return (
     <main className="storePage">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <section className="storeHero">
         <p className="eyebrow">Store</p>
         <h1>
@@ -213,7 +183,7 @@ export default async function StorePage({ params }: StorePageProps) {
         <h2>Products from {profile.storeName}</h2>
         <p>🚚 Delivery: Discuss with seller · 💳 Payment methods: MoMo, cash, and seller-approved options.</p>
         <ul>
-          {products.map((product) => (
+          {profile.products.map((product) => (
             <li key={product.id}>
               {product.productName}
               {product.categoryKey ? (

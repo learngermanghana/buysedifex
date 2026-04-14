@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ConcernReportForm } from '@/components/concern-report-form';
 import { canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 const title = 'Contact Sedifex';
@@ -60,13 +59,6 @@ export default function ContactPage() {
           <li>Short summary of the issue and relevant date/time.</li>
           <li>Any screenshots or order conversation context that helps resolve the issue quickly.</li>
         </ul>
-      </section>
-
-      <section>
-        <p className="eyebrow">Trust and safety</p>
-        <h2>Report a concern</h2>
-        <p>Use this secure form to report fraud risk, product concerns, or account abuse for review by Sedifex support.</p>
-        <ConcernReportForm />
       </section>
 
       <div className="inlineLinks">

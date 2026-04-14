@@ -1,21 +1,49 @@
 'use client';
 
-import type { SedifexPromo } from '@sedifex/integration-types';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { trackEvent } from '@/lib/client-tracking';
-import { getStoreHref } from '@/lib/store-route';
+import { FirestoreError, collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { db, firebaseConfigError } from '@/lib/firebase';
 
-type StorePromo = SedifexPromo;
+type StorePromo = {
+  id: string;
+  storeName?: string;
+  storeSlug?: string;
+  verified?: boolean | string;
+  promoTitle?: string;
+  promoSummary?: string;
+  promoImageUrl?: string;
+  promoImageAlt?: string | null;
+  promoStartDate?: string;
+  promoEndDate?: string;
+  promoTiktokUrl?: string | null;
+  promoWebsiteUrl?: string | null;
+  promoYoutubeUrl?: string | null;
+};
 
-const getStorePath = (promo: StorePromo) => getStoreHref(promo.storeId ?? promo.id, promo.storeName, promo.storeSlug);
+const isVerifiedStore = (value: StorePromo['verified']) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'yes';
+  }
 
-const promoMatchesCity = (promo: StorePromo, city: string) => {
-  if (!city || city === 'all') return false;
-  const normalizedCity = city.trim().toLowerCase();
-  const haystack = [promo.promoSummary, promo.promoTitle, promo.storeName].filter(Boolean).join(' ').toLowerCase();
-  return haystack.includes(normalizedCity);
+  return false;
+};
+
+const isWithinPromoWindow = (promo: StorePromo, today: string) => {
+  if (!promo.promoStartDate || !promo.promoEndDate) return false;
+  return promo.promoStartDate <= today && promo.promoEndDate >= today;
+};
+
+const getStorePath = (promo: StorePromo) => {
+  const slug = promo.storeSlug?.trim();
+  if (slug) {
+    return `/stores/${encodeURIComponent(slug)}`;
+  }
+
+  return null;
 };
 
 export function PromoCarousel() {
@@ -26,19 +54,57 @@ export function PromoCarousel() {
 
   useEffect(() => {
     const loadPromos = async () => {
+      if (!db) {
+        setError(firebaseConfigError ?? 'Firebase is not configured.');
+        setIsLoading(false);
+        return;
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+
       try {
-        const response = await fetch('/api/integration/promos', { cache: 'no-store' });
-        if (!response.ok) throw new Error('Failed to load promos');
-        const body = (await response.json()) as { items?: StorePromo[] };
+        const primaryQuery = query(
+          collection(db, 'stores'),
+          where('promoStartDate', '<=', today),
+          where('promoEndDate', '>=', today),
+          orderBy('promoStartDate', 'desc'),
+          limit(50),
+        );
 
-        const preferredCity = typeof window === 'undefined' ? 'all' : window.localStorage.getItem('sedifex.preferredCity') ?? 'all';
-        const sourcePromos = Array.isArray(body.items) ? body.items : [];
-        const cityMatched = sourcePromos.filter((promo) => promoMatchesCity(promo, preferredCity));
-        setPromos(cityMatched.length > 0 ? cityMatched : sourcePromos);
+        const snapshot = await getDocs(primaryQuery);
+        const items = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }) as StorePromo)
+          .filter(
+            (item) =>
+              isVerifiedStore(item.verified) && Boolean(item.promoTitle?.trim()) && Boolean(item.promoImageUrl?.trim()),
+          )
+          .slice(0, 10);
 
+        setPromos(items);
         setError(null);
-      } catch {
-        setError('Could not load promotions at the moment.');
+      } catch (err) {
+        const firestoreError = err as FirestoreError;
+
+        if (firestoreError.code !== 'failed-precondition') {
+          setError('Could not load promotions at the moment.');
+          setIsLoading(false);
+          return;
+        }
+
+        try {
+          const fallbackQuery = query(collection(db, 'stores'), limit(100));
+          const snapshot = await getDocs(fallbackQuery);
+          const items = snapshot.docs
+            .map((doc) => ({ id: doc.id, ...doc.data() }) as StorePromo)
+            .filter((item) => isVerifiedStore(item.verified) && isWithinPromoWindow(item, today))
+            .sort((a, b) => (b.promoStartDate ?? '').localeCompare(a.promoStartDate ?? ''))
+            .slice(0, 10);
+
+          setPromos(items);
+          setError(null);
+        } catch {
+          setError('Could not load promotions at the moment.');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -65,11 +131,6 @@ export function PromoCarousel() {
 
   const activePromo = useMemo(() => promos[activeIndex], [activeIndex, promos]);
 
-  useEffect(() => {
-    if (!activePromo) return;
-    void trackEvent('promo_impression', { promoId: activePromo.id, storeId: activePromo.storeId ?? null, position: activeIndex });
-  }, [activePromo, activeIndex]);
-
   return (
     <aside className="promoRail" aria-label="Latest store promotions">
       <div className="promoRailHeader">
@@ -77,7 +138,9 @@ export function PromoCarousel() {
         <h2>Verified store deals</h2>
       </div>
 
-      {isLoading ? <div className="promoCard skeletonPromo" aria-hidden="true" /> : null}
+      {isLoading ? (
+        <div className="promoCard skeletonPromo" aria-hidden="true" />
+      ) : null}
 
       {!isLoading && error ? <p className="error">{error}</p> : null}
 
@@ -87,38 +150,35 @@ export function PromoCarousel() {
             <Image
               src={activePromo.promoImageUrl ?? 'https://placehold.co/640x360'}
               alt={activePromo.promoImageAlt?.trim() || activePromo.promoTitle || 'Store promotion image'}
-              fill
+              width={640}
+              height={360}
               sizes="(max-width: 780px) 100vw, 320px"
-              style={{ objectFit: 'cover' }}
+              style={{ width: '100%', height: 'auto' }}
             />
           </div>
 
           <div className="promoMeta">
             <h3>{activePromo.promoTitle ?? 'Latest promotion'}</h3>
-            {activePromo.promoSummary ? <p className="promoSummary">{activePromo.promoSummary}</p> : null}
-            {activePromo.promoStartDate || activePromo.promoEndDate ? (
-              <p className="promoDates">{[activePromo.promoStartDate, activePromo.promoEndDate].filter(Boolean).join(' - ')}</p>
-            ) : null}
+            <p className="promoSummary">{activePromo.promoSummary ?? 'Discover the latest offer from this verified store.'}</p>
+            <p className="promoDates">
+              {activePromo.promoStartDate} - {activePromo.promoEndDate}
+            </p>
           </div>
 
           <div className="promoActions">
-            {getStorePath(activePromo) ? (
-              <Link href={getStorePath(activePromo) ?? '#'} onClick={() => trackEvent('promo_click', { promoId: activePromo.id, channel: 'store' })}>
-                Visit store
-              </Link>
-            ) : null}
+            {getStorePath(activePromo) ? <Link href={getStorePath(activePromo) ?? '#'}>Visit store</Link> : null}
             {activePromo.promoWebsiteUrl ? (
-              <a href={activePromo.promoWebsiteUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent('promo_click', { promoId: activePromo.id, channel: 'website' })}>
+              <a href={activePromo.promoWebsiteUrl} target="_blank" rel="noreferrer">
                 Website
               </a>
             ) : null}
             {activePromo.promoTiktokUrl ? (
-              <a href={activePromo.promoTiktokUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent('promo_click', { promoId: activePromo.id, channel: 'tiktok' })}>
+              <a href={activePromo.promoTiktokUrl} target="_blank" rel="noreferrer">
                 TikTok
               </a>
             ) : null}
             {activePromo.promoYoutubeUrl ? (
-              <a href={activePromo.promoYoutubeUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent('promo_click', { promoId: activePromo.id, channel: 'youtube' })}>
+              <a href={activePromo.promoYoutubeUrl} target="_blank" rel="noreferrer">
                 YouTube
               </a>
             ) : null}
@@ -140,7 +200,9 @@ export function PromoCarousel() {
         </article>
       ) : null}
 
-      {!isLoading && !error && promos.length === 0 ? <p className="promoEmpty">No active promotions yet. Verified stores will appear here automatically.</p> : null}
+      {!isLoading && !error && promos.length === 0 ? (
+        <p className="promoEmpty">No active promotions yet. Verified stores will appear here automatically.</p>
+      ) : null}
     </aside>
   );
 }

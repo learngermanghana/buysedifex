@@ -3,11 +3,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { FormattedDescription } from '@/components/formatted-description';
-import { ProductLeadPanel } from '@/components/product-lead-panel';
 import { getPublicProductById } from '@/lib/public-products';
 import { getStoreProfileById } from '@/lib/public-stores';
-import { extractProductIdFromRouteParam, getProductHref } from '@/lib/product-route';
-import { getStoreHref } from '@/lib/store-route';
+import { getStoreHref, getStoreRouteId } from '@/lib/store-route';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 type ProductPageProps = {
@@ -53,8 +51,8 @@ const buildMetadataDescription = (input: {
 };
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const normalizedProductId = extractProductIdFromRouteParam(params.productId);
-  const product = await getPublicProductById(normalizedProductId);
+  const { productId } = params;
+  const product = await getPublicProductById(productId);
 
   if (!product) {
     return {
@@ -64,12 +62,12 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     };
   }
 
-  const canonicalPath = getProductHref(product.id, product.productName);
+  const canonicalPath = `/products/${encodeURIComponent(productId)}`;
   const canonicalUrl = canonicalUrlForPath(canonicalPath);
   const title = `${product.productName}${buildLocation(product.city)} | ${product.storeName} | Sedifex`;
   const description = buildMetadataDescription(product);
   const socialImages =
-    product.imageUrls.length > 0 ? product.imageUrls.map((url: string) => ({ url })) : [{ url: defaultSocialImageUrl() }];
+    product.imageUrls.length > 0 ? product.imageUrls.map((url) => ({ url })) : [{ url: defaultSocialImageUrl() }];
 
   return {
     title,
@@ -92,14 +90,14 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       card: 'summary_large_image',
       title,
       description,
-      images: socialImages.map((image: { url: string }) => image.url),
+      images: socialImages.map((image) => image.url),
     },
   };
 }
 
 export default async function ProductDetailPage({ params }: ProductPageProps) {
-  const normalizedProductId = extractProductIdFromRouteParam(params.productId);
-  const product = await getPublicProductById(normalizedProductId);
+  const { productId } = params;
+  const product = await getPublicProductById(productId);
 
   if (!product) {
     notFound();
@@ -112,13 +110,16 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     'Location unavailable';
   const resolvedStorePhone = storeProfile?.storePhone?.trim() || product.waLink?.trim() || 'Phone unavailable';
   const storePhoneHref = sanitizePhoneForTel(storeProfile?.storePhone ?? product.waLink);
-  const storeHref = getStoreHref(storeProfile?.storeId ?? product.storeId, resolvedStoreName, storeProfile?.storeSlug);
+  const resolvedStoreId = getStoreRouteId(storeProfile?.storeId ?? product.storeId, resolvedStoreName);
+  const storeHref = getStoreHref(resolvedStoreId ?? undefined, resolvedStoreName);
   const hasStorePage = Boolean(storeHref);
   const hasWebsite = Boolean(storeProfile?.websiteUrl);
   const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
   const sanitizedWhatsapp = (product.waLink ?? storeProfile?.storeWhatsapp ?? storeProfile?.storePhone ?? '').replace(/[^\d]/g, '');
   const whatsappHref = sanitizedWhatsapp ? `https://wa.me/${sanitizedWhatsapp}` : '';
-  const productUrl = canonicalUrlForPath(getProductHref(product.id, product.productName));
+  const requestHref = `mailto:info@sedifex.com?subject=${encodeURIComponent(`Product request: ${product.productName}`)}&body=${encodeURIComponent(`Please help me request ${product.productName} from ${resolvedStoreName}. Product ID: ${product.id}`)}`;
+
+  const productUrl = canonicalUrlForPath(`/products/${encodeURIComponent(productId)}`);
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -159,7 +160,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <section className="productSummaryCard">
         {product.imageUrls.length > 0 ? (
           <section className="productImageGrid" aria-label="Product images">
-            {product.imageUrls.map((imageUrl: string) => (
+            {product.imageUrls.map((imageUrl) => (
               <Image
                 key={imageUrl}
                 src={imageUrl}
@@ -230,12 +231,20 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           ) : null}
         </div>
       </section>
-      <ProductLeadPanel
-        productId={product.id}
-        productName={product.productName}
-        city={storeProfile?.city ?? product.city}
-        whatsappHref={whatsappHref}
-      />
+      <aside className="stickyProductActions">
+        {whatsappHref ? (
+          <a className="waButton" href={whatsappHref} target="_blank" rel="noopener noreferrer">
+            Chat on WhatsApp
+          </a>
+        ) : (
+          <span className="waButton" aria-disabled="true">
+            WhatsApp unavailable
+          </span>
+        )}
+        <a className="requestButton" href={requestHref}>
+          Request this product
+        </a>
+      </aside>
     </main>
   );
 }
