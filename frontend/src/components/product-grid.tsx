@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FirestoreError,
   QueryConstraint,
@@ -48,6 +48,8 @@ type PublicProduct = {
 type SortOption = 'newest' | 'price' | 'featured';
 
 const PAGE_SIZE = 12;
+const SEARCH_SCAN_LIMIT = 300;
+const SEARCH_BATCH_SIZE = 100;
 
 const normalizeDisplayCurrency = (currency?: string) => {
   const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
@@ -290,7 +292,7 @@ export function ProductGrid() {
     }
   };
 
-  const fetchProducts = async (cursor?: QueryDocumentSnapshot) => {
+  const fetchProducts = useCallback(async (cursor?: QueryDocumentSnapshot) => {
     if (!db) {
       setError(firebaseConfigError ?? 'Firebase is not configured.');
       return;
@@ -384,7 +386,65 @@ export function ProductGrid() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedCategory, selectedSort]);
+
+  const fetchProductsForSearch = useCallback(async () => {
+    if (!db) {
+      setError(firebaseConfigError ?? 'Firebase is not configured.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setDebugInfo(null);
+
+    try {
+      const filters: QueryConstraint[] = [where('isVisible', '==', true)];
+
+      if (selectedCategory !== 'all') {
+        filters.push(where('categoryKey', '==', selectedCategory));
+      }
+
+      const allItems: PublicProduct[] = [];
+      let cursor: QueryDocumentSnapshot | undefined;
+
+      while (allItems.length < SEARCH_SCAN_LIMIT) {
+        const batchQuery = query(
+          collection(db, 'publicProducts'),
+          ...filters,
+          orderBy(documentId(), 'asc'),
+          limit(SEARCH_BATCH_SIZE),
+          ...(cursor ? [startAfter(cursor)] : []),
+        );
+
+        const snapshot = await getDocs(batchQuery);
+        const batchItems = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
+          .filter((item) => hasDisplayImage(item) && isVerifiedStore(item.verified));
+
+        allItems.push(...batchItems);
+
+        if (snapshot.docs.length < SEARCH_BATCH_SIZE) {
+          break;
+        }
+
+        cursor = snapshot.docs.at(-1);
+      }
+
+      setProducts(allItems.slice(0, SEARCH_SCAN_LIMIT));
+      setLastDoc(null);
+      setCities((current) => {
+        const next = new Set(current);
+        allItems.forEach((item) => next.add(getStoreCity(item)));
+        return Array.from(next).sort((a, b) => a.localeCompare(b));
+      });
+    } catch (err) {
+      console.error('Failed to fetch products for search', err);
+      setError('Could not load all products for search. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedCategory]);
 
   useEffect(() => {
     fetchCategories();
@@ -393,8 +453,16 @@ export function ProductGrid() {
   useEffect(() => {
     setProducts([]);
     setLastDoc(null);
+    if (searchText.trim().length > 0) return;
     fetchProducts();
-  }, [selectedCategory, selectedSort]);
+  }, [fetchProducts, searchText]);
+
+  useEffect(() => {
+    if (searchText.trim().length === 0) return;
+    setProducts([]);
+    setLastDoc(null);
+    fetchProductsForSearch();
+  }, [fetchProductsForSearch, searchText]);
 
   return (
     <section className="marketplace">
@@ -543,7 +611,11 @@ export function ProductGrid() {
       )}
 
       <div className="actions">
-        <button type="button" disabled={!lastDoc || isLoading} onClick={() => fetchProducts(lastDoc ?? undefined)}>
+        <button
+          type="button"
+          disabled={!lastDoc || isLoading || searchText.trim().length > 0}
+          onClick={() => fetchProducts(lastDoc ?? undefined)}
+        >
           {isLoading && products.length > 0 ? 'Loading more...' : 'Load more products'}
         </button>
       </div>
