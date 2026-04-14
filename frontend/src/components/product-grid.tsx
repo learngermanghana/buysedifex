@@ -19,6 +19,7 @@ import {
 import { db, firebaseConfigError } from '@/lib/firebase';
 import { FormattedDescription } from '@/components/formatted-description';
 import { getStoreHref } from '@/lib/store-route';
+import { getProductHref } from '@/lib/product-route';
 
 type PublicProduct = {
   id: string;
@@ -92,6 +93,33 @@ const getStoreCity = (item: PublicProduct) => {
 };
 
 const hasDisplayImage = (item: PublicProduct) => Array.isArray(item.imageUrls) && item.imageUrls.some((url) => Boolean(url?.trim()));
+
+const buildShareData = (item: PublicProduct) => {
+  const href = getProductHref(item.id, item.productName);
+  const absoluteUrl = typeof window === 'undefined' ? href : new URL(href, window.location.origin).toString();
+  return {
+    url: absoluteUrl,
+    title: item.productName?.trim() || 'Product on Sedifex',
+    text: `Check out ${item.productName?.trim() || 'this product'} on Sedifex.`,
+  };
+};
+
+const shareProduct = async (item: PublicProduct) => {
+  const shareData = buildShareData(item);
+
+  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    await navigator.share(shareData);
+    return;
+  }
+
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(shareData.url);
+    return;
+  }
+
+  window.prompt('Copy this product link', shareData.url);
+};
+
 const isVerifiedStore = (value: PublicProduct['verified']) => {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string') {
@@ -469,7 +497,7 @@ export function ProductGrid() {
                     />
                   </div>
                   <h3>{item.productName ?? 'Untitled item'}</h3>
-                  <Link href={`/products/${encodeURIComponent(item.id)}`}>View product details</Link>
+                  <Link href={getProductHref(item.id, item.productName)}>View product details</Link>
                   <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
                   {shouldCollapseDescription && (
                     <button type="button" className="descriptionToggle" onClick={() => toggleDescription(item.id)}>
@@ -493,6 +521,16 @@ export function ProductGrid() {
                   </div>
                   <p>City: {getStoreCity(item)}</p>
                   <p>Phone: {getStorePhone(item)}</p>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={() => {
+                      void shareProduct(item);
+                    }}
+                    aria-label={`Share ${item.productName ?? 'this product'}`}
+                  >
+                    Share product
+                  </button>
                   {canContactOnWhatsApp ? (
                     <a className="waButton" href={whatsappLink} target="_blank" rel="noreferrer" aria-label={`Contact ${item.storeName ?? 'store'} on WhatsApp about ${item.productName ?? 'this item'}`}>
                       Contact on WhatsApp

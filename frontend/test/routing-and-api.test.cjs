@@ -16,7 +16,10 @@ test('product routes support slug + id links and id extraction', () => {
   assert.match(productRouteSource, /extractProductIdFromRouteParam/);
   assert.match(productRouteSource, /getProductHref/);
   assert.match(gridSource, /getProductHref\(item\.id, item\.productName\)/);
+  assert.match(gridSource, /Share product/);
+  assert.match(gridSource, /navigator\.share/);
   assert.match(productPageSource, /extractProductIdFromRouteParam\(params\.productId\)/);
+  assert.match(productPageSource, /canonicalUrlForPath\(getProductHref\(product\.id, product\.productName\)\)/);
 });
 
 test('store routes support slug + id links and id extraction', () => {
