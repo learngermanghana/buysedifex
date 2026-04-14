@@ -59,7 +59,8 @@ test('store and product APIs read from Sedifex integration endpoints', () => {
   assert.doesNotMatch(integrationClientSource, /SEDIFEX_PUBLIC_API_BASE_URL/);
   assert.doesNotMatch(integrationClientSource, /buildPublicEndpoint/);
   assert.doesNotMatch(integrationClientSource, /'\/v1\/products'/);
-  assert.match(productGridSource, /filter\(\(item\) => hasDisplayImage\(item\)\)/);
+  assert.match(productGridSource, /const nextItems = body\.items \?\? \[\];/);
+  assert.match(productGridSource, /src=\{item\.imageUrls\?\.\[0\] \?\? 'https:\/\/placehold\.co\/640x640'\}/);
   assert.doesNotMatch(productGridSource, /hasDisplayImage\(item\) && isVerifiedStore\(item\.verified\)/);
   assert.match(productGridSource, /<option value="store-diverse">Mixed stores<\/option>/);
 });

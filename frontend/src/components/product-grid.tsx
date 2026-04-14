@@ -70,7 +70,6 @@ const buildWhatsAppLink = (item: PublicProduct) => {
 };
 const getStorePhone = (item: PublicProduct) => getContactPhone(item) || 'Phone unavailable';
 const getStoreCity = (item: PublicProduct) => item.city?.trim() || 'City unavailable';
-const hasDisplayImage = (item: PublicProduct) => Array.isArray(item.imageUrls) && item.imageUrls.some((url) => Boolean(url?.trim()));
 const isVerifiedStore = (value: PublicProduct['verified']) => Boolean(value);
 
 const toPositivePrice = (value: string) => {
@@ -341,7 +340,7 @@ export function ProductGrid({
       const body = (await response.json()) as { items?: PublicProduct[]; hasMore?: boolean; error?: string };
       if (!response.ok) throw new Error(body.error ?? 'Failed to load products');
 
-      const nextItems = (body.items ?? []).filter((item) => hasDisplayImage(item));
+      const nextItems = body.items ?? [];
       setProducts((current) => (nextPage === 1 ? nextItems : [...current, ...nextItems]));
       setCities((current) => Array.from(new Set([...current, ...nextItems.map(getStoreCity)])).sort((a, b) => a.localeCompare(b)));
       setHasMore(Boolean(body.hasMore));
