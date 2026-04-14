@@ -30,7 +30,7 @@ test('product detail page renders key detail sections', () => {
 test('store page renders profile and product listing sections', () => {
   const source = read('src/app/stores/[storeId]/page.tsx');
   assert.match(source, /<p className="eyebrow">Store<\/p>/);
-  assert.match(source, /Products from \{profile\.storeName\}/);
+  assert.match(source, /(Products from|Active listings from) \{profile\.storeName\}/);
   assert.match(source, /Store categories/);
   assert.match(source, /alternates: \{ canonical: canonicalUrl \}/);
 });

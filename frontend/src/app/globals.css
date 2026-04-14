@@ -14,6 +14,78 @@ body {
   min-height: 100vh;
 }
 
+.siteHeader {
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffffe8;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+
+.siteHeaderInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.siteBrand {
+  margin: 0;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.mainNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.mainNav a {
+  text-decoration: none;
+  color: #334155;
+  font-size: 0.88rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 0.34rem 0.7rem;
+  background: #fff;
+}
+
+.mainNav a.active {
+  background: #eef2ff;
+  border-color: #818cf8;
+  color: #312e81;
+}
+
+.siteFooter {
+  border-top: 1px solid #e2e8f0;
+  margin-top: 1rem;
+  padding: 1.4rem 0 2rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.siteFooter p {
+  margin: 0;
+  color: #475569;
+}
+
+.siteFooter nav {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.siteFooter a {
+  color: #1d4ed8;
+  text-decoration: none;
+}
+
 .container {
   max-width: 1240px;
   margin: 0 auto;
