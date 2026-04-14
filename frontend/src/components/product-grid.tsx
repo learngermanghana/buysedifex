@@ -91,32 +91,6 @@ const getStoreCity = (item: PublicProduct) => {
 
 const hasDisplayImage = (item: PublicProduct) => Array.isArray(item.imageUrls) && item.imageUrls.some((url) => Boolean(url?.trim()));
 
-const buildShareData = (item: PublicProduct) => {
-  const href = getProductHref(item.id, item.productName);
-  const absoluteUrl = typeof window === 'undefined' ? href : new URL(href, window.location.origin).toString();
-  return {
-    url: absoluteUrl,
-    title: item.productName?.trim() || 'Product on Sedifex',
-    text: `Check out ${item.productName?.trim() || 'this product'} on Sedifex.`,
-  };
-};
-
-const shareProduct = async (item: PublicProduct) => {
-  const shareData = buildShareData(item);
-
-  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-    await navigator.share(shareData);
-    return;
-  }
-
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(shareData.url);
-    return;
-  }
-
-  window.prompt('Copy this product link', shareData.url);
-};
-
 const isVerifiedStore = (value: PublicProduct['verified']) => {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string') {
@@ -582,16 +556,6 @@ export function ProductGrid() {
                   </div>
                   <p>City: {getStoreCity(item)}</p>
                   <p>Phone: {getStorePhone(item)}</p>
-                  <button
-                    type="button"
-                    className="secondaryButton"
-                    onClick={() => {
-                      void shareProduct(item);
-                    }}
-                    aria-label={`Share ${item.productName ?? 'this product'}`}
-                  >
-                    Share product
-                  </button>
                   <WhatsAppChatButton
                     phone={getContactPhone(item)}
                     message={buildWhatsAppMessage(item)}

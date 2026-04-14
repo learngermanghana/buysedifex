@@ -21,12 +21,15 @@ test('product links are built from slug+id helper and parsed on product page', (
   assert.match(productPageSource, /extractProductIdFromRouteParam\(params\.productId\)/);
 });
 
-test('product cards include share action using built product url', () => {
+test('share action is handled on detail pages instead of product cards', () => {
   const gridSource = read('src/components/product-grid.tsx');
+  const productPageSource = read('src/app/products/[productId]/page.tsx');
+  const storePageSource = read('src/app/stores/[storeId]/page.tsx');
+  const shareButtonSource = read('src/components/share-button.tsx');
 
-  assert.match(gridSource, /const buildShareData = \(item: PublicProduct\) =>/);
-  assert.match(gridSource, /const href = getProductHref\(item\.id, item\.productName\)/);
-  assert.match(gridSource, /navigator\.share/);
-  assert.match(gridSource, /navigator\.clipboard\?\.writeText/);
-  assert.match(gridSource, /Share product/);
+  assert.doesNotMatch(gridSource, /Share product/);
+  assert.match(productPageSource, /label="Share product"/);
+  assert.match(storePageSource, /label="Share store"/);
+  assert.match(shareButtonSource, /navigator\.share/);
+  assert.match(shareButtonSource, /navigator\.clipboard\?\.writeText/);
 });
