@@ -53,6 +53,8 @@ type StoreEnrichedProduct = PublicProductDetail & {
   sameAs: string[];
   verified?: boolean;
   storeEmail?: string;
+  isVisible?: boolean;
+  isPublished?: boolean;
 };
 
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? process.env.FIREBASE_PROJECT_ID;
@@ -162,6 +164,8 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
     storeEmail: readString(fields, ['storeEmail', 'email', 'ownerEmail', 'contactEmail']),
     addressLine1: readString(fields, ['addressLine1', 'address']),
     verified: readBoolean(fields, ['verified']),
+    isVisible: readBoolean(fields, ['isVisible']),
+    isPublished: readBoolean(fields, ['isPublished']),
     sameAs: [
       readString(fields, ['instagramUrl']),
       readString(fields, ['facebookUrl']),
@@ -172,6 +176,9 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
     ].filter(isValidHttpUrl),
   };
 };
+
+const productIsPubliclyVisible = (product: StoreEnrichedProduct): boolean =>
+  product.isVisible === true || product.isPublished === true;
 
 const toPublicProductDetail = (product: StoreEnrichedProduct): PublicProductDetail => ({
   id: product.id,
@@ -308,6 +315,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
       'tiktokUrl',
       'youtubeUrl',
       'verified',
+      'status',
     ].forEach((fieldPath) => endpoint.searchParams.append('mask.fieldPaths', fieldPath));
 
     const response = await fetch(endpoint, {
@@ -339,6 +347,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
       country: readString(fields, ['country', 'storeCountry']),
       addressLine1: readString(fields, ['addressLine1', 'address']),
       verified: readBoolean(fields, ['verified']) ?? false,
+      status: readString(fields, ['status']),
       sameAs: [
         readString(fields, ['instagramUrl']),
         readString(fields, ['facebookUrl']),
@@ -394,6 +403,8 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
         { fieldPath: 'ownerEmail' },
         { fieldPath: 'publishedAt' },
         { fieldPath: 'verified' },
+        { fieldPath: 'isVisible' },
+        { fieldPath: 'isPublished' },
       ],
     },
     from: [{ collectionId: 'publicProducts' }],
@@ -409,17 +420,24 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
             },
           },
           {
-            fieldFilter: {
-              field: { fieldPath: 'isVisible' },
-              op: 'EQUAL',
-              value: { booleanValue: true },
-            },
-          },
-          {
-            fieldFilter: {
-              field: { fieldPath: 'verified' },
-              op: 'EQUAL',
-              value: { booleanValue: true },
+            compositeFilter: {
+              op: 'OR',
+              filters: [
+                {
+                  fieldFilter: {
+                    field: { fieldPath: 'isVisible' },
+                    op: 'EQUAL',
+                    value: { booleanValue: true },
+                  },
+                },
+                {
+                  fieldFilter: {
+                    field: { fieldPath: 'isPublished' },
+                    op: 'EQUAL',
+                    value: { booleanValue: true },
+                  },
+                },
+              ],
             },
           },
         ],
@@ -453,7 +471,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     matchedProducts = normalizeStoreNamesByStoreId(
       rows
         .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
-        .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && item.verified === true),
+        .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && productIsPubliclyVisible(item)),
     );
 
     if (matchedProducts.length > 0) {
@@ -461,8 +479,30 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     }
   }
 
+  const storeDocument = await readStoreDocumentById().catch(() => null);
+
   if (matchedProducts.length === 0) {
-    return null;
+    if (!storeDocument || storeDocument.verified !== true) {
+      return null;
+    }
+
+    return {
+      storeId: normalizedStoreId,
+      storeName: storeDocument.storeName,
+      storeSlug: storeDocument.storeSlug,
+      storeEmail: storeDocument.storeEmail,
+      storePhone: storeDocument.storePhone,
+      storeWhatsapp: storeDocument.storeWhatsapp,
+      websiteUrl: isValidHttpUrl(storeDocument.websiteUrl) ? storeDocument.websiteUrl : undefined,
+      storeLogoUrl: isValidHttpUrl(storeDocument.storeLogoUrl) ? storeDocument.storeLogoUrl : undefined,
+      storeBannerUrl: isValidHttpUrl(storeDocument.storeBannerUrl) ? storeDocument.storeBannerUrl : undefined,
+      city: storeDocument.city,
+      country: storeDocument.country,
+      addressLine1: storeDocument.addressLine1,
+      sameAs: storeDocument.sameAs.filter(isValidHttpUrl),
+      products: [],
+      verified: true,
+    };
   }
 
   const head = matchedProducts[0];
@@ -487,7 +527,6 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
   };
 
   try {
-    const storeDocument = await readStoreDocumentById();
     if (!storeDocument) {
       return profileFromProducts;
     }
@@ -550,6 +589,8 @@ export const getProductsByCategory = async (
         { fieldPath: 'waLink' },
         { fieldPath: 'publishedAt' },
         { fieldPath: 'verified' },
+        { fieldPath: 'isVisible' },
+        { fieldPath: 'isPublished' },
       ],
     },
     from: [{ collectionId: 'publicProducts' }],
@@ -565,17 +606,24 @@ export const getProductsByCategory = async (
             },
           },
           {
-            fieldFilter: {
-              field: { fieldPath: 'isVisible' },
-              op: 'EQUAL',
-              value: { booleanValue: true },
-            },
-          },
-          {
-            fieldFilter: {
-              field: { fieldPath: 'verified' },
-              op: 'EQUAL',
-              value: { booleanValue: true },
+            compositeFilter: {
+              op: 'OR',
+              filters: [
+                {
+                  fieldFilter: {
+                    field: { fieldPath: 'isVisible' },
+                    op: 'EQUAL',
+                    value: { booleanValue: true },
+                  },
+                },
+                {
+                  fieldFilter: {
+                    field: { fieldPath: 'isPublished' },
+                    op: 'EQUAL',
+                    value: { booleanValue: true },
+                  },
+                },
+              ],
             },
           },
         ],
@@ -589,7 +637,7 @@ export const getProductsByCategory = async (
   const rows = await runPublicProductsQuery(query);
   const items = normalizeStoreNamesByStoreId(rows.flatMap((row) => (row.document ? [productFromDocument(row.document)] : [])))
     .map(toPublicProductDetail)
-    .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && item.verified === true);
+    .filter((item) => item.id && item.productName && item.imageUrls.length > 0);
 
   return {
     products: items.slice(0, pageSize),
@@ -608,17 +656,24 @@ export const listPublicCategoryKeys = async (limitCount = 600): Promise<string[]
         op: 'AND',
         filters: [
           {
-            fieldFilter: {
-              field: { fieldPath: 'isVisible' },
-              op: 'EQUAL',
-              value: { booleanValue: true },
-            },
-          },
-          {
-            fieldFilter: {
-              field: { fieldPath: 'verified' },
-              op: 'EQUAL',
-              value: { booleanValue: true },
+            compositeFilter: {
+              op: 'OR',
+              filters: [
+                {
+                  fieldFilter: {
+                    field: { fieldPath: 'isVisible' },
+                    op: 'EQUAL',
+                    value: { booleanValue: true },
+                  },
+                },
+                {
+                  fieldFilter: {
+                    field: { fieldPath: 'isPublished' },
+                    op: 'EQUAL',
+                    value: { booleanValue: true },
+                  },
+                },
+              ],
             },
           },
         ],
@@ -656,17 +711,24 @@ export const listPublicStoreIds = async (limitCount = 200): Promise<string[]> =>
         op: 'AND',
         filters: [
           {
-            fieldFilter: {
-              field: { fieldPath: 'isVisible' },
-              op: 'EQUAL',
-              value: { booleanValue: true },
-            },
-          },
-          {
-            fieldFilter: {
-              field: { fieldPath: 'verified' },
-              op: 'EQUAL',
-              value: { booleanValue: true },
+            compositeFilter: {
+              op: 'OR',
+              filters: [
+                {
+                  fieldFilter: {
+                    field: { fieldPath: 'isVisible' },
+                    op: 'EQUAL',
+                    value: { booleanValue: true },
+                  },
+                },
+                {
+                  fieldFilter: {
+                    field: { fieldPath: 'isPublished' },
+                    op: 'EQUAL',
+                    value: { booleanValue: true },
+                  },
+                },
+              ],
             },
           },
         ],
@@ -677,12 +739,47 @@ export const listPublicStoreIds = async (limitCount = 200): Promise<string[]> =>
   };
 
   const rows = await runPublicProductsQuery(query);
+  const idsFromPublicProducts = rows
+    .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
+    .flatMap((product) => (product.storeId ? [product.storeId] : []));
 
-  return Array.from(
-    new Set(
-      rows
-        .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
-        .flatMap((product) => (product.storeId ? [product.storeId] : [])),
-    ),
-  );
+  const storesQuery = {
+    select: {
+      fields: [{ fieldPath: 'storeId' }],
+    },
+    from: [{ collectionId: 'stores' }],
+    where: {
+      compositeFilter: {
+        op: 'AND',
+        filters: [
+          {
+            fieldFilter: {
+              field: { fieldPath: 'verified' },
+              op: 'EQUAL',
+              value: { booleanValue: true },
+            },
+          },
+          {
+            fieldFilter: {
+              field: { fieldPath: 'status' },
+              op: 'EQUAL',
+              value: { stringValue: 'active' },
+            },
+          },
+        ],
+      },
+    },
+    limit: limitCount,
+  };
+
+  const storeRows = await runPublicProductsQuerySafely(storesQuery, 'stores listing');
+  const idsFromStores = storeRows
+    .flatMap((row) => (row.document ? [row.document] : []))
+    .flatMap((doc) => {
+      const storeIdFromName = doc.name?.split('/').at(-1);
+      const storeIdFromField = doc.fields && readString(doc.fields, ['storeId']);
+      return [storeIdFromField, storeIdFromName].filter((id): id is string => Boolean(id && id.trim()));
+    });
+
+  return Array.from(new Set([...idsFromPublicProducts, ...idsFromStores]));
 };
