@@ -249,6 +249,18 @@ const runPublicProductsQuery = async (structuredQuery: Record<string, unknown>):
   return (await response.json()) as FirestoreRunQueryResponse[];
 };
 
+const runPublicProductsQuerySafely = async (
+  structuredQuery: Record<string, unknown>,
+  context: string,
+): Promise<FirestoreRunQueryResponse[]> => {
+  try {
+    return await runPublicProductsQuery(structuredQuery);
+  } catch (error) {
+    console.warn(`Unable to query publicProducts for ${context}.`, error);
+    return [];
+  }
+};
+
 export const getStoreProfileById = async (storeId: string): Promise<StoreProfile | null> => {
   const normalizedStoreId = normalizeRouteId(storeId);
 
@@ -434,7 +446,10 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
 
   let matchedProducts: StoreEnrichedProduct[] = [];
   for (const lookup of fallbackLookups) {
-    const rows = await runPublicProductsQuery(buildStoreQuery(lookup.fieldPath, lookup.value));
+    const rows = await runPublicProductsQuerySafely(
+      buildStoreQuery(lookup.fieldPath, lookup.value),
+      `${lookup.fieldPath}=${lookup.value}`,
+    );
     matchedProducts = normalizeStoreNamesByStoreId(
       rows
         .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
