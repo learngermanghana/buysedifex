@@ -834,6 +834,7 @@ select:focus {
   align-items: start;
 }
 
+.promoColumn,
 .productsColumn {
   min-width: 0;
 }
@@ -852,7 +853,6 @@ select:focus {
   gap: 0.8rem;
   position: sticky;
   top: calc(var(--sticky-nav-offset) + 0.8rem);
-  margin-bottom: var(--space-4);
 }
 
 .promoRailHeader {

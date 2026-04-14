@@ -15,6 +15,7 @@ export interface SedifexProduct {
   country?: string;
   waLink?: string;
   phone?: string;
+  websiteLink?: string;
   addressLine1?: string;
   verified?: boolean;
   publishedAt?: string;
