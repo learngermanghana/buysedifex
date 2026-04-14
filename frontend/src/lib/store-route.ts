@@ -6,6 +6,16 @@ const normalizeStoreToken = (value: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
+const decodeRouteParam = (value: string) => {
+  try {
+    return decodeURIComponent(value).trim();
+  } catch {
+    return value.trim();
+  }
+};
+
+export const extractStoreIdFromRouteParam = (routeParam: string): string => decodeRouteParam(routeParam);
+
 export const getStoreRouteId = (storeId?: string, storeName?: string): string | null => {
   const normalizedStoreId = storeId?.trim();
   if (normalizedStoreId) {
