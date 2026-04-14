@@ -6,8 +6,6 @@ on:
       - main
     paths:
       - 'firestore.indexes.json'
-      - 'firebase.json'
-      - '.firebaserc'
       - '.github/workflows/deploy-firestore-indexes.yml'
 
 concurrency:
@@ -36,5 +34,15 @@ jobs:
       - name: Set Google credentials
         run: echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
 
+      - name: Create deploy config for indexes only
+        run: |
+          cat > firestore.indexes.deploy.json <<'JSON'
+          {
+            "firestore": {
+              "indexes": "firestore.indexes.json"
+            }
+          }
+          JSON
+
       - name: Deploy Firestore indexes
-        run: firebase deploy --only firestore:indexes --project sedifex-web
+        run: firebase deploy --only firestore:indexes --project sedifex-web --config firestore.indexes.deploy.json
