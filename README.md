@@ -1,6 +1,6 @@
 # Buy Sedifex Monorepo
 
-Buy Sedifex contains a Firebase-backed marketplace with:
+Buy Sedifex contains a Firebase-backed marketplace with
 
 - **Cloud Functions** to denormalize canonical store/product records into a public read model.
 - **Next.js frontend** to render product, category, and store pages from `publicProducts`.
