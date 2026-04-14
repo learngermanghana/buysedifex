@@ -35,7 +35,7 @@ type IntegrationProductRecord = Partial<SedifexProduct> & {
   imageUrl?: string | null;
   imageUrls?: string[];
   price?: number;
-  stockCount?: number;
+  stockCount?: number | null;
 };
 
 type IntegrationStoreRecord = {
@@ -53,6 +53,15 @@ type IntegrationStoreRecord = {
   whatsapp?: string | null;
   whatsappNumber?: string | null;
   addressLine1?: string | null;
+  verified?: boolean | null;
+  promoTitle?: string | null;
+  promoSummary?: string | null;
+  promoImageUrl?: string | null;
+  promoImageAlt?: string | null;
+  promoStartDate?: string | null;
+  promoEndDate?: string | null;
+  promoSlug?: string | null;
+  promoWebsiteUrl?: string | null;
 };
 
 type SafeStoreRecord = {
@@ -64,6 +73,7 @@ type SafeStoreRecord = {
   phone?: string;
   waLink?: string;
   addressLine1?: string;
+  verified?: boolean;
 };
 
 type IntegrationPromoRecord = {
@@ -111,6 +121,12 @@ type IntegrationPromoPayload = {
   promo?: IntegrationPromoRecord | null;
 };
 
+const cleanString = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+};
+
 const toStoreProfile = (
   profile: IntegrationPromoRecord | null | undefined,
 ): SedifexStoreProfile | null => {
@@ -130,19 +146,12 @@ const toStoreProfile = (
   };
 };
 
-const cleanString = (value: unknown): string | undefined => {
-  if (typeof value !== 'string') return undefined;
-  const trimmed = value.trim();
-  return trimmed ? trimmed : undefined;
-};
-
 const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | null => {
   const id = cleanString(product.id);
   const storeId = cleanString(product.storeId);
-  const storeName = cleanString(product.storeName);
-  const productName = cleanString(product.productName) || cleanString(product.name);
+  const productName = cleanString(product.productName) ?? cleanString(product.name);
 
-  if (!id || !productName) return null;
+  if (!id || !storeId || !productName) return null;
 
   const normalizedImageUrls = Array.isArray(product.imageUrls)
     ? product.imageUrls
@@ -159,16 +168,18 @@ const normalizeProduct = (product: IntegrationProductRecord): SedifexProduct | n
         ? [fallbackImageUrl]
         : [];
 
+  const phone = cleanString(product.phone) ?? cleanString(product.storePhone);
+
   return {
     ...product,
     id,
-    storeId: storeId ?? '',
-    storeName: storeName ?? '',
+    storeId,
+    storeName: cleanString(product.storeName) ?? '',
     productName,
     categoryKey: cleanString(product.categoryKey) ?? cleanString(product.category),
     city: cleanString(product.city) ?? cleanString(product.storeCity),
-    phone: cleanString(product.phone) ?? cleanString(product.storePhone),
-    waLink: cleanString(product.waLink) ?? cleanString(product.storePhone),
+    phone,
+    waLink: cleanString(product.waLink) ?? phone,
     websiteLink: cleanString(product.websiteLink),
     imageUrls,
     imageAlt: cleanString(product.imageAlt) ?? productName,
@@ -182,26 +193,40 @@ const normalizeProducts = (products: IntegrationProductRecord[]): SedifexProduct
     .map(normalizeProduct)
     .filter((product): product is SedifexProduct => Boolean(product));
 
-const toSafeStoreRecord = (store: IntegrationStoreRecord | null | undefined): SafeStoreRecord | null => {
+const toSafeStoreRecord = (
+  store: IntegrationStoreRecord | IntegrationPromoRecord | null | undefined,
+): SafeStoreRecord | null => {
   const storeId = cleanString(store?.storeId) ?? cleanString(store?.id);
-  if (!store || !storeId) return null;
+  if (!storeId) return null;
 
   const phone = cleanString(store.phone) ?? cleanString(store.storePhone);
-  const city = cleanString(store.city);
-  const country = cleanString(store.country);
-  const addressLine1 = cleanString(store.addressLine1);
-  const storeName = cleanString(store.displayName) || cleanString(store.name) || cleanString(store.storeName);
-  const whatsapp = cleanString(store.whatsapp) || cleanString(store.whatsappNumber);
+  const whatsapp =
+    cleanString((store as IntegrationStoreRecord).whatsapp) ??
+    cleanString((store as IntegrationStoreRecord).whatsappNumber) ??
+    cleanString((store as IntegrationPromoRecord).whatsapp) ??
+    cleanString((store as IntegrationPromoRecord).whatsappNumber);
 
   return {
     storeId,
-    storeName: storeName ?? undefined,
-    storeSlug: cleanString(store.storeSlug) ?? cleanString(store.workspaceSlug),
-    city: city ?? undefined,
-    country: country ?? undefined,
-    phone: phone ?? undefined,
-    waLink: whatsapp ?? phone ?? undefined,
-    addressLine1: addressLine1 ?? undefined,
+    storeName:
+      cleanString((store as IntegrationStoreRecord).displayName) ??
+      cleanString(store.name) ??
+      cleanString(store.storeName),
+    storeSlug:
+      cleanString((store as IntegrationStoreRecord).storeSlug) ??
+      cleanString((store as IntegrationStoreRecord).workspaceSlug) ??
+      cleanString((store as IntegrationPromoRecord).promoSlug),
+    city: cleanString(store.city),
+    country: cleanString((store as IntegrationStoreRecord).country),
+    phone,
+    waLink: whatsapp ?? phone,
+    addressLine1: cleanString(store.addressLine1),
+    verified:
+      typeof (store as IntegrationStoreRecord).verified === 'boolean'
+        ? (store as IntegrationStoreRecord).verified
+        : typeof (store as IntegrationPromoRecord).verified === 'boolean'
+          ? (store as IntegrationPromoRecord).verified
+          : undefined,
   };
 };
 
@@ -209,56 +234,37 @@ const getStoreById = async (storeId: string): Promise<SafeStoreRecord | null> =>
   const normalizedStoreId = storeId.trim();
   if (!normalizedStoreId) return null;
 
-  const resolveStorePayload = async () => {
-    const encodedStoreId = encodeURIComponent(normalizedStoreId);
-    const paths = ['/stores/' + encodedStoreId, '/stores/' + encodedStoreId + '/store'];
+  const encodedStoreId = encodeURIComponent(normalizedStoreId);
+  const candidatePaths = [
+    `/stores/${encodedStoreId}`,
+    `/stores/${encodedStoreId}/store`,
+  ];
 
-    for (const endpointPath of paths) {
-      try {
-        const storePayload = await integrationFetch<{
-          store?: IntegrationStoreRecord | null;
-          data?: IntegrationStoreRecord | null;
-          profile?: IntegrationStoreRecord | null;
-          item?: IntegrationStoreRecord | null;
-        }>(endpointPath);
+  for (const endpointPath of candidatePaths) {
+    try {
+      const payload = await integrationFetch<
+        | IntegrationStoreRecord
+        | {
+            store?: IntegrationStoreRecord | null;
+            data?: IntegrationStoreRecord | null;
+            profile?: IntegrationStoreRecord | null;
+            item?: IntegrationStoreRecord | null;
+          }
+      >(endpointPath);
 
-        const safeStore = toSafeStoreRecord(storePayload.store ?? storePayload.data ?? storePayload.profile ?? storePayload.item);
-        if (safeStore) return safeStore;
-      } catch {
-        continue;
-      }
+      const rawStore =
+        'storeId' in payload || 'id' in payload
+          ? (payload as IntegrationStoreRecord)
+          : payload.store ?? payload.data ?? payload.profile ?? payload.item ?? null;
+
+      const safeStore = toSafeStoreRecord(rawStore);
+      if (safeStore) return safeStore;
+    } catch {
+      continue;
     }
-
-    return null;
-  };
-
-  const storeFromStoreEndpoint = await resolveStorePayload();
-
-  try {
-    const payload = await integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', {
-      storeId: normalizedStoreId,
-    });
-    const fromPromo = toSafeStoreRecord(payload.profile ?? payload.promo ?? payload.items?.[0] ?? payload.promos?.[0]);
-
-    if (!storeFromStoreEndpoint) {
-      return fromPromo;
-    }
-
-    return {
-      ...fromPromo,
-      ...storeFromStoreEndpoint,
-      storeId: storeFromStoreEndpoint.storeId,
-      storeName: storeFromStoreEndpoint.storeName ?? fromPromo?.storeName,
-      storeSlug: storeFromStoreEndpoint.storeSlug ?? fromPromo?.storeSlug,
-      city: storeFromStoreEndpoint.city ?? fromPromo?.city,
-      country: storeFromStoreEndpoint.country ?? fromPromo?.country,
-      phone: storeFromStoreEndpoint.phone ?? fromPromo?.phone,
-      waLink: storeFromStoreEndpoint.phone ?? fromPromo?.waLink,
-      addressLine1: storeFromStoreEndpoint.addressLine1 ?? fromPromo?.addressLine1,
-    };
-  } catch {
-    return storeFromStoreEndpoint;
   }
+
+  return null;
 };
 
 const normalizePromo = (
@@ -266,42 +272,69 @@ const normalizePromo = (
   fallbackStoreId?: string,
 ): SedifexPromo | null => {
   const storeId = cleanString(promo.storeId) ?? fallbackStoreId;
+  const promoTitle = cleanString(promo.promoTitle) ?? cleanString(promo.title);
+  const promoSummary =
+    cleanString(promo.promoSummary) ??
+    cleanString(promo.summary) ??
+    cleanString(promo.description);
+  const promoImageUrl =
+    cleanString(promo.promoImageUrl) ??
+    cleanString(promo.imageUrl) ??
+    cleanString(promo.image);
+
   const id =
     cleanString(promo.id) ??
     cleanString(promo.promoId) ??
-    (storeId ? `${storeId}-${cleanString(promo.promoSlug) ?? cleanString(promo.promoTitle) ?? 'promo'}` : undefined);
+    (storeId
+      ? `${storeId}-${cleanString(promo.promoSlug) ?? promoTitle ?? 'promo'}`
+      : undefined);
 
-  if (!id) return null;
+  if (!id || !storeId) return null;
+  if (!promoTitle || !promoSummary || !promoImageUrl) return null;
+  if (promo.enabled === false) return null;
 
   return {
     id,
     storeId,
-    storeName: cleanString(promo.storeName) ?? cleanString(promo.displayName) ?? cleanString(promo.name),
+    storeName:
+      cleanString(promo.storeName) ??
+      cleanString(promo.displayName) ??
+      cleanString(promo.name),
     storeSlug: cleanString(promo.storeSlug) ?? cleanString(promo.promoSlug),
     verified: promo.verified,
-    promoTitle: cleanString(promo.promoTitle) ?? cleanString(promo.title),
-    promoSummary: cleanString(promo.promoSummary) ?? cleanString(promo.summary) ?? cleanString(promo.description),
-    promoImageUrl: cleanString(promo.promoImageUrl) ?? cleanString(promo.imageUrl) ?? cleanString(promo.image),
-    promoImageAlt: cleanString(promo.promoImageAlt) ?? cleanString(promo.promoTitle) ?? cleanString(promo.title) ?? null,
-    promoStartDate: cleanString(promo.promoStartDate) ?? cleanString(promo.startDate),
-    promoEndDate: cleanString(promo.promoEndDate) ?? cleanString(promo.endDate),
-    promoWebsiteUrl: cleanString(promo.promoWebsiteUrl) ?? cleanString(promo.websiteUrl) ?? null,
-    promoTiktokUrl: cleanString(promo.promoTiktokUrl) ?? cleanString(promo.tiktokUrl) ?? null,
-    promoYoutubeUrl: cleanString(promo.promoYoutubeUrl) ?? cleanString(promo.youtubeUrl) ?? null,
+    promoTitle,
+    promoSummary,
+    promoImageUrl,
+    promoImageAlt:
+      cleanString(promo.promoImageAlt) ??
+      cleanString(promo.promoTitle) ??
+      cleanString(promo.title) ??
+      null,
+    promoStartDate:
+      cleanString(promo.promoStartDate) ?? cleanString(promo.startDate),
+    promoEndDate:
+      cleanString(promo.promoEndDate) ?? cleanString(promo.endDate),
+    promoWebsiteUrl:
+      cleanString(promo.promoWebsiteUrl) ?? cleanString(promo.websiteUrl) ?? null,
+    promoTiktokUrl:
+      cleanString(promo.promoTiktokUrl) ?? cleanString(promo.tiktokUrl) ?? null,
+    promoYoutubeUrl:
+      cleanString(promo.promoYoutubeUrl) ?? cleanString(promo.youtubeUrl) ?? null,
   };
 };
 
 const normalizePromoPayload = (
   payload: IntegrationPromoPayload,
   fallbackStoreId?: string,
-) => {
+): { items: SedifexPromo[] } => {
   const rawItems = payload.items ?? payload.promos ?? [];
   const single = payload.profile ?? payload.promo;
   const combined = rawItems.length > 0 ? rawItems : single ? [single] : [];
+
   const items = combined
-    .filter((item) => item.enabled !== false)
     .map((item) => normalizePromo(item, fallbackStoreId))
     .filter((item): item is SedifexPromo => Boolean(item));
+
   return { items };
 };
 
@@ -482,20 +515,26 @@ export const getIntegrationStoreProfile = async (storeId: string) => {
     }),
   ]);
 
-  const normalizedProducts = normalizeProducts(productsPayload.products ?? productsPayload.items ?? []);
+  const normalizedProducts = normalizeProducts(
+    productsPayload.products ?? productsPayload.items ?? [],
+  );
+
   const profileFromPromo = toStoreProfile(promoPayload?.profile ?? promoPayload?.promo);
-  const profile: SedifexStoreProfile | null = profileFromPromo ?? (storePayload?.storeName
-    ? {
-        storeId: storePayload.storeId,
-        storeName: storePayload.storeName,
-        storeSlug: storePayload.storeSlug,
-        city: storePayload.city,
-        country: storePayload.country,
-        addressLine1: storePayload.addressLine1,
-        storePhone: storePayload.phone,
-        storeWhatsapp: storePayload.waLink,
-      }
-    : null);
+  const profile: SedifexStoreProfile | null =
+    profileFromPromo ??
+    (storePayload?.storeName
+      ? {
+          storeId: storePayload.storeId,
+          storeName: storePayload.storeName,
+          storeSlug: storePayload.storeSlug,
+          city: storePayload.city,
+          country: storePayload.country,
+          addressLine1: storePayload.addressLine1,
+          storePhone: storePayload.phone,
+          storeWhatsapp: storePayload.waLink,
+          verified: storePayload.verified,
+        }
+      : null);
 
   return {
     profile,
@@ -512,7 +551,10 @@ export const listIntegrationPromos = async () => {
   const promoResponses = await Promise.all(
     storeIds.map(async (storeId) => {
       try {
-        const payload = await integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', { storeId });
+        const payload = await integrationFetch<IntegrationPromoPayload>(
+          '/v1IntegrationPromo',
+          { storeId },
+        );
         return normalizePromoPayload(payload, storeId).items;
       } catch {
         return [];
@@ -521,9 +563,7 @@ export const listIntegrationPromos = async () => {
   );
 
   const deduped = Array.from(
-    new Map(
-      promoResponses.flat().map((promo) => [promo.id, promo]),
-    ).values(),
+    new Map(promoResponses.flat().map((promo) => [promo.id, promo])).values(),
   );
 
   return { items: deduped };
