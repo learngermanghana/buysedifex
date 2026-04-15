@@ -48,6 +48,7 @@ type PublicProduct = {
 type SortOption = 'newest' | 'price' | 'featured';
 
 const PAGE_SIZE = 12;
+const FETCH_SCAN_BATCHES = 4;
 const SEARCH_SCAN_LIMIT = 300;
 const SEARCH_BATCH_SIZE = 100;
 
@@ -174,6 +175,12 @@ const mixProductsAcrossStores = (items: PublicProduct[]) => {
   return mixed;
 };
 
+const selectStoreBalancedProducts = (items: PublicProduct[], count: number) => {
+  if (items.length <= count) return items;
+  const randomized = shuffleProducts(items);
+  return mixProductsAcrossStores(randomized).slice(0, count);
+};
+
 export function ProductGrid() {
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [categories, setCategories] = useState<string[]>(['all']);
@@ -291,26 +298,59 @@ export function ProductGrid() {
             : [[orderBy('publishedAt', 'desc')], [orderBy(documentId(), 'asc')]];
 
       let snapshot = null;
+      let cursorDoc = cursor;
 
       for (let index = 0; index < orderOptions.length; index += 1) {
         const ordering = orderOptions[index];
         try {
-          const baseQuery = query(collection(db, 'publicProducts'), ...filters, ...ordering, limit(PAGE_SIZE));
-          const pagedQuery = cursor ? query(baseQuery, startAfter(cursor)) : baseQuery;
-          const nextSnapshot = await getDocs(pagedQuery);
+          const collectedItems: PublicProduct[] = [];
+          let scanCursor = cursor;
+          let latestSnapshotDoc: QueryDocumentSnapshot | null = null;
+          let lastSnapshotSize = 0;
+
+          for (let scanIndex = 0; scanIndex < FETCH_SCAN_BATCHES; scanIndex += 1) {
+            const baseQuery = query(collection(db, 'publicProducts'), ...filters, ...ordering, limit(PAGE_SIZE));
+            const pagedQuery = scanCursor ? query(baseQuery, startAfter(scanCursor)) : baseQuery;
+            const scanSnapshot = await getDocs(pagedQuery);
+            lastSnapshotSize = scanSnapshot.docs.length;
+
+            if (scanSnapshot.empty) {
+              break;
+            }
+
+            const batchItems = scanSnapshot.docs
+              .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
+              .filter((item) => hasDisplayImage(item) && isVerifiedStore(item.verified));
+
+            collectedItems.push(...batchItems);
+            latestSnapshotDoc = scanSnapshot.docs.at(-1) ?? latestSnapshotDoc;
+            scanCursor = latestSnapshotDoc ?? undefined;
+
+            if (lastSnapshotSize < PAGE_SIZE || collectedItems.length >= PAGE_SIZE) {
+              break;
+            }
+          }
 
           const shouldTryFallbackForMissingPublishedAt =
             selectedSort === 'newest' &&
             !cursor &&
             index === 0 &&
-            nextSnapshot.empty &&
+            collectedItems.length === 0 &&
             orderOptions.length > 1;
 
           if (shouldTryFallbackForMissingPublishedAt) {
             continue;
           }
 
-          snapshot = nextSnapshot;
+          snapshot = {
+            docs: selectStoreBalancedProducts(collectedItems, PAGE_SIZE).map((item) => ({
+              id: item.id,
+              data: () => item,
+            })),
+            lastDoc: latestSnapshotDoc,
+            isEndReached: lastSnapshotSize < PAGE_SIZE,
+          };
+          cursorDoc = snapshot.lastDoc;
           break;
         } catch (queryErr) {
           const firestoreError = queryErr as FirestoreError;
@@ -334,7 +374,7 @@ export function ProductGrid() {
         nextItems.forEach((item) => next.add(getStoreCity(item)));
         return Array.from(next).sort((a, b) => a.localeCompare(b));
       });
-      setLastDoc(snapshot.docs.at(-1) ?? null);
+      setLastDoc(snapshot.isEndReached ? null : (cursorDoc ?? null));
     } catch (err) {
       console.error('Failed to fetch products', err);
       const firestoreError = err as FirestoreError;
