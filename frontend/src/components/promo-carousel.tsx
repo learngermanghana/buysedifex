@@ -15,8 +15,8 @@ type StorePromo = {
   promoSummary?: string;
   promoImageUrl?: string;
   promoImageAlt?: string | null;
-  promoStartDate?: string;
-  promoEndDate?: string;
+  promoStartDate?: unknown;
+  promoEndDate?: unknown;
   promoTiktokUrl?: string | null;
   promoWebsiteUrl?: string | null;
   promoYoutubeUrl?: string | null;
@@ -65,6 +65,17 @@ const isWithinPromoWindow = (promo: StorePromo, now: Date) => {
   const end = coerceDate(promo.promoEndDate);
   if (!start || !end) return false;
   return start <= now && end >= now;
+};
+
+const formatPromoDate = (value: unknown) => {
+  const parsed = coerceDate(value);
+  if (!parsed) return '';
+
+  return parsed.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 };
 
 const getStorePath = (promo: StorePromo) => {
@@ -190,6 +201,14 @@ export function PromoCarousel() {
   }, [activeIndex, promos.length]);
 
   const activePromo = useMemo(() => promos[activeIndex], [activeIndex, promos]);
+  const promoDateRange = useMemo(() => {
+    if (!activePromo) return '';
+
+    const start = formatPromoDate(activePromo.promoStartDate);
+    const end = formatPromoDate(activePromo.promoEndDate);
+    if (!start || !end) return '';
+    return `${start} - ${end}`;
+  }, [activePromo]);
 
   return (
     <aside className="promoRail" aria-label="Latest store promotions">
@@ -220,9 +239,7 @@ export function PromoCarousel() {
           <div className="promoMeta">
             <h3>{activePromo.promoTitle ?? 'Latest promotion'}</h3>
             <p className="promoSummary">{activePromo.promoSummary ?? 'Discover the latest offer from this verified store.'}</p>
-            <p className="promoDates">
-              {activePromo.promoStartDate} - {activePromo.promoEndDate}
-            </p>
+            {promoDateRange ? <p className="promoDates">{promoDateRange}</p> : null}
           </div>
 
           <div className="promoActions">
