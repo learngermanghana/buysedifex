@@ -11,6 +11,7 @@ const DEFAULT_CURRENCY = 'GHS';
 const DEFAULT_CONDITION = 'new';
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGES = 20;
+const PAGE_FETCH_TIMEOUT_MS = 8000;
 
 const escapeXml = (value: string): string =>
   value
@@ -102,11 +103,32 @@ const fetchFeedItems = async () => {
   }> = [];
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const response = await listIntegrationProducts({
-      page,
-      pageSize: DEFAULT_PAGE_SIZE,
-      sort: 'newest',
+    const response = await Promise.race([
+      listIntegrationProducts({
+        page,
+        pageSize: DEFAULT_PAGE_SIZE,
+        sort: 'newest',
+      }),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(
+            new Error(
+              `Timed out while fetching Google Merchant feed page ${page}.`,
+            ),
+          );
+        }, PAGE_FETCH_TIMEOUT_MS);
+      }),
+    ]).catch((error) => {
+      if (page === 1) {
+        throw error;
+      }
+
+      return null;
     });
+
+    if (!response) {
+      break;
+    }
 
     items.push(...response.items);
 
