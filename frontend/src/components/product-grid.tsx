@@ -396,14 +396,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             let fallbackCursor: QueryDocumentSnapshot | undefined;
             let safetyCounter = 0;
 
-            while (collectedItems.length < PAGE_SIZE && safetyCounter < NEWEST_FALLBACK_MAX_SCANS) {
+            while (collectedItems.length < PAGE_SIZE && safetyCounter < FETCH_SCAN_BATCHES) {
               safetyCounter += 1;
-              const fallbackBaseQuery = query(
-                collection(db, 'publicProducts'),
-                ...filters,
-                orderBy(documentId(), 'asc'),
-                limit(NEWEST_FALLBACK_BATCH_SIZE),
-              );
+              const fallbackBaseQuery = query(collection(db, 'publicProducts'), ...filters, orderBy(documentId(), 'asc'), limit(PAGE_SIZE));
               const fallbackPagedQuery = fallbackCursor ? query(fallbackBaseQuery, startAfter(fallbackCursor)) : fallbackBaseQuery;
               const fallbackSnapshot = await getDocs(fallbackPagedQuery);
 
@@ -432,7 +427,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                 }
               });
 
-              if (fallbackSnapshot.docs.length < NEWEST_FALLBACK_BATCH_SIZE) {
+              if (fallbackSnapshot.docs.length < PAGE_SIZE) {
                 break;
               }
             }
