@@ -192,6 +192,28 @@ const mixProductsAcrossStores = (items: PublicProduct[]) => {
   return mixed;
 };
 
+const mixProductsByCategoryThenStore = (items: PublicProduct[]) => {
+  const categoryBuckets = new Map<string, PublicProduct[]>();
+
+  items.forEach((item) => {
+    const categoryKey = getCategory(item) || 'uncategorized';
+    const bucket = categoryBuckets.get(categoryKey);
+
+    if (bucket) {
+      bucket.push(item);
+    } else {
+      categoryBuckets.set(categoryKey, [item]);
+    }
+  });
+
+  const mixedByCategory: PublicProduct[] = [];
+  for (const categoryItems of categoryBuckets.values()) {
+    mixedByCategory.push(...mixProductsAcrossStores(categoryItems));
+  }
+
+  return mixedByCategory;
+};
+
 const selectStoreBalancedProducts = (items: PublicProduct[], count: number) => {
   if (items.length <= count) return items;
   const randomized = shuffleProducts(items);
@@ -318,7 +340,8 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     });
 
     const imageReadyProducts = matchingProducts.filter((product) => hasDisplayImage(product) && isVerifiedStore(product.verified));
-    return sortProducts(imageReadyProducts, selectedSort);
+    const sortedProducts = sortProducts(imageReadyProducts, selectedSort);
+    return mixProductsByCategoryThenStore(sortedProducts);
   }, [itemTypeFilter, products, searchText, selectedCategory, selectedCity, selectedSort]);
 
   const toggleDescription = (productId: string) => {
