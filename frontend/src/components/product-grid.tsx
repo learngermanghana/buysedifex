@@ -53,6 +53,8 @@ const PAGE_SIZE = 12;
 const FETCH_SCAN_BATCHES = 4;
 const SEARCH_SCAN_LIMIT = 300;
 const SEARCH_BATCH_SIZE = 100;
+const NEWEST_FALLBACK_BATCH_SIZE = 100;
+const NEWEST_FALLBACK_MAX_SCANS = 12;
 
 const normalizeDisplayCurrency = (currency?: string) => {
   const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
