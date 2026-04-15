@@ -26,12 +26,16 @@ type PublicProduct = {
   id: string;
   storeId?: string;
   productName?: string;
+  name?: string;
   description?: string;
   categoryKey?: string;
+  category?: string;
   imageUrls?: string[];
   imageAlt?: string;
   price?: number;
   currency?: string;
+  sku?: string;
+  batchNumber?: string;
   storeName?: string;
   storePhone?: string;
   phone?: string;
@@ -53,8 +57,6 @@ const PAGE_SIZE = 12;
 const FETCH_SCAN_BATCHES = 4;
 const SEARCH_SCAN_LIMIT = 300;
 const SEARCH_BATCH_SIZE = 100;
-const NEWEST_FALLBACK_BATCH_SIZE = 100;
-const NEWEST_FALLBACK_MAX_SCANS = 12;
 
 const normalizeDisplayCurrency = (currency?: string) => {
   const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
@@ -82,10 +84,13 @@ const getContactPhone = (item: PublicProduct) => {
 };
 
 const buildWhatsAppMessage = (item: PublicProduct) => {
-  const productLabel = item.productName?.trim() || 'this item';
+  const productLabel = (item.productName ?? item.name)?.trim() || 'this item';
   const storeLabel = item.storeName?.trim() || 'this shop';
   return `Hi ${storeLabel}, I'm interested in the ${productLabel} I saw on Sedifex Market.`;
 };
+
+const getProductName = (item: PublicProduct) => (item.productName ?? item.name)?.trim() || 'Untitled item';
+const getCategory = (item: PublicProduct) => item.categoryKey?.trim() || item.category?.trim() || '';
 
 const getStorePhone = (item: PublicProduct) => getContactPhone(item) || 'Phone unavailable';
 
@@ -255,7 +260,14 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
       const cityMatches = selectedCity === 'all' || getStoreCity(product).toLowerCase() === selectedCity.toLowerCase();
       if (!cityMatches) return false;
       if (!text) return true;
-      const haystack = [product.productName, product.description, product.storeName, product.categoryKey]
+      const haystack = [
+        getProductName(product),
+        product.description,
+        product.storeName,
+        getCategory(product),
+        product.sku,
+        product.batchNumber,
+      ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
@@ -298,7 +310,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
         snapshot.docs.forEach((docItem) => {
           const data = docItem.data() as PublicProduct;
-          const category = data.categoryKey;
+          const category = getCategory(data);
           if (typeof category === 'string' && category.trim().length > 0) {
             all.add(category);
           }
@@ -656,7 +668,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                   <div className="imageWrap">
                     <Image
                       src={item.imageUrls?.[0] ?? 'https://placehold.co/640x640'}
-                      alt={item.imageAlt?.trim() || item.productName || 'Product image'}
+                      alt={item.imageAlt?.trim() || getProductName(item) || 'Product image'}
                       loading="lazy"
                       width={360}
                       height={360}
@@ -664,8 +676,8 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                       style={{ width: '100%', height: 'auto' }}
                     />
                   </div>
-                  <h3>{item.productName ?? 'Untitled item'}</h3>
-                  <Link href={getProductHref(item.id, item.productName)}>View product details</Link>
+                  <h3>{getProductName(item)}</h3>
+                  <Link href={getProductHref(item.id, getProductName(item))}>View product details</Link>
                   <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
                   {shouldCollapseDescription && (
                     <button type="button" className="descriptionToggle" onClick={() => toggleDescription(item.id)}>
