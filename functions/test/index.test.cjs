@@ -145,3 +145,25 @@ test('product names are normalized to title case', () => {
 
   assert.equal(normalized.name, 'Skin Booster Injection');
 });
+
+test('ranking score favors verified, recent, featured products', () => {
+  const now = Date.now();
+  const newerProduct = {
+    name: 'Serum',
+    itemType: 'product',
+    featuredRank: 4,
+    price: 30,
+    stockCount: 20,
+    imageUrls: ['https://example.com/a.jpg', 'https://example.com/b.jpg'],
+    updatedAt: { toMillis: () => now },
+  };
+  const olderProduct = {
+    ...newerProduct,
+    featuredRank: 0,
+    updatedAt: { toMillis: () => now - 180 * 24 * 60 * 60 * 1000 },
+  };
+
+  const boosted = t.computeRankingScore({ verified: true }, newerProduct);
+  const baseline = t.computeRankingScore({ verified: false }, olderProduct);
+  assert.ok(boosted > baseline);
+});

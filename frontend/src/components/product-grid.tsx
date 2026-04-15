@@ -46,6 +46,7 @@ type PublicProduct = {
   isVisible?: boolean;
   verified?: boolean | string;
   featuredRank?: number;
+  rankingScore?: number;
   publishedAt?: { seconds: number };
   isPublished?: boolean;
 };
@@ -190,6 +191,39 @@ const selectStoreBalancedProducts = (items: PublicProduct[], count: number) => {
   return mixProductsAcrossStores(randomized).slice(0, count);
 };
 
+const getPublishedAtSeconds = (item: PublicProduct) => {
+  const seconds = item.publishedAt?.seconds;
+  return typeof seconds === 'number' ? seconds : 0;
+};
+
+const sortProducts = (items: PublicProduct[], selectedSort: SortOption) => {
+  const sorted = [...items];
+
+  sorted.sort((left, right) => {
+    if (selectedSort === 'price') {
+      const leftPrice = typeof left.price === 'number' ? left.price : Number.POSITIVE_INFINITY;
+      const rightPrice = typeof right.price === 'number' ? right.price : Number.POSITIVE_INFINITY;
+      if (leftPrice !== rightPrice) return leftPrice - rightPrice;
+    } else if (selectedSort === 'featured') {
+      const leftScore = typeof left.rankingScore === 'number' ? left.rankingScore : Number.NEGATIVE_INFINITY;
+      const rightScore = typeof right.rankingScore === 'number' ? right.rankingScore : Number.NEGATIVE_INFINITY;
+      if (leftScore !== rightScore) return rightScore - leftScore;
+
+      const leftFeaturedRank = typeof left.featuredRank === 'number' ? left.featuredRank : Number.NEGATIVE_INFINITY;
+      const rightFeaturedRank = typeof right.featuredRank === 'number' ? right.featuredRank : Number.NEGATIVE_INFINITY;
+      if (leftFeaturedRank !== rightFeaturedRank) return rightFeaturedRank - leftFeaturedRank;
+    } else {
+      const leftPublishedAt = getPublishedAtSeconds(left);
+      const rightPublishedAt = getPublishedAtSeconds(right);
+      if (leftPublishedAt !== rightPublishedAt) return rightPublishedAt - leftPublishedAt;
+    }
+
+    return left.id.localeCompare(right.id);
+  });
+
+  return sorted;
+};
+
 type ProductGridProps = {
   itemTypeFilter?: ItemTypeFilter;
 };
@@ -275,8 +309,8 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     });
 
     const imageReadyProducts = matchingProducts.filter((product) => hasDisplayImage(product) && isVerifiedStore(product.verified));
-    return mixProductsAcrossStores(shuffleProducts(imageReadyProducts));
-  }, [itemTypeFilter, products, searchText, selectedCity]);
+    return sortProducts(imageReadyProducts, selectedSort);
+  }, [itemTypeFilter, products, searchText, selectedCity, selectedSort]);
 
   const toggleDescription = (productId: string) => {
     setExpandedDescriptionIds((current) => {
@@ -353,7 +387,11 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         selectedSort === 'price'
           ? [[orderBy('price', 'asc'), orderBy(documentId(), 'asc')], [orderBy(documentId(), 'asc')]]
           : selectedSort === 'featured'
-            ? [[orderBy('featuredRank', 'desc'), orderBy(documentId(), 'asc')], [orderBy(documentId(), 'asc')]]
+            ? [
+                [orderBy('rankingScore', 'desc'), orderBy('featuredRank', 'desc'), orderBy(documentId(), 'asc')],
+                [orderBy('featuredRank', 'desc'), orderBy(documentId(), 'asc')],
+                [orderBy(documentId(), 'asc')],
+              ]
             : [[orderBy('publishedAt', 'desc')], [orderBy(documentId(), 'asc')]];
 
       let snapshot = null;
@@ -677,7 +715,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                     />
                   </div>
                   <h3>{getProductName(item)}</h3>
-                  <Link href={getProductHref(item.id, getProductName(item))}>View product details</Link>
+                  <Link href={getProductHref(item.id, item.productName)}>View product details</Link>
                   <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
                   {shouldCollapseDescription && (
                     <button type="button" className="descriptionToggle" onClick={() => toggleDescription(item.id)}>

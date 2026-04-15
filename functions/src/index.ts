@@ -3,6 +3,7 @@ import { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } from 'firebas
 import { __setDbForTests as setDbForTests } from './modules/db';
 import { normalizeCategory, normalizeProduct, normalizeText, normalizeWhatsAppNumber, toTitleCase } from './modules/normalization';
 import { rebuildPublicProductsForStore, syncFlatProduct, toPublicProductDoc, upsertOrDeletePublicProduct } from './modules/public-products';
+import { computeRankingScore } from './modules/ranking';
 import { computeVisibility, getEffectiveStoreStatus, isStoreBuyVisible, isVisibleProduct, publicProductId, withStoreDefaults, buildWhatsAppLink } from './modules/visibility';
 import { type ProductDoc, type StoreDoc } from './modules/types';
 
@@ -27,6 +28,7 @@ export const __testing = {
   isVisibleProduct,
   computeVisibility,
   publicProductId,
+  computeRankingScore,
   toPublicProductDoc,
   upsertOrDeletePublicProduct,
 };
