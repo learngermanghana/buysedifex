@@ -22,6 +22,11 @@ type StorePromo = {
   promoYoutubeUrl?: string | null;
 };
 
+type FirestoreTimestampLike = {
+  seconds?: number;
+  toDate?: () => Date;
+};
+
 const isVerifiedStore = (value: StorePromo['verified']) => {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string') {
@@ -32,9 +37,34 @@ const isVerifiedStore = (value: StorePromo['verified']) => {
   return false;
 };
 
-const isWithinPromoWindow = (promo: StorePromo, today: string) => {
-  if (!promo.promoStartDate || !promo.promoEndDate) return false;
-  return promo.promoStartDate <= today && promo.promoEndDate >= today;
+const coerceDate = (value: unknown): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const firestoreTimestamp = value as FirestoreTimestampLike;
+
+  if (typeof firestoreTimestamp.toDate === 'function') {
+    const parsed = firestoreTimestamp.toDate();
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  if (typeof firestoreTimestamp.seconds === 'number') {
+    const parsed = new Date(firestoreTimestamp.seconds * 1000);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  return null;
+};
+
+const isWithinPromoWindow = (promo: StorePromo, now: Date) => {
+  const start = coerceDate(promo.promoStartDate);
+  const end = coerceDate(promo.promoEndDate);
+  if (!start || !end) return false;
+  return start <= now && end >= now;
 };
 
 const getStorePath = (promo: StorePromo) => {
@@ -60,7 +90,8 @@ export function PromoCarousel() {
         return;
       }
 
-      const today = new Date().toISOString().slice(0, 10);
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
 
       try {
         const primaryQuery = query(
@@ -76,11 +107,34 @@ export function PromoCarousel() {
           .map((doc) => ({ id: doc.id, ...doc.data() }) as StorePromo)
           .filter(
             (item) =>
-              isVerifiedStore(item.verified) && Boolean(item.promoTitle?.trim()) && Boolean(item.promoImageUrl?.trim()),
+              isVerifiedStore(item.verified) &&
+              isWithinPromoWindow(item, now) &&
+              Boolean(item.promoImageUrl?.trim()) &&
+              Boolean(item.promoTitle?.trim() || item.promoSummary?.trim()),
           )
           .slice(0, 10);
 
-        setPromos(items);
+        if (items.length > 0) {
+          setPromos(items);
+          setError(null);
+          return;
+        }
+
+        const fallbackQuery = query(collection(db, 'stores'), limit(100));
+        const fallbackSnapshot = await getDocs(fallbackQuery);
+        const fallbackItems = fallbackSnapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }) as StorePromo)
+          .filter(
+            (item) =>
+              isVerifiedStore(item.verified) &&
+              isWithinPromoWindow(item, now) &&
+              Boolean(item.promoImageUrl?.trim()) &&
+              Boolean(item.promoTitle?.trim() || item.promoSummary?.trim()),
+          )
+          .sort((a, b) => (coerceDate(b.promoStartDate)?.getTime() ?? 0) - (coerceDate(a.promoStartDate)?.getTime() ?? 0))
+          .slice(0, 10);
+
+        setPromos(fallbackItems);
         setError(null);
       } catch (err) {
         const firestoreError = err as FirestoreError;
@@ -96,8 +150,14 @@ export function PromoCarousel() {
           const snapshot = await getDocs(fallbackQuery);
           const items = snapshot.docs
             .map((doc) => ({ id: doc.id, ...doc.data() }) as StorePromo)
-            .filter((item) => isVerifiedStore(item.verified) && isWithinPromoWindow(item, today))
-            .sort((a, b) => (b.promoStartDate ?? '').localeCompare(a.promoStartDate ?? ''))
+            .filter(
+              (item) =>
+                isVerifiedStore(item.verified) &&
+                isWithinPromoWindow(item, now) &&
+                Boolean(item.promoImageUrl?.trim()) &&
+                Boolean(item.promoTitle?.trim() || item.promoSummary?.trim()),
+            )
+            .sort((a, b) => (coerceDate(b.promoStartDate)?.getTime() ?? 0) - (coerceDate(a.promoStartDate)?.getTime() ?? 0))
             .slice(0, 10);
 
           setPromos(items);
