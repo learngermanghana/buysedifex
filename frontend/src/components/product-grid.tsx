@@ -53,6 +53,8 @@ const PAGE_SIZE = 12;
 const FETCH_SCAN_BATCHES = 4;
 const SEARCH_SCAN_LIMIT = 300;
 const SEARCH_BATCH_SIZE = 100;
+const NEWEST_FALLBACK_BATCH_SIZE = 100;
+const NEWEST_FALLBACK_MAX_SCANS = 12;
 
 const normalizeDisplayCurrency = (currency?: string) => {
   const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
@@ -387,6 +389,53 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
           if (shouldTryFallbackForMissingPublishedAt) {
             continue;
+          }
+
+          if (selectedSort === 'newest' && !cursor && index === 0 && collectedItems.length < PAGE_SIZE) {
+            const seenIds = new Set(collectedItems.map((item) => item.id));
+            let fallbackCursor: QueryDocumentSnapshot | undefined;
+            let safetyCounter = 0;
+
+            while (collectedItems.length < PAGE_SIZE && safetyCounter < NEWEST_FALLBACK_MAX_SCANS) {
+              safetyCounter += 1;
+              const fallbackBaseQuery = query(
+                collection(db, 'publicProducts'),
+                ...filters,
+                orderBy(documentId(), 'asc'),
+                limit(NEWEST_FALLBACK_BATCH_SIZE),
+              );
+              const fallbackPagedQuery = fallbackCursor ? query(fallbackBaseQuery, startAfter(fallbackCursor)) : fallbackBaseQuery;
+              const fallbackSnapshot = await getDocs(fallbackPagedQuery);
+
+              if (fallbackSnapshot.empty) {
+                break;
+              }
+
+              fallbackCursor = fallbackSnapshot.docs.at(-1) ?? fallbackCursor;
+
+              const fallbackBatchRaw = fallbackSnapshot.docs
+                .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
+                .filter((item) => !seenIds.has(item.id) && hasDisplayImage(item));
+
+              if (fallbackBatchRaw.length === 0) {
+                if (fallbackSnapshot.docs.length < PAGE_SIZE) break;
+                continue;
+              }
+
+              const fallbackBatch = await hydrateVerifiedFromStores(fallbackBatchRaw);
+              const fallbackVisible = fallbackBatch.filter((item) => isVerifiedStore(item.verified));
+
+              fallbackVisible.forEach((item) => {
+                if (!seenIds.has(item.id)) {
+                  seenIds.add(item.id);
+                  collectedItems.push(item);
+                }
+              });
+
+              if (fallbackSnapshot.docs.length < NEWEST_FALLBACK_BATCH_SIZE) {
+                break;
+              }
+            }
           }
 
           snapshot = {
