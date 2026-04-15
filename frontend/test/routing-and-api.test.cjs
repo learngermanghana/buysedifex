@@ -58,3 +58,13 @@ test('concerns API route exists for secure concern submissions', () => {
   assert.match(concernsRouteSource, /Concern reporting is not configured/);
   assert.match(concernsRouteSource, /Invalid concern payload/);
 });
+
+test('google merchant rss feed route builds XML feed items from integration products', () => {
+  const merchantFeedRouteSource = read('src/app/api/feeds/google-merchant-rss/route.ts');
+
+  assert.match(merchantFeedRouteSource, /xmlns:g="http:\/\/base\.google\.com\/ns\/1\.0"/);
+  assert.match(merchantFeedRouteSource, /listIntegrationProducts/);
+  assert.match(merchantFeedRouteSource, /getProductHref\(item\.id, item\.productName\)/);
+  assert.match(merchantFeedRouteSource, /canonicalUrlForPath\(getProductHref\(item\.id, item\.productName\)\)/);
+  assert.match(merchantFeedRouteSource, /Content-Type': 'application\/xml; charset=utf-8'/);
+});
