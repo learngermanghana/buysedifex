@@ -16,7 +16,36 @@ export function toTitleCase(value?: string | null): string | null {
 
 export function normalizeCategory(value?: string | null): string | null {
   const text = normalizeText(value);
-  return text ? text.toLowerCase() : null;
+  if (!text) return null;
+
+  const normalized = text.toLowerCase();
+  const categoryMatchers: Array<{ key: string; tokens: string[] }> = [
+    { key: 'Supplements', tokens: ['supplement', 'vitamin', 'protein', 'wellness'] },
+    { key: 'Skin care', tokens: ['skin', 'skincare', 'face', 'soap', 'cleanser', 'lotion', 'cream'] },
+    { key: 'Hair care', tokens: ['hair', 'shampoo', 'conditioner', 'wig', 'braid'] },
+    { key: 'Food & beverages', tokens: ['food', 'drink', 'beverage', 'snack', 'juice', 'tea', 'coffee'] },
+    { key: 'Groceries', tokens: ['grocery', 'rice', 'oil', 'flour', 'spice', 'pantry'] },
+    { key: 'Baby care', tokens: ['baby', 'infant', 'newborn', 'diaper', 'formula'] },
+    { key: 'Fashion', tokens: ['fashion', 'cloth', 'clothing', 'dress', 'shoe', 'bag'] },
+    { key: 'Beauty', tokens: ['beauty', 'makeup', 'cosmetic', 'lipstick', 'perfume', 'nail'] },
+  ];
+
+  let bestMatch: string | null = null;
+  let bestScore = 0;
+
+  categoryMatchers.forEach(({ key, tokens }) => {
+    let score = 0;
+    tokens.forEach((token) => {
+      if (normalized.includes(token)) score += 1;
+    });
+    if (normalized === key.toLowerCase()) score += 3;
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = key;
+    }
+  });
+
+  return bestMatch ?? 'Beauty';
 }
 
 export function normalizeWhatsAppNumber(raw?: string | null): string | null {

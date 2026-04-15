@@ -21,6 +21,7 @@ import { FormattedDescription } from '@/components/formatted-description';
 import { WhatsAppChatButton } from '@/components/whatsapp-chat-button';
 import { getStoreHref } from '@/lib/store-route';
 import { getProductHref } from '@/lib/product-route';
+import { CANONICAL_CATEGORY_KEYS, resolveClosestCategoryKey } from '@/lib/category-taxonomy';
 
 type PublicProduct = {
   id: string;
@@ -91,7 +92,13 @@ const buildWhatsAppMessage = (item: PublicProduct) => {
 };
 
 const getProductName = (item: PublicProduct) => (item.productName ?? item.name)?.trim() || 'Untitled item';
-const getCategory = (item: PublicProduct) => item.categoryKey?.trim() || item.category?.trim() || '';
+const getCategory = (item: PublicProduct) =>
+  resolveClosestCategoryKey({
+    category: item.categoryKey?.trim() || item.category?.trim(),
+    productName: getProductName(item),
+    description: item.description,
+    itemType: item.itemType,
+  });
 
 const getStorePhone = (item: PublicProduct) => getContactPhone(item) || 'Phone unavailable';
 
@@ -293,6 +300,8 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
       if (!typeMatches) return false;
       const cityMatches = selectedCity === 'all' || getStoreCity(product).toLowerCase() === selectedCity.toLowerCase();
       if (!cityMatches) return false;
+      const categoryMatches = selectedCategory === 'all' || getCategory(product) === selectedCategory;
+      if (!categoryMatches) return false;
       if (!text) return true;
       const haystack = [
         getProductName(product),
@@ -310,7 +319,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
     const imageReadyProducts = matchingProducts.filter((product) => hasDisplayImage(product) && isVerifiedStore(product.verified));
     return sortProducts(imageReadyProducts, selectedSort);
-  }, [itemTypeFilter, products, searchText, selectedCity, selectedSort]);
+  }, [itemTypeFilter, products, searchText, selectedCategory, selectedCity, selectedSort]);
 
   const toggleDescription = (productId: string) => {
     setExpandedDescriptionIds((current) => {
@@ -325,45 +334,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   };
 
   const fetchCategories = async () => {
-    if (!db) {
-      setError(firebaseConfigError ?? 'Firebase is not configured.');
-      return;
-    }
-
     setIsLoadingCategories(true);
-
-    try {
-      const all = new Set<string>();
-      let cursor: QueryDocumentSnapshot | undefined;
-
-      while (true) {
-        const base = query(collection(db, 'publicProducts'), orderBy('categoryKey', 'asc'), limit(200));
-
-        const paged = cursor ? query(base, startAfter(cursor)) : base;
-        const snapshot = await getDocs(paged);
-
-        snapshot.docs.forEach((docItem) => {
-          const data = docItem.data() as PublicProduct;
-          const category = getCategory(data);
-          if (typeof category === 'string' && category.trim().length > 0) {
-            all.add(category);
-          }
-        });
-
-        if (snapshot.docs.length < 200) {
-          break;
-        }
-
-        cursor = snapshot.docs.at(-1);
-      }
-
-      setCategories(['all', ...Array.from(all).sort()]);
-    } catch (err) {
-      console.error('Failed to fetch categories', err);
-      setCategories(['all']);
-    } finally {
-      setIsLoadingCategories(false);
-    }
+    setCategories(['all', ...CANONICAL_CATEGORY_KEYS]);
+    setIsLoadingCategories(false);
   };
 
   const fetchProducts = useCallback(async (cursor?: QueryDocumentSnapshot) => {
@@ -378,10 +351,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
     try {
       const filters: QueryConstraint[] = [];
-
-      if (selectedCategory !== 'all') {
-        filters.push(where('categoryKey', '==', selectedCategory));
-      }
 
       const orderOptions: QueryConstraint[][] =
         selectedSort === 'price'
@@ -556,10 +525,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     try {
       const filters: QueryConstraint[] = [];
 
-      if (selectedCategory !== 'all') {
-        filters.push(where('categoryKey', '==', selectedCategory));
-      }
-
       const allItems: PublicProduct[] = [];
       let cursor: QueryDocumentSnapshot | undefined;
 
@@ -601,7 +566,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [hydrateVerifiedFromStores, selectedCategory]);
+  }, [hydrateVerifiedFromStores]);
 
   useEffect(() => {
     fetchCategories();
