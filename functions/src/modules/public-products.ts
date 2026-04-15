@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import { logger } from 'firebase-functions';
 import { getDb } from './db';
 import { normalizeCategory, normalizeProduct, normalizeStore, normalizeText } from './normalization';
+import { computeRankingScore } from './ranking';
 import { buildWhatsAppLink, computeVisibility, getEffectiveStoreStatus, publicProductId, resolveStorePhone, withStoreDefaults } from './visibility';
 import { type ProductDoc, type StoreDoc } from './types';
 
@@ -20,6 +21,7 @@ export function toPublicProductDoc(input: {
   const storeName = normalizeText(store.name);
   const productName = normalizeText(product.name);
   const categoryKey = normalizeCategory(product.category ?? store.category);
+  const rankingScore = computeRankingScore(store, product);
 
   const normalizedImageUrls = Array.isArray(product.imageUrls)
     ? product.imageUrls.map((url) => normalizeText(url)).filter((url): url is string => Boolean(url))
@@ -54,6 +56,7 @@ export function toPublicProductDoc(input: {
     price: typeof product.price === 'number' ? product.price : null,
     currency: normalizeText(product.currency) ?? 'GHS',
     featuredRank: typeof product.featuredRank === 'number' ? product.featuredRank : 0,
+    rankingScore,
     itemType: normalizeText(product.itemType),
     shopLink: normalizeText(product.shopLink),
     sku: normalizeText(product.sku),

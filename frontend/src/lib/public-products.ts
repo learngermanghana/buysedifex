@@ -16,6 +16,7 @@ export type PublicProductDetail = {
   waLink?: string;
   verified?: boolean;
   itemType?: string;
+  rankingScore?: number;
 };
 
 type FirestoreValue =
