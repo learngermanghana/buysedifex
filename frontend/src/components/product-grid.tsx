@@ -8,9 +8,9 @@ import {
   QueryConstraint,
   QueryDocumentSnapshot,
   collection,
+  documentId,
   getDocs,
   limit,
-  documentId,
   orderBy,
   query,
   startAfter,
@@ -43,6 +43,7 @@ type PublicProduct = {
   verified?: boolean | string;
   featuredRank?: number;
   publishedAt?: { seconds: number };
+  isPublished?: boolean;
 };
 
 type SortOption = 'newest' | 'price' | 'featured';
@@ -208,6 +209,41 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<Set<string>>(new Set());
 
+  const hydrateVerifiedFromStores = useCallback(async (items: PublicProduct[]): Promise<PublicProduct[]> => {
+    const unresolvedStoreIds = Array.from(
+      new Set(
+        items
+          .filter((item) => !isVerifiedStore(item.verified))
+          .map((item) => item.storeId?.trim())
+          .filter((storeId): storeId is string => Boolean(storeId)),
+      ),
+    );
+
+    if (unresolvedStoreIds.length === 0 || !db) {
+      return items;
+    }
+
+    const verifiedByStoreId = new Map<string, boolean>();
+
+    for (let index = 0; index < unresolvedStoreIds.length; index += 10) {
+      const chunk = unresolvedStoreIds.slice(index, index + 10);
+      const storesSnapshot = await getDocs(
+        query(collection(db, 'stores'), where(documentId(), 'in', chunk), limit(chunk.length)),
+      );
+
+      storesSnapshot.docs.forEach((storeDoc) => {
+        const storeData = storeDoc.data() as { verified?: boolean | string };
+        verifiedByStoreId.set(storeDoc.id, isVerifiedStore(storeData.verified));
+      });
+    }
+
+    return items.map((item) => {
+      const storeId = item.storeId?.trim();
+      if (!storeId || isVerifiedStore(item.verified)) return item;
+      return { ...item, verified: verifiedByStoreId.get(storeId) === true };
+    });
+  }, []);
+
   const visibleProducts = useMemo(() => {
     const text = searchText.trim().toLowerCase();
     const normalizedProducts = normalizeStoreNamesByStoreId(products);
@@ -253,12 +289,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
       let cursor: QueryDocumentSnapshot | undefined;
 
       while (true) {
-        const base = query(
-          collection(db, 'publicProducts'),
-          where('isVisible', '==', true),
-          orderBy('categoryKey', 'asc'),
-          limit(200),
-        );
+        const base = query(collection(db, 'publicProducts'), orderBy('categoryKey', 'asc'), limit(200));
 
         const paged = cursor ? query(base, startAfter(cursor)) : base;
         const snapshot = await getDocs(paged);
@@ -298,7 +329,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setDebugInfo(null);
 
     try {
-      const filters: QueryConstraint[] = [where('isVisible', '==', true)];
+      const filters: QueryConstraint[] = [];
 
       if (selectedCategory !== 'all') {
         filters.push(where('categoryKey', '==', selectedCategory));
@@ -332,11 +363,13 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
               break;
             }
 
-            const batchItems = scanSnapshot.docs
+            const batchItemsRaw = scanSnapshot.docs
               .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-              .filter((item) => hasDisplayImage(item) && isVerifiedStore(item.verified));
+              .filter((item) => hasDisplayImage(item));
 
-            collectedItems.push(...batchItems);
+            const batchItems = await hydrateVerifiedFromStores(batchItemsRaw);
+
+            collectedItems.push(...batchItems.filter((item) => isVerifiedStore(item.verified)));
             latestSnapshotDoc = scanSnapshot.docs.at(-1) ?? latestSnapshotDoc;
             scanCursor = latestSnapshotDoc;
 
@@ -414,7 +447,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCategory, selectedSort]);
+  }, [hydrateVerifiedFromStores, selectedCategory, selectedSort]);
 
   const fetchProductsForSearch = useCallback(async () => {
     if (!db) {
@@ -427,7 +460,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setDebugInfo(null);
 
     try {
-      const filters: QueryConstraint[] = [where('isVisible', '==', true)];
+      const filters: QueryConstraint[] = [];
 
       if (selectedCategory !== 'all') {
         filters.push(where('categoryKey', '==', selectedCategory));
@@ -446,9 +479,11 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         );
 
         const snapshot = await getDocs(batchQuery);
-        const batchItems = snapshot.docs
+        const batchItemsRaw = snapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-          .filter((item) => hasDisplayImage(item) && isVerifiedStore(item.verified));
+          .filter((item) => hasDisplayImage(item));
+
+        const batchItems = (await hydrateVerifiedFromStores(batchItemsRaw)).filter((item) => isVerifiedStore(item.verified));
 
         allItems.push(...batchItems);
 
@@ -472,7 +507,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCategory]);
+  }, [hydrateVerifiedFromStores, selectedCategory]);
 
   useEffect(() => {
     fetchCategories();
