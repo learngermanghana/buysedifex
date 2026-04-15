@@ -17,12 +17,12 @@ export const CANONICAL_CATEGORY_KEYS = CATEGORY_CONFIG.map((entry) => entry.key)
 const normalizeText = (value?: string | null) => (value ?? '').trim().toLowerCase();
 
 const normalizedCategoryLookup = new Map<string, string>(
-  CATEGORY_CONFIG.flatMap(({ key, keywords }) => {
+  CATEGORY_CONFIG.flatMap<readonly [string, string]>(({ key, keywords }) => {
     const normalizedKey = normalizeText(key);
     return [
       [normalizedKey, key],
       [normalizedKey.replace(/\s*&\s*/g, ' and '), key],
-      ...keywords.map((keyword) => [normalizeText(keyword), key]),
+      ...keywords.map((keyword): readonly [string, string] => [normalizeText(keyword), key]),
     ];
   }),
 );
