@@ -305,7 +305,7 @@ export function ProductGrid() {
         try {
           const collectedItems: PublicProduct[] = [];
           let scanCursor = cursor;
-          let latestSnapshotDoc: QueryDocumentSnapshot | null = null;
+          let latestSnapshotDoc: QueryDocumentSnapshot | undefined;
           let lastSnapshotSize = 0;
 
           for (let scanIndex = 0; scanIndex < FETCH_SCAN_BATCHES; scanIndex += 1) {
@@ -324,7 +324,7 @@ export function ProductGrid() {
 
             collectedItems.push(...batchItems);
             latestSnapshotDoc = scanSnapshot.docs.at(-1) ?? latestSnapshotDoc;
-            scanCursor = latestSnapshotDoc ?? undefined;
+            scanCursor = latestSnapshotDoc;
 
             if (lastSnapshotSize < PAGE_SIZE || collectedItems.length >= PAGE_SIZE) {
               break;
@@ -365,7 +365,7 @@ export function ProductGrid() {
       }
 
       const nextItems = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
+        .map((doc) => doc.data() as PublicProduct)
         .filter((item) => hasDisplayImage(item) && isVerifiedStore(item.verified));
 
       setProducts((current) => (cursor ? [...current, ...nextItems] : nextItems));
