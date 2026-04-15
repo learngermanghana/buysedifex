@@ -169,10 +169,10 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
                 src={imageUrl}
                 alt={product.imageAlt?.trim() || `${product.productName} at ${resolvedStoreName}`}
                 loading="lazy"
+                className="productDetailImage"
                 width={480}
                 height={480}
                 sizes="(max-width: 768px) 100vw, 33vw"
-                style={{ width: '100%', height: 'auto', borderRadius: 14 }}
               />
             ))}
           </section>
