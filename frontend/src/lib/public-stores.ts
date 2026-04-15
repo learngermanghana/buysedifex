@@ -1,4 +1,5 @@
 import type { PublicProductDetail } from '@/lib/public-products';
+import { CANONICAL_CATEGORY_KEYS, resolveClosestCategoryKey } from '@/lib/category-taxonomy';
 
 type FirestoreValue =
   | { stringValue: string }
@@ -154,7 +155,12 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
     price: readNumber(fields, ['price']),
     currency: readString(fields, ['currency']),
     storeName: readString(fields, ['storeName']) ?? 'Unknown store',
-    categoryKey: readString(fields, ['categoryKey', 'category']),
+    categoryKey: resolveClosestCategoryKey({
+      category: readString(fields, ['categoryKey', 'category']),
+      productName: readString(fields, ['productName', 'name']),
+      description: readString(fields, ['description']),
+      itemType: readString(fields, ['itemType', 'type']),
+    }),
     sku: readString(fields, ['sku']),
     stockCount: readNumber(fields, ['stockCount']),
     city: readString(fields, ['city', 'storeCity', 'town']),
@@ -594,8 +600,9 @@ export const getProductsByCategory = async (
   const pageSize = Math.min(Math.max(options.pageSize ?? 24, 1), 48);
   const page = Math.max(options.page ?? 1, 1);
   const offset = (page - 1) * pageSize;
+  const normalizedCategoryKey = resolveClosestCategoryKey({ category: categoryKey });
 
-  const query = {
+  const baseQuery = {
     select: {
       fields: [
         { fieldPath: 'productId' },
@@ -631,13 +638,6 @@ export const getProductsByCategory = async (
         op: 'AND',
         filters: [
           {
-            fieldFilter: {
-              field: { fieldPath: 'categoryKey' },
-              op: 'EQUAL',
-              value: { stringValue: categoryKey },
-            },
-          },
-          {
             compositeFilter: {
               op: 'OR',
               filters: [
@@ -662,74 +662,49 @@ export const getProductsByCategory = async (
       },
     },
     orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
-    offset,
-    limit: pageSize + 1,
   };
 
-  const rows = await runPublicProductsQuery(query);
-  const items = normalizeStoreNamesByStoreId(rows.flatMap((row) => (row.document ? [productFromDocument(row.document)] : [])))
-    .map(toPublicProductDetail)
-    .filter((item) => item.id && item.productName && item.imageUrls.length > 0);
+  const matchingItems: PublicProductDetail[] = [];
+  let queryOffset = 0;
+  let exhausted = false;
+
+  while (matchingItems.length < offset + pageSize + 1 && !exhausted) {
+    const rows = await runPublicProductsQuery({
+      ...baseQuery,
+      offset: queryOffset,
+      limit: 150,
+    });
+    const batchItems = normalizeStoreNamesByStoreId(rows.flatMap((row) => (row.document ? [productFromDocument(row.document)] : [])))
+      .map(toPublicProductDetail)
+      .filter(
+        (item) =>
+          item.id &&
+          item.productName &&
+          item.imageUrls.length > 0 &&
+          resolveClosestCategoryKey({
+            category: item.categoryKey,
+            productName: item.productName,
+            description: item.description,
+            itemType: item.itemType,
+          }) === normalizedCategoryKey,
+      );
+
+    matchingItems.push(...batchItems);
+    if (rows.length < 150) {
+      exhausted = true;
+    }
+    queryOffset += 150;
+  }
 
   return {
-    products: items.slice(0, pageSize),
-    hasMore: items.length > pageSize,
+    products: matchingItems.slice(offset, offset + pageSize),
+    hasMore: matchingItems.length > offset + pageSize,
   };
 };
 
 export const listPublicCategoryKeys = async (limitCount = 600): Promise<string[]> => {
-  const query = {
-    select: {
-      fields: [{ fieldPath: 'categoryKey' }, { fieldPath: 'category' }, { fieldPath: 'publishedAt' }],
-    },
-    from: [{ collectionId: 'publicProducts' }],
-    where: {
-      compositeFilter: {
-        op: 'AND',
-        filters: [
-          {
-            compositeFilter: {
-              op: 'OR',
-              filters: [
-                {
-                  fieldFilter: {
-                    field: { fieldPath: 'isVisible' },
-                    op: 'EQUAL',
-                    value: { booleanValue: true },
-                  },
-                },
-                {
-                  fieldFilter: {
-                    field: { fieldPath: 'isPublished' },
-                    op: 'EQUAL',
-                    value: { booleanValue: true },
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      },
-    },
-    orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
-    limit: limitCount,
-  };
-
-  let rows: FirestoreRunQueryResponse[] = [];
-  try {
-    rows = await runPublicProductsQuery(query);
-  } catch (error) {
-    console.warn('Unable to list public category keys during static generation.', error);
-    return [];
-  }
-
-  return Array.from(
-    new Set(
-      rows
-        .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
-        .flatMap((product) => (product.categoryKey ? [product.categoryKey] : [])),
-    ),
-  ).sort();
+  void limitCount;
+  return [...CANONICAL_CATEGORY_KEYS];
 };
 
 export const listPublicStoreIds = async (limitCount = 200): Promise<string[]> => {
