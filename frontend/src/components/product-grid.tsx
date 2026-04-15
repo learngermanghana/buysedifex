@@ -389,6 +389,48 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             continue;
           }
 
+          if (selectedSort === 'newest' && !cursor && index === 0 && collectedItems.length < PAGE_SIZE) {
+            const seenIds = new Set(collectedItems.map((item) => item.id));
+            let fallbackCursor: QueryDocumentSnapshot | undefined;
+            let safetyCounter = 0;
+
+            while (collectedItems.length < PAGE_SIZE && safetyCounter < FETCH_SCAN_BATCHES) {
+              safetyCounter += 1;
+              const fallbackBaseQuery = query(collection(db, 'publicProducts'), ...filters, orderBy(documentId(), 'asc'), limit(PAGE_SIZE));
+              const fallbackPagedQuery = fallbackCursor ? query(fallbackBaseQuery, startAfter(fallbackCursor)) : fallbackBaseQuery;
+              const fallbackSnapshot = await getDocs(fallbackPagedQuery);
+
+              if (fallbackSnapshot.empty) {
+                break;
+              }
+
+              fallbackCursor = fallbackSnapshot.docs.at(-1) ?? fallbackCursor;
+
+              const fallbackBatchRaw = fallbackSnapshot.docs
+                .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
+                .filter((item) => !seenIds.has(item.id) && hasDisplayImage(item));
+
+              if (fallbackBatchRaw.length === 0) {
+                if (fallbackSnapshot.docs.length < PAGE_SIZE) break;
+                continue;
+              }
+
+              const fallbackBatch = await hydrateVerifiedFromStores(fallbackBatchRaw);
+              const fallbackVisible = fallbackBatch.filter((item) => isVerifiedStore(item.verified));
+
+              fallbackVisible.forEach((item) => {
+                if (!seenIds.has(item.id)) {
+                  seenIds.add(item.id);
+                  collectedItems.push(item);
+                }
+              });
+
+              if (fallbackSnapshot.docs.length < PAGE_SIZE) {
+                break;
+              }
+            }
+          }
+
           snapshot = {
             docs: selectStoreBalancedProducts(collectedItems, PAGE_SIZE).map((item) => ({
               id: item.id,
