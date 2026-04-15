@@ -46,6 +46,7 @@ type PublicProduct = {
 };
 
 type SortOption = 'newest' | 'price' | 'featured';
+type ItemTypeFilter = 'all' | 'product' | 'service';
 
 const PAGE_SIZE = 12;
 const FETCH_SCAN_BATCHES = 4;
@@ -181,7 +182,18 @@ const selectStoreBalancedProducts = (items: PublicProduct[], count: number) => {
   return mixProductsAcrossStores(randomized).slice(0, count);
 };
 
-export function ProductGrid() {
+type ProductGridProps = {
+  itemTypeFilter?: ItemTypeFilter;
+};
+
+const matchesItemTypeFilter = (itemType: string | undefined, filter: ItemTypeFilter) => {
+  if (filter === 'all') return true;
+  const normalized = itemType?.trim().toLowerCase();
+  if (filter === 'service') return normalized === 'service';
+  return normalized !== 'service';
+};
+
+export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [categories, setCategories] = useState<string[]>(['all']);
   const [cities, setCities] = useState<string[]>(['all']);
@@ -200,6 +212,8 @@ export function ProductGrid() {
     const text = searchText.trim().toLowerCase();
     const normalizedProducts = normalizeStoreNamesByStoreId(products);
     const matchingProducts = normalizedProducts.filter((product) => {
+      const typeMatches = matchesItemTypeFilter(product.itemType, itemTypeFilter);
+      if (!typeMatches) return false;
       const cityMatches = selectedCity === 'all' || getStoreCity(product).toLowerCase() === selectedCity.toLowerCase();
       if (!cityMatches) return false;
       if (!text) return true;
@@ -212,7 +226,7 @@ export function ProductGrid() {
 
     const imageReadyProducts = matchingProducts.filter((product) => hasDisplayImage(product) && isVerifiedStore(product.verified));
     return mixProductsAcrossStores(shuffleProducts(imageReadyProducts));
-  }, [products, searchText, selectedCity]);
+  }, [itemTypeFilter, products, searchText, selectedCity]);
 
   const toggleDescription = (productId: string) => {
     setExpandedDescriptionIds((current) => {

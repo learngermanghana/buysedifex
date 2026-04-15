@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProductGrid } from '@/components/product-grid';
 import { PromoCarousel } from '@/components/promo-carousel';
-import { SectionTabs } from '@/components/section-tabs';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 const title = 'Discover trusted local stores near you';
@@ -35,7 +34,6 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <main className="container">
-      <SectionTabs activeTab="products" />
       <header className="hero">
         <div
           className="heroImage"
@@ -46,6 +44,21 @@ export default function HomePage() {
           <p className="eyebrow">Sedifex Market</p>
           <h1>Discover trusted local stores near you</h1>
           <p>Search products, compare prices, and contact verified stores in seconds.</p>
+          <p>
+            Need filters? <Link href="/search">Use advanced search</Link>.
+          </p>
+          <p>
+            Learn more <Link href="/about">about Sedifex</Link>.
+          </p>
+          <p>
+            Looking for providers? <Link href="/services">Browse services</Link>.
+          </p>
+          <p>
+            Store owner? <Link href="/sell">Start selling</Link>.
+          </p>
+          <p>
+            Need help? <Link href="/contact">Contact support</Link>.
+          </p>
           <form className="heroSearch" role="search">
             <input type="search" placeholder="Search products, stores, or categories" aria-label="Search products and stores" />
             <select aria-label="Choose location" defaultValue="Accra">
@@ -60,15 +73,6 @@ export default function HomePage() {
             <span>🏪 Top stores near you</span>
             <span>📦 Categories</span>
           </div>
-          <nav className="inlineLinks" aria-label="Sedifex information pages">
-            <Link href="/search">Search &amp; Filter</Link>
-            <Link href="/about">About</Link>
-            <Link href="/services">Services</Link>
-            <Link href="/sell">Sell on Sedifex</Link>
-            <Link href="/contact">Contact</Link>
-            <Link href="/privacy">Privacy</Link>
-            <Link href="/terms">Terms</Link>
-          </nav>
         </div>
       </header>
       <section className="quickSections" aria-label="Homepage discovery sections">

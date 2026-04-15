@@ -14,13 +14,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: canonicalUrlForPath('/'), changeFrequency: 'daily', priority: 1 },
+    { url: canonicalUrlForPath('/products'), changeFrequency: 'daily', priority: 0.9 },
+    { url: canonicalUrlForPath('/services'), changeFrequency: 'daily', priority: 0.8 },
+    { url: canonicalUrlForPath('/contact'), changeFrequency: 'weekly', priority: 0.7 },
+    { url: canonicalUrlForPath('/add-product'), changeFrequency: 'weekly', priority: 0.7 },
     { url: canonicalUrlForPath('/about'), changeFrequency: 'weekly', priority: 0.6 },
-    { url: canonicalUrlForPath('/services'), changeFrequency: 'weekly', priority: 0.7 },
     { url: canonicalUrlForPath('/for-businesses'), changeFrequency: 'weekly', priority: 0.7 },
     { url: canonicalUrlForPath('/sell'), changeFrequency: 'weekly', priority: 0.7 },
-    { url: canonicalUrlForPath('/contact'), changeFrequency: 'weekly', priority: 0.6 },
     { url: canonicalUrlForPath('/search'), changeFrequency: 'daily', priority: 0.8 },
     { url: canonicalUrlForPath('/privacy'), changeFrequency: 'monthly', priority: 0.4 },
+    { url: canonicalUrlForPath('/return-policy'), changeFrequency: 'monthly', priority: 0.4 },
     { url: canonicalUrlForPath('/terms'), changeFrequency: 'monthly', priority: 0.4 },
   ];
 
