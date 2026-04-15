@@ -5,10 +5,13 @@ import { usePathname } from 'next/navigation';
 
 const navItems = [
   { href: '/', label: 'Home', match: (pathname: string) => pathname === '/' },
-  { href: '/search', label: 'Products', match: (pathname: string) => pathname.startsWith('/search') || pathname.startsWith('/products') },
-  { href: '/services', label: 'Service', match: (pathname: string) => pathname.startsWith('/services') },
-  { href: '/stores', label: 'Stores', match: (pathname: string) => pathname.startsWith('/stores') },
-  { href: '/categories', label: 'Categories', match: (pathname: string) => pathname.startsWith('/category') || pathname.startsWith('/categories') },
+  {
+    href: '/products',
+    label: 'Products',
+    match: (pathname: string) => pathname.startsWith('/products') || pathname.startsWith('/search'),
+  },
+  { href: '/services', label: 'Services', match: (pathname: string) => pathname.startsWith('/services') },
+  { href: '/contact', label: 'Contact', match: (pathname: string) => pathname.startsWith('/contact') },
 ];
 
 export function MainNav() {

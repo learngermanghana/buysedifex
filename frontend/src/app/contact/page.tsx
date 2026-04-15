@@ -34,8 +34,11 @@ export default function ContactPage() {
   return (
     <main className="container infoPage">
       <p className="eyebrow">Contact</p>
-      <h1>Support and contact</h1>
-      <p>If you need help with listings, trust concerns, disputes, or account questions, contact Sedifex directly.</p>
+      <h1>Report a concern or enquiry</h1>
+      <p>
+        If you need help with listings, trust concerns, disputes, or business enquiries, contact Sedifex support
+        directly.
+      </p>
 
       <section>
         <h2>Contact channels</h2>
