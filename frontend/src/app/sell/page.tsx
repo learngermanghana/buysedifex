@@ -41,35 +41,46 @@ export default function SellPage() {
       <section>
         <h2>Who can apply</h2>
         <ul>
-          <li>Businesses with clear contact details and active WhatsApp communication.</li>
-          <li>Stores with accurate product details, prices, and images.</li>
-          <li>Sellers who can respond quickly to customer inquiries and order follow-ups.</li>
+          <li>
+            To appear on Sedifex Market, a store must create an account at{' '}
+            <Link href="https://wwe.sedifex.com">wwe.sedifex.com</Link> and add products and services.
+          </li>
+          <li>Stores must provide accurate product details, prices, images, and contact information.</li>
+          <li>Sellers should be ready to respond quickly to customer inquiries and order follow-ups.</li>
         </ul>
       </section>
 
       <section>
         <h2>Approval flow</h2>
         <ol>
-          <li>Email your store profile, listing information, and business registration to info@sedifex.com.</li>
-          <li>Our team reviews your documents and verifies your store for trust and quality standards.</li>
-          <li>Approved stores are published on buy.sedifex.com and become discoverable across marketplace pages.</li>
+          <li>Set up your store account and keep your profile and product details complete.</li>
+          <li>Our team reviews your store and verifies it for trust, quality, and fraud prevention standards.</li>
+          <li>
+            Only verified stores are shown on Sedifex Market, and products added in Sedifex are automatically shown here
+            after verification.
+          </li>
         </ol>
       </section>
 
       <section>
-        <h2>If your store is not approved yet</h2>
+        <h2>If your store is not verified yet</h2>
         <p>
-          You can still manage your own products internally using Sedifex while your marketplace application remains under
-          review.
+          You can continue to use Sedifex for your store activities, but your store and products will not appear on
+          Sedifex Market until verification is complete.
         </p>
       </section>
 
       <section>
-        <h2>How selling works</h2>
+        <h2>How Sedifex Market works</h2>
         <ul>
-          <li>Customers discover your products on Sedifex.</li>
-          <li>They tap through to WhatsApp to chat directly with your store.</li>
-          <li>You finalize product availability, payment, and delivery directly with the buyer.</li>
+          <li>Sedifex acts as a marketplace mediator to recommend stores to customers.</li>
+          <li>We do not accept payments on behalf of any shop.</li>
+          <li>Each verified shop must have a location.</li>
+          <li>
+            If a store does not provide a location, customers should pay only after receiving their products through
+            delivery.
+          </li>
+          <li>If you notice suspicious behavior, please report it immediately as a potential fraud alert.</li>
         </ul>
       </section>
 
