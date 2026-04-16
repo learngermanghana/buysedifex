@@ -11,6 +11,7 @@ const navItems = [
     match: (pathname: string) => pathname.startsWith('/products') || pathname.startsWith('/search'),
   },
   { href: '/services', label: 'Services', match: (pathname: string) => pathname.startsWith('/services') },
+  { href: '/sell', label: 'How to Sell', match: (pathname: string) => pathname.startsWith('/sell') },
   { href: '/contact', label: 'Contact', match: (pathname: string) => pathname.startsWith('/contact') },
 ];
 
