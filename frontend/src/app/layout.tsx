@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
+import Link from 'next/link';
 import { MainNav } from '@/components/main-nav';
 import { SiteFooter } from '@/components/site-footer';
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
@@ -24,6 +26,11 @@ export const metadata: Metadata = {
     siteName: 'Sedifex',
     images: [{ url: defaultSocialImageUrl() }],
   },
+  icons: {
+    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    shortcut: ['/icon.svg'],
+    apple: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+  },
   twitter: {
     card: 'summary_large_image',
     title: 'Buy on Sedifex',
@@ -39,7 +46,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <WebVitalsReporter />
         <header className="siteHeader">
           <div className="container siteHeaderInner">
-            <p className="siteBrand">Sedifex Market</p>
+            <Link href="/" className="siteBrand" aria-label="Sedifex Market home">
+              <Image src="/sedifex-logo.svg" alt="Sedifex logo" width={32} height={32} priority />
+              <span>Sedifex Market</span>
+            </Link>
             <MainNav />
           </div>
         </header>

@@ -36,6 +36,14 @@ body {
   margin: 0;
   font-weight: 800;
   color: #1e293b;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+.siteBrand img {
+  border-radius: 0.6rem;
 }
 
 .mainNav {
