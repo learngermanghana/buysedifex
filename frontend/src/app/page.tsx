@@ -120,16 +120,24 @@ export default async function HomePage() {
         </div>
         <div className="storeShowcaseGrid">
           {storeProfiles.map((store) => (
-            <article key={store.id} className="storeShowcaseCard">
-              <h3>{store.name}</h3>
-              <p>{describeStore(store.categories)}</p>
-              <p className="storeShowcaseMeta">
-                {store.productCount > 0 ? `${store.productCount} active listing${store.productCount === 1 ? '' : 's'}` : 'Listings coming soon'}
-              </p>
-              <Link href={getStoreHref(store.id, store.name)} className="storeShowcaseLink">
-                Open store
-              </Link>
-            </article>
+            (() => {
+              const storeHref = getStoreHref(store.id, store.name) ?? '/stores';
+
+              return (
+                <article key={store.id} className="storeShowcaseCard">
+                  <h3>{store.name}</h3>
+                  <p>{describeStore(store.categories)}</p>
+                  <p className="storeShowcaseMeta">
+                    {store.productCount > 0
+                      ? `${store.productCount} active listing${store.productCount === 1 ? '' : 's'}`
+                      : 'Listings coming soon'}
+                  </p>
+                  <Link href={storeHref} className="storeShowcaseLink">
+                    Open store
+                  </Link>
+                </article>
+              );
+            })()
           ))}
         </div>
         <p className="storeShowcaseFooter">
