@@ -14,14 +14,14 @@ type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
 type RequestFormState = {
   name: string;
   phone: string;
-  location: string;
+  notes: string;
   quantity: string;
 };
 
 const initialFormState: RequestFormState = {
   name: '',
   phone: '',
-  location: '',
+  notes: '',
   quantity: '1',
 };
 
@@ -71,7 +71,7 @@ export function ProductLeadPanel({ productId, productName, city, whatsappHref }:
           productName,
           name: formState.name.trim(),
           phone: formState.phone.trim(),
-          location: formState.location.trim(),
+          notes: formState.notes.trim(),
           quantity,
         }),
       });
@@ -123,14 +123,14 @@ export function ProductLeadPanel({ productId, productName, city, whatsappHref }:
           onChange={(event) => setFormState((current) => ({ ...current, phone: event.target.value }))}
         />
 
-        <label htmlFor="request-location">Location</label>
-        <input
-          id="request-location"
-          name="location"
-          type="text"
+        <label htmlFor="request-notes">Notes</label>
+        <textarea
+          id="request-notes"
+          name="notes"
           required
-          value={formState.location}
-          onChange={(event) => setFormState((current) => ({ ...current, location: event.target.value }))}
+          value={formState.notes}
+          onChange={(event) => setFormState((current) => ({ ...current, notes: event.target.value }))}
+          placeholder="Share your preference or any extra request details"
         />
 
         <label htmlFor="request-quantity">Quantity</label>

@@ -6,7 +6,12 @@ type LeadPayload = {
   productName?: string;
   name?: string;
   phone?: string;
+  notes?: string;
   location?: string;
+  branchLocationId?: string;
+  branchId?: string;
+  locationId?: string;
+  storeBranchId?: string;
   quantity?: number;
 };
 
@@ -14,13 +19,20 @@ const isNonEmptyString = (value: unknown): value is string => typeof value === '
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as LeadPayload;
+  const normalizedNotes =
+    body.notes ??
+    body.location ??
+    body.branchLocationId ??
+    body.branchId ??
+    body.locationId ??
+    body.storeBranchId;
 
   if (
     !isNonEmptyString(body.productId) ||
     !isNonEmptyString(body.productName) ||
     !isNonEmptyString(body.name) ||
     !isNonEmptyString(body.phone) ||
-    !isNonEmptyString(body.location) ||
+    !isNonEmptyString(normalizedNotes) ||
     typeof body.quantity !== 'number' ||
     Number.isNaN(body.quantity) ||
     body.quantity < 1
@@ -33,7 +45,7 @@ export async function POST(request: NextRequest) {
     productName: body.productName.trim(),
     name: body.name.trim(),
     phone: body.phone.trim(),
-    location: body.location.trim(),
+    notes: normalizedNotes.trim(),
     quantity: Math.floor(body.quantity),
     createdAt: new Date().toISOString(),
     source: 'product-request-form',
