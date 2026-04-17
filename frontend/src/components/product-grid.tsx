@@ -108,6 +108,7 @@ const getStoreCity = (item: PublicProduct) => {
 };
 
 const hasDisplayImage = (item: PublicProduct) => Array.isArray(item.imageUrls) && item.imageUrls.some((url) => Boolean(url?.trim()));
+const isPublicListing = (item: PublicProduct) => item.isVisible === true || item.isPublished === true;
 
 const isVerifiedStore = (value: PublicProduct['verified']) => {
   if (typeof value === 'boolean') return value;
@@ -339,7 +340,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
       return haystack.includes(text);
     });
 
-    const imageReadyProducts = matchingProducts.filter((product) => hasDisplayImage(product) && isVerifiedStore(product.verified));
+    const imageReadyProducts = matchingProducts.filter(
+      (product) => isPublicListing(product) && hasDisplayImage(product) && isVerifiedStore(product.verified),
+    );
     const sortedProducts = sortProducts(imageReadyProducts, selectedSort);
     return mixProductsByCategoryThenStore(sortedProducts);
   }, [itemTypeFilter, products, searchText, selectedCategory, selectedCity, selectedSort]);
@@ -409,7 +412,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
             const batchItemsRaw = scanSnapshot.docs
               .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-              .filter((item) => hasDisplayImage(item));
+              .filter((item) => isPublicListing(item) && hasDisplayImage(item));
 
             const batchItems = await hydrateVerifiedFromStores(batchItemsRaw);
 
@@ -452,7 +455,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
               const fallbackBatchRaw = fallbackSnapshot.docs
                 .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-                .filter((item) => !seenIds.has(item.id) && hasDisplayImage(item));
+                .filter((item) => !seenIds.has(item.id) && isPublicListing(item) && hasDisplayImage(item));
 
               if (fallbackBatchRaw.length === 0) {
                 if (fallbackSnapshot.docs.length < PAGE_SIZE) break;
@@ -499,7 +502,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
       const nextItems = snapshot.docs
         .map((doc) => doc.data() as PublicProduct)
-        .filter((item) => hasDisplayImage(item) && isVerifiedStore(item.verified));
+        .filter((item) => isPublicListing(item) && hasDisplayImage(item) && isVerifiedStore(item.verified));
 
       setProducts((current) => (cursor ? [...current, ...nextItems] : nextItems));
       setCities((current) => {
@@ -563,7 +566,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         const snapshot = await getDocs(batchQuery);
         const batchItemsRaw = snapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-          .filter((item) => hasDisplayImage(item));
+          .filter((item) => isPublicListing(item) && hasDisplayImage(item));
 
         const batchItems = (await hydrateVerifiedFromStores(batchItemsRaw)).filter((item) => isVerifiedStore(item.verified));
 
