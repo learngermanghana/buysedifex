@@ -373,7 +373,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setDebugInfo(null);
 
     try {
-      const filters: QueryConstraint[] = [];
+      const filters: QueryConstraint[] = itemTypeFilter === 'service' ? [where('itemType', '==', 'service')] : [];
 
       const orderOptions: QueryConstraint[][] =
         selectedSort === 'price'
@@ -533,7 +533,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [hydrateVerifiedFromStores, selectedCategory, selectedSort]);
+  }, [hydrateVerifiedFromStores, itemTypeFilter, selectedCategory, selectedSort]);
 
   const fetchProductsForSearch = useCallback(async () => {
     if (!db) {
@@ -546,7 +546,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setDebugInfo(null);
 
     try {
-      const filters: QueryConstraint[] = [];
+      const filters: QueryConstraint[] = itemTypeFilter === 'service' ? [where('itemType', '==', 'service')] : [];
 
       const allItems: PublicProduct[] = [];
       let cursor: QueryDocumentSnapshot | undefined;
@@ -589,7 +589,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [hydrateVerifiedFromStores]);
+  }, [hydrateVerifiedFromStores, itemTypeFilter]);
 
   useEffect(() => {
     fetchCategories();
