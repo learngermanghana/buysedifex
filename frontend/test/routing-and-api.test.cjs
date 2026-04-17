@@ -64,6 +64,8 @@ test('google merchant rss feed route builds XML feed items from integration prod
 
   assert.match(merchantFeedRouteSource, /xmlns:g="http:\/\/base\.google\.com\/ns\/1\.0"/);
   assert.match(merchantFeedRouteSource, /listIntegrationProducts/);
+  assert.match(merchantFeedRouteSource, /const storeId = extractStoreId\(searchParams\.get\('storeId'\)\)/);
+  assert.match(merchantFeedRouteSource, /storeId,/);
   assert.match(merchantFeedRouteSource, /getProductHref\(item\.id, item\.productName\)/);
   assert.match(merchantFeedRouteSource, /canonicalUrlForPath\(getProductHref\(item\.id, item\.productName\)\)/);
   assert.match(merchantFeedRouteSource, /Content-Type': 'application\/xml; charset=utf-8'/);

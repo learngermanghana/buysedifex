@@ -13,6 +13,12 @@ const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGES = 20;
 const PAGE_FETCH_TIMEOUT_MS = 8000;
 
+const buildFeedTitle = (storeId?: string): string =>
+  storeId ? `${FEED_TITLE} - Store ${storeId}` : FEED_TITLE;
+
+const buildFeedDescription = (storeId?: string): string =>
+  storeId ? `${FEED_DESCRIPTION} Filtered for store ${storeId}.` : FEED_DESCRIPTION;
+
 const escapeXml = (value: string): string =>
   value
     .replace(/&/g, '&amp;')
@@ -40,6 +46,22 @@ const normalizeAvailability = (stockCount?: number): string => {
   }
 
   return 'in stock';
+};
+
+const extractStoreId = (rawStoreParam?: string | null): string | undefined => {
+  const input = rawStoreParam?.trim();
+  if (!input) return undefined;
+
+  const candidate = decodeURIComponent(input).trim();
+  const [storePath] = candidate.split(/[?#]/, 1);
+  const pathSegments = storePath.split('/').filter(Boolean);
+  const storesIndex = pathSegments.findIndex((segment) => segment === 'stores');
+
+  if (storesIndex >= 0 && pathSegments[storesIndex + 1]) {
+    return pathSegments[storesIndex + 1];
+  }
+
+  return candidate;
 };
 
 const toFeedItemXml = (item: {
@@ -88,7 +110,7 @@ const toFeedItemXml = (item: {
   return lines.join('\n');
 };
 
-const fetchFeedItems = async () => {
+const fetchFeedItems = async (storeId?: string) => {
   const items: Array<{
     id: string;
     productName: string;
@@ -105,6 +127,7 @@ const fetchFeedItems = async () => {
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     const response = await Promise.race([
       listIntegrationProducts({
+        storeId,
         page,
         pageSize: DEFAULT_PAGE_SIZE,
         sort: 'newest',
@@ -140,9 +163,11 @@ const fetchFeedItems = async () => {
   return items;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const products = await fetchFeedItems();
+    const { searchParams } = new URL(request.url);
+    const storeId = extractStoreId(searchParams.get('storeId'));
+    const products = await fetchFeedItems(storeId);
     const itemXml = products
       .map(toFeedItemXml)
       .filter((item): item is string => Boolean(item));
@@ -151,9 +176,9 @@ export async function GET() {
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">',
       '  <channel>',
-      `    <title>${escapeXml(FEED_TITLE)}</title>`,
+      `    <title>${escapeXml(buildFeedTitle(storeId))}</title>`,
       `    <link>${escapeXml(canonicalUrlForPath('/'))}</link>`,
-      `    <description>${escapeXml(FEED_DESCRIPTION)}</description>`,
+      `    <description>${escapeXml(buildFeedDescription(storeId))}</description>`,
       ...itemXml,
       '  </channel>',
       '</rss>',
