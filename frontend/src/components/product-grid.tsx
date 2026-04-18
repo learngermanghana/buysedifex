@@ -281,23 +281,18 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<Set<string>>(new Set());
 
   const hydrateVerifiedFromStores = useCallback(async (items: PublicProduct[]): Promise<PublicProduct[]> => {
-    const unresolvedStoreIds = Array.from(
-      new Set(
-        items
-          .filter((item) => !isVerifiedStore(item.verified))
-          .map((item) => item.storeId?.trim())
-          .filter((storeId): storeId is string => Boolean(storeId)),
-      ),
+    const storeIds = Array.from(
+      new Set(items.map((item) => item.storeId?.trim()).filter((storeId): storeId is string => Boolean(storeId))),
     );
 
-    if (unresolvedStoreIds.length === 0 || !db) {
+    if (storeIds.length === 0 || !db) {
       return items;
     }
 
     const verifiedByStoreId = new Map<string, boolean>();
 
-    for (let index = 0; index < unresolvedStoreIds.length; index += 10) {
-      const chunk = unresolvedStoreIds.slice(index, index + 10);
+    for (let index = 0; index < storeIds.length; index += 10) {
+      const chunk = storeIds.slice(index, index + 10);
       const storesSnapshot = await getDocs(
         query(collection(db, 'stores'), where(documentId(), 'in', chunk), limit(chunk.length)),
       );
@@ -310,7 +305,8 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
     return items.map((item) => {
       const storeId = item.storeId?.trim();
-      if (!storeId || isVerifiedStore(item.verified)) return item;
+      if (!storeId) return item;
+      if (!verifiedByStoreId.has(storeId)) return item;
       return { ...item, verified: verifiedByStoreId.get(storeId) === true };
     });
   }, []);
@@ -376,7 +372,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setDebugInfo(null);
 
     try {
-      const filters: QueryConstraint[] = itemTypeFilter === 'service' ? [where('itemType', '==', 'service')] : [];
+      const filters: QueryConstraint[] = [];
 
       const orderOptions: QueryConstraint[][] =
         selectedSort === 'price'
@@ -549,7 +545,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setDebugInfo(null);
 
     try {
-      const filters: QueryConstraint[] = itemTypeFilter === 'service' ? [where('itemType', '==', 'service')] : [];
+      const filters: QueryConstraint[] = [];
 
       const allItems: PublicProduct[] = [];
       let cursor: QueryDocumentSnapshot | undefined;

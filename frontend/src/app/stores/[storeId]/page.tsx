@@ -112,6 +112,8 @@ export default async function StorePage({ params }: StorePageProps) {
   };
 
   const categoryKeys = Array.from(new Set(profile.products.map((product) => product.categoryKey).filter(Boolean))) as string[];
+  const serviceListings = profile.products.filter((product) => product.itemType?.trim().toLowerCase() === 'service');
+  const productListings = profile.products.filter((product) => product.itemType?.trim().toLowerCase() !== 'service');
   const normalizedPhone = (profile.storePhone ?? '').replace(/[^\d+]/g, '');
   const normalizedWhatsapp = (profile.storeWhatsapp ?? '').trim();
   const whatsappLink =
@@ -202,24 +204,46 @@ export default async function StorePage({ params }: StorePageProps) {
         </section>
       ) : null}
 
-      <section className="storeInfoCard" aria-label="Store products">
-        <h2>Active listings from {profile.storeName}</h2>
-        <p>🚚 Delivery: Discuss with seller · 💳 Payment methods: MoMo, cash, and seller-approved options.</p>
-        <ul>
-          {profile.products.map((product) => (
-            <li key={product.id}>
-              <Link href={getProductHref(product.id, product.productName)}>{product.productName}</Link>
-              {product.categoryKey ? (
-                <>
-                  {' '}
-                  in{' '}
-                  <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
-                </>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </section>
+      {productListings.length > 0 ? (
+        <section className="storeInfoCard" aria-label="Store products">
+          <h2>Products from {profile.storeName}</h2>
+          <p>🚚 Delivery: Discuss with seller · 💳 Payment methods: MoMo, cash, and seller-approved options.</p>
+          <ul>
+            {productListings.map((product) => (
+              <li key={product.id}>
+                <Link href={getProductHref(product.id, product.productName)}>{product.productName}</Link>
+                {product.categoryKey ? (
+                  <>
+                    {' '}
+                    in{' '}
+                    <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
+                  </>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {serviceListings.length > 0 ? (
+        <section className="storeInfoCard" aria-label="Store services">
+          <h2>Services from {profile.storeName}</h2>
+          <ul>
+            {serviceListings.map((service) => (
+              <li key={service.id}>
+                <Link href={getProductHref(service.id, service.productName)}>{service.productName}</Link>
+                {service.categoryKey ? (
+                  <>
+                    {' '}
+                    in{' '}
+                    <Link href={`/category/${encodeURIComponent(service.categoryKey)}`}>{service.categoryKey}</Link>
+                  </>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </main>
   );
 }
