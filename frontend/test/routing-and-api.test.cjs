@@ -47,7 +47,8 @@ test('store and product APIs read from Sedifex integration endpoints', () => {
   assert.match(storesSource, /getStoreProfileById/);
   assert.match(productsSource, /getPublicProductById/);
   assert.match(integrationClientSource, /listIntegrationProducts/);
-  assert.match(productGridSource, /src=\{item\.imageUrls\?\.\[0\] \?\? 'https:\/\/placehold\.co\/640x640'\}/);
+  assert.match(productGridSource, /const getDisplayImages = \(item: PublicProduct\): string\[] =>/);
+  assert.match(productGridSource, /src=\{getDisplayImages\(item\)\[0\] \?\? 'https:\/\/placehold\.co\/640x640'\}/);
 });
 
 
