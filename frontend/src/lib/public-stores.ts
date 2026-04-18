@@ -745,7 +745,7 @@ export const listPublicStoreIds = async (limitCount = 200): Promise<string[]> =>
     limit: limitCount,
   };
 
-  const rows = await runPublicProductsQuery(query);
+  const rows = await runPublicProductsQuerySafely(query, 'public store ids');
   const idsFromPublicProducts = rows
     .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
     .flatMap((product) => (product.storeId ? [product.storeId] : []));
