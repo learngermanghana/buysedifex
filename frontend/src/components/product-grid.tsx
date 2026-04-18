@@ -32,6 +32,8 @@ type PublicProduct = {
   categoryKey?: string;
   category?: string;
   imageUrls?: string[];
+  imageUrl?: string;
+  image?: string;
   imageAlt?: string;
   price?: number;
   currency?: string;
@@ -44,12 +46,12 @@ type PublicProduct = {
   city?: string;
   storeCity?: string;
   itemType?: string;
-  isVisible?: boolean;
+  isVisible?: boolean | string | number;
   verified?: boolean | string;
   featuredRank?: number;
   rankingScore?: number;
   publishedAt?: { seconds: number };
-  isPublished?: boolean;
+  isPublished?: boolean | string | number;
 };
 
 type SortOption = 'newest' | 'price' | 'featured';
@@ -107,8 +109,30 @@ const getStoreCity = (item: PublicProduct) => {
   return rawCity?.trim() || 'City unavailable';
 };
 
-const hasDisplayImage = (item: PublicProduct) => Array.isArray(item.imageUrls) && item.imageUrls.some((url) => Boolean(url?.trim()));
-const isPublicListing = (item: PublicProduct) => item.isVisible === true || item.isPublished === true;
+const asTruthyBoolean = (value: unknown): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'yes';
+  }
+
+  return false;
+};
+
+const getDisplayImages = (item: PublicProduct): string[] => {
+  const imageList = Array.isArray(item.imageUrls) ? item.imageUrls : [];
+  const fallbackImages = [item.imageUrl, item.image]
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const merged = [...imageList, ...fallbackImages].map((value) => value.trim()).filter(Boolean);
+  return Array.from(new Set(merged));
+};
+
+const hasDisplayImage = (item: PublicProduct) => getDisplayImages(item).length > 0;
+const isPublicListing = (item: PublicProduct) => asTruthyBoolean(item.isVisible) || asTruthyBoolean(item.isPublished);
 
 const isVerifiedStore = (value: PublicProduct['verified']) => {
   if (typeof value === 'boolean') return value;
@@ -261,8 +285,9 @@ type ProductGridProps = {
 const matchesItemTypeFilter = (itemType: string | undefined, filter: ItemTypeFilter) => {
   if (filter === 'all') return true;
   const normalized = itemType?.trim().toLowerCase();
-  if (filter === 'service') return normalized === 'service';
-  return normalized !== 'service';
+  const isService = normalized === 'service' || normalized === 'services' || Boolean(normalized?.includes('service'));
+  if (filter === 'service') return isService;
+  return !isService;
 };
 
 export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
@@ -336,9 +361,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
       return haystack.includes(text);
     });
 
-    const imageReadyProducts = matchingProducts.filter(
-      (product) => isPublicListing(product) && hasDisplayImage(product) && isVerifiedStore(product.verified),
-    );
+    const imageReadyProducts = matchingProducts.filter((product) => isPublicListing(product) && hasDisplayImage(product));
     const sortedProducts = sortProducts(imageReadyProducts, selectedSort);
     return mixProductsByCategoryThenStore(sortedProducts);
   }, [itemTypeFilter, products, searchText, selectedCategory, selectedCity, selectedSort]);
@@ -412,7 +435,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
             const batchItems = await hydrateVerifiedFromStores(batchItemsRaw);
 
-            collectedItems.push(...batchItems.filter((item) => isVerifiedStore(item.verified)));
+            collectedItems.push(...batchItems);
             latestSnapshotDoc = scanSnapshot.docs.at(-1) ?? latestSnapshotDoc;
             scanCursor = latestSnapshotDoc;
 
@@ -459,9 +482,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
               }
 
               const fallbackBatch = await hydrateVerifiedFromStores(fallbackBatchRaw);
-              const fallbackVisible = fallbackBatch.filter((item) => isVerifiedStore(item.verified));
-
-              fallbackVisible.forEach((item) => {
+              fallbackBatch.forEach((item) => {
                 if (!seenIds.has(item.id)) {
                   seenIds.add(item.id);
                   collectedItems.push(item);
@@ -498,7 +519,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
       const nextItems = snapshot.docs
         .map((doc) => doc.data() as PublicProduct)
-        .filter((item) => isPublicListing(item) && hasDisplayImage(item) && isVerifiedStore(item.verified));
+        .filter((item) => isPublicListing(item) && hasDisplayImage(item));
 
       setProducts((current) => (cursor ? [...current, ...nextItems] : nextItems));
       setCities((current) => {
@@ -564,7 +585,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
           .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
           .filter((item) => isPublicListing(item) && hasDisplayImage(item));
 
-        const batchItems = (await hydrateVerifiedFromStores(batchItemsRaw)).filter((item) => isVerifiedStore(item.verified));
+        const batchItems = await hydrateVerifiedFromStores(batchItemsRaw);
 
         allItems.push(...batchItems);
 
@@ -692,7 +713,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                 <article key={item.id} className="card">
                   <div className="imageWrap">
                     <Image
-                      src={item.imageUrls?.[0] ?? 'https://placehold.co/640x640'}
+                      src={getDisplayImages(item)[0] ?? 'https://placehold.co/640x640'}
                       alt={item.imageAlt?.trim() || getProductName(item) || 'Product image'}
                       loading="lazy"
                       width={360}
