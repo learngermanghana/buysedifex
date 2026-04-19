@@ -17,8 +17,11 @@ const ENV_FILE_LOCATIONS = [
 ];
 
 type IntegrationProductsPayload = {
+  storeId?: string;
   products?: IntegrationProductRecord[];
   items?: IntegrationProductRecord[];
+  publicProducts?: IntegrationProductRecord[];
+  publicServices?: IntegrationProductRecord[];
   hasMore?: boolean;
 };
 
@@ -396,6 +399,7 @@ const getIntegrationConfig = () => {
   return {
     baseUrl: process.env.SEDIFEX_INTEGRATION_API_BASE_URL,
     apiKey: process.env.SEDIFEX_INTEGRATION_API_KEY,
+    promoSlug: process.env.SEDIFEX_INTEGRATION_PROMO_SLUG,
     contractVersion: process.env.SEDIFEX_INTEGRATION_API_VERSION ?? '2026-04-13',
   };
 };
@@ -451,30 +455,91 @@ const integrationFetch = async <T>(
   return (await response.json()) as T;
 };
 
-export const getIntegrationProductById = async (productId: string) => {
-  const payload = await integrationFetch<IntegrationProductsPayload>(
-    '/v1IntegrationProducts',
-    { productId },
-  );
+const integrationPublicFetch = async <T>(
+  endpointPath: string,
+  query?: Record<string, string | number | undefined>,
+): Promise<T> => {
+  const { contractVersion } = getIntegrationConfig();
+  const endpoint = buildEndpoint(endpointPath, query);
 
-  const products = payload.products ?? payload.items ?? [];
-  return normalizeProducts(products)[0] ?? null;
+  const response = await fetch(endpoint, {
+    headers: {
+      'X-Sedifex-Contract-Version': contractVersion,
+      Accept: 'application/json',
+    },
+    next: { revalidate: 300 },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Sedifex integration request failed (${response.status}) for ${endpoint.pathname}.`,
+    );
+  }
+
+  return (await response.json()) as T;
 };
 
-export const listIntegrationProducts = async (query?: {
+const getCatalogItems = (payload: IntegrationProductsPayload): SedifexProduct[] => {
+  const publicProducts = normalizeProducts(payload.publicProducts ?? []);
+  const publicServices = normalizeProducts(payload.publicServices ?? []);
+
+  if (publicProducts.length > 0 || publicServices.length > 0) {
+    return [...publicProducts, ...publicServices];
+  }
+
+  return normalizeProducts(payload.items ?? payload.products ?? []);
+};
+
+const fetchCatalogProducts = async (query?: {
+  productId?: string;
   categoryKey?: string;
   storeId?: string;
+  promoSlug?: string;
   page?: number;
   pageSize?: number;
   sort?: SedifexProductSort | string;
   maxPerStore?: number;
 }) => {
-  const payload = await integrationFetch<IntegrationProductsPayload>(
-    '/v1IntegrationProducts',
-    query,
-  );
+  const { apiKey } = getIntegrationConfig();
 
-  const allItems = normalizeProducts(payload.items ?? payload.products ?? []);
+  if (apiKey) {
+    return integrationFetch<IntegrationProductsPayload>('/v1IntegrationProducts', query);
+  }
+
+  const catalogQuery = {
+    storeId: query?.storeId,
+    slug: query?.promoSlug,
+  };
+
+  if (!catalogQuery.storeId && !catalogQuery.slug) {
+    throw new Error(
+      'Public catalog access requires storeId or promoSlug when SEDIFEX_INTEGRATION_API_KEY is not configured.',
+    );
+  }
+
+  return integrationPublicFetch<IntegrationProductsPayload>(
+    '/integrationPublicCatalog',
+    catalogQuery,
+  );
+};
+
+export const getIntegrationProductById = async (productId: string) => {
+  const payload = await fetchCatalogProducts({ productId });
+  return getCatalogItems(payload)[0] ?? null;
+};
+
+export const listIntegrationProducts = async (query?: {
+  categoryKey?: string;
+  storeId?: string;
+  promoSlug?: string;
+  page?: number;
+  pageSize?: number;
+  sort?: SedifexProductSort | string;
+  maxPerStore?: number;
+}) => {
+  const payload = await fetchCatalogProducts(query);
+
+  const allItems = getCatalogItems(payload);
   const page = Math.max(1, query?.page ?? 1);
   const fallbackPageSize = allItems.length > 0 ? allItems.length : 1;
   const pageSize = Math.max(1, query?.pageSize ?? fallbackPageSize);
@@ -496,11 +561,11 @@ export const listIntegrationProducts = async (query?: {
 };
 
 export const listIntegrationCategoryKeys = async () => {
-  const payload = await integrationFetch<IntegrationProductsPayload>(
-    '/v1IntegrationProducts',
-  );
+  const { apiKey } = getIntegrationConfig();
+  if (!apiKey) return { items: [] as string[] };
 
-  const products = normalizeProducts(payload.products ?? payload.items ?? []);
+  const payload = await fetchCatalogProducts();
+  const products = getCatalogItems(payload);
   const categoryKeys = Array.from(
     new Set(products.map((item) => item.categoryKey ?? '').filter(Boolean)),
   );
@@ -509,11 +574,13 @@ export const listIntegrationCategoryKeys = async () => {
 };
 
 export const listIntegrationStoreIds = async () => {
+  const { apiKey } = getIntegrationConfig();
+  if (!apiKey) return { items: [] as string[] };
+
   const payload = await integrationFetch<IntegrationProductsPayload>(
     '/v1IntegrationProducts',
   );
-
-  const products = normalizeProducts(payload.products ?? payload.items ?? []);
+  const products = getCatalogItems(payload);
   const storeIds = Array.from(
     new Set(products.map((item) => item.storeId).filter(Boolean)),
   );
@@ -522,19 +589,23 @@ export const listIntegrationStoreIds = async () => {
 };
 
 export const getIntegrationStoreProfile = async (storeId: string) => {
+  const { apiKey, promoSlug } = getIntegrationConfig();
   const [promoPayload, storePayload, productsPayload] = await Promise.all([
-    integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', {
-      storeId,
-    }).catch(() => null),
+    (apiKey
+      ? integrationFetch<IntegrationPromoPayload>('/v1IntegrationPromo', {
+          storeId,
+        })
+      : promoSlug
+        ? integrationPublicFetch<IntegrationPromoPayload>('/v1IntegrationPromo', {
+            slug: promoSlug,
+          })
+        : Promise.resolve(null)
+    ).catch(() => null),
     getStoreById(storeId).catch(() => null),
-    integrationFetch<IntegrationProductsPayload>('/v1IntegrationProducts', {
-      storeId,
-    }),
+    fetchCatalogProducts({ storeId, promoSlug }),
   ]);
 
-  const normalizedProducts = normalizeProducts(
-    productsPayload.products ?? productsPayload.items ?? [],
-  );
+  const normalizedProducts = getCatalogItems(productsPayload);
 
   const profileFromPromo = toStoreProfile(promoPayload?.profile ?? promoPayload?.promo);
   const profile: SedifexStoreProfile | null =
@@ -560,6 +631,20 @@ export const getIntegrationStoreProfile = async (storeId: string) => {
 };
 
 export const listIntegrationPromos = async () => {
+  const { apiKey, promoSlug } = getIntegrationConfig();
+  if (!apiKey) {
+    if (!promoSlug) return { items: [] as SedifexPromo[] };
+    try {
+      const payload = await integrationPublicFetch<IntegrationPromoPayload>(
+        '/v1IntegrationPromo',
+        { slug: promoSlug },
+      );
+      return normalizePromoPayload(payload);
+    } catch {
+      return { items: [] as SedifexPromo[] };
+    }
+  }
+
   const { items: storeIds } = await listIntegrationStoreIds();
   if (storeIds.length === 0) {
     return { items: [] as SedifexPromo[] };
