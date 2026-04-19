@@ -342,6 +342,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     const text = searchText.trim().toLowerCase();
     const normalizedProducts = normalizeStoreNamesByStoreId(products);
     const matchingProducts = normalizedProducts.filter((product) => {
+      if (!isVerifiedStore(product.verified)) return false;
       const typeMatches = matchesItemTypeFilter(product.itemType, itemTypeFilter);
       if (!typeMatches) return false;
       const cityMatches = selectedCity === 'all' || getStoreCity(product).toLowerCase() === selectedCity.toLowerCase();
@@ -440,7 +441,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                   matchesItemTypeFilter(item.itemType, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
               );
 
-            const batchItems = await hydrateVerifiedFromStores(batchItemsRaw);
+            const batchItems = (await hydrateVerifiedFromStores(batchItemsRaw)).filter((item) => isVerifiedStore(item.verified));
 
             collectedItems.push(...batchItems);
             latestSnapshotDoc = scanSnapshot.docs.at(-1) ?? latestSnapshotDoc;
@@ -496,7 +497,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                 continue;
               }
 
-              const fallbackBatch = await hydrateVerifiedFromStores(fallbackBatchRaw);
+              const fallbackBatch = (await hydrateVerifiedFromStores(fallbackBatchRaw)).filter((item) =>
+                isVerifiedStore(item.verified),
+              );
               fallbackBatch.forEach((item) => {
                 if (!seenIds.has(item.id)) {
                   seenIds.add(item.id);
@@ -568,7 +571,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [hydrateVerifiedFromStores, itemTypeFilter, selectedCategory, selectedSort]);
+  }, [hasServerSideItemTypeFilter, hydrateVerifiedFromStores, itemTypeFilter, selectedCategory, selectedSort]);
 
   const fetchProductsForSearch = useCallback(async () => {
     if (!db) {
@@ -602,7 +605,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             (item) => matchesItemTypeFilter(item.itemType, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
           );
 
-        const batchItems = await hydrateVerifiedFromStores(batchItemsRaw);
+        const batchItems = (await hydrateVerifiedFromStores(batchItemsRaw)).filter((item) => isVerifiedStore(item.verified));
 
         allItems.push(...batchItems);
 
