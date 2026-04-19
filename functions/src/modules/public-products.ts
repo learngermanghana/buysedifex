@@ -22,6 +22,7 @@ export function toPublicProductDoc(input: {
   const productName = normalizeText(product.name);
   const categoryKey = normalizeCategory(product.category ?? store.category);
   const rankingScore = computeRankingScore(store, product);
+  const itemType = normalizeText(product.itemType)?.toLowerCase() ?? 'product';
 
   const normalizedImageUrls = Array.isArray(product.imageUrls)
     ? product.imageUrls.map((url) => normalizeText(url)).filter((url): url is string => Boolean(url))
@@ -49,6 +50,7 @@ export function toPublicProductDoc(input: {
     country: normalizeText(store.country),
     addressLine1: normalizeText(store.addressLine1),
     productName,
+    name: productName,
     productSlug: normalizeText(product.slug),
     description: normalizeText(product.description),
     imageUrls,
@@ -57,7 +59,7 @@ export function toPublicProductDoc(input: {
     currency: normalizeText(product.currency) ?? 'GHS',
     featuredRank: typeof product.featuredRank === 'number' ? product.featuredRank : 0,
     rankingScore,
-    itemType: normalizeText(product.itemType),
+    itemType,
     shopLink: normalizeText(product.shopLink),
     sku: normalizeText(product.sku),
     barcode: normalizeText(product.barcode),
