@@ -128,6 +128,8 @@ test('store aliases are normalized for public product docs', () => {
   });
 
   assert.equal(doc.storeName, 'Renamed Store');
+  assert.equal(doc.name, 'Rice');
+  assert.equal(doc.itemType, 'product');
   assert.equal(doc.city, 'Accra');
   assert.equal(doc.country, 'Ghana');
   assert.equal(doc.addressLine1, '123 High St');
