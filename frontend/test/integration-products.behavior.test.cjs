@@ -97,3 +97,47 @@ test('listIntegrationProducts paginates locally when upstream omits hasMore', as
   assert.deepEqual(secondPage.items.map((item) => item.id), ['p-3']);
   assert.equal(secondPage.hasMore, false);
 });
+
+test('listIntegrationProducts uses integrationPublicCatalog and public collections when API key is absent', async () => {
+  process.env.SEDIFEX_INTEGRATION_API_BASE_URL = 'https://integration.example.com';
+  delete process.env.SEDIFEX_INTEGRATION_API_KEY;
+  process.env.SEDIFEX_INTEGRATION_API_VERSION = '2026-04-13';
+
+  const observed = { url: null, headers: null };
+
+  global.fetch = async (url, options) => {
+    observed.url = new URL(String(url));
+    observed.headers = options?.headers ?? {};
+
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          storeId: 'store-1',
+          products: [
+            { id: 'fallback-1', storeId: 'store-1', productName: 'Fallback', imageUrl: 'https://cdn.example.com/fallback.jpg' },
+          ],
+          publicProducts: [
+            { id: 'p-1', storeId: 'store-1', productName: 'Public Product', imageUrl: 'https://cdn.example.com/p-1.jpg' },
+          ],
+          publicServices: [
+            { id: 's-1', storeId: 'store-1', productName: 'Public Service', imageUrl: 'https://cdn.example.com/s-1.jpg' },
+          ],
+        };
+      },
+    };
+  };
+
+  const { listIntegrationProducts } = await importIntegrationModule();
+  const result = await listIntegrationProducts({ storeId: 'store-1' });
+
+  assert.equal(observed.url.pathname, '/integrationPublicCatalog');
+  assert.equal(observed.url.searchParams.get('storeId'), 'store-1');
+  assert.equal(observed.headers['x-api-key'], undefined);
+  assert.deepEqual(
+    result.items.map((item) => item.id),
+    ['p-1', 's-1'],
+  );
+  assert.equal(result.hasMore, false);
+});
