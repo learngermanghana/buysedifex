@@ -59,6 +59,7 @@ type ItemTypeFilter = 'all' | 'product' | 'service';
 
 const PAGE_SIZE = 12;
 const FETCH_SCAN_BATCHES = 4;
+const FILTERED_FETCH_SCAN_BATCHES = 12;
 const SEARCH_SCAN_LIMIT = 300;
 const SEARCH_BATCH_SIZE = 100;
 
@@ -304,6 +305,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<Set<string>>(new Set());
+  const hasServerSideItemTypeFilter = itemTypeFilter !== 'all';
 
   const hydrateVerifiedFromStores = useCallback(async (items: PublicProduct[]): Promise<PublicProduct[]> => {
     const storeIds = Array.from(
@@ -419,7 +421,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
           let latestSnapshotDoc: QueryDocumentSnapshot | undefined;
           let lastSnapshotSize = 0;
 
-          for (let scanIndex = 0; scanIndex < FETCH_SCAN_BATCHES; scanIndex += 1) {
+          const maxScanBatches = hasServerSideItemTypeFilter ? FILTERED_FETCH_SCAN_BATCHES : FETCH_SCAN_BATCHES;
+
+          for (let scanIndex = 0; scanIndex < maxScanBatches; scanIndex += 1) {
             const baseQuery = query(collection(db, 'publicProducts'), ...filters, ...ordering, limit(PAGE_SIZE));
             const pagedQuery = scanCursor ? query(baseQuery, startAfter(scanCursor)) : baseQuery;
             const scanSnapshot = await getDocs(pagedQuery);
@@ -431,7 +435,10 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
             const batchItemsRaw = scanSnapshot.docs
               .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-              .filter((item) => isPublicListing(item) && hasDisplayImage(item));
+              .filter(
+                (item) =>
+                  matchesItemTypeFilter(item.itemType, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
+              );
 
             const batchItems = await hydrateVerifiedFromStores(batchItemsRaw);
 
@@ -460,7 +467,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             let fallbackCursor: QueryDocumentSnapshot | undefined;
             let safetyCounter = 0;
 
-            while (collectedItems.length < PAGE_SIZE && safetyCounter < FETCH_SCAN_BATCHES) {
+            const fallbackScanLimit = hasServerSideItemTypeFilter ? FILTERED_FETCH_SCAN_BATCHES : FETCH_SCAN_BATCHES;
+
+            while (collectedItems.length < PAGE_SIZE && safetyCounter < fallbackScanLimit) {
               safetyCounter += 1;
               const fallbackBaseQuery = query(collection(db, 'publicProducts'), ...filters, orderBy(documentId(), 'asc'), limit(PAGE_SIZE));
               const fallbackPagedQuery = fallbackCursor ? query(fallbackBaseQuery, startAfter(fallbackCursor)) : fallbackBaseQuery;
@@ -474,7 +483,13 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
               const fallbackBatchRaw = fallbackSnapshot.docs
                 .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-                .filter((item) => !seenIds.has(item.id) && isPublicListing(item) && hasDisplayImage(item));
+                .filter(
+                  (item) =>
+                    !seenIds.has(item.id) &&
+                    matchesItemTypeFilter(item.itemType, itemTypeFilter) &&
+                    isPublicListing(item) &&
+                    hasDisplayImage(item),
+                );
 
               if (fallbackBatchRaw.length === 0) {
                 if (fallbackSnapshot.docs.length < PAGE_SIZE) break;
@@ -583,7 +598,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         const snapshot = await getDocs(batchQuery);
         const batchItemsRaw = snapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-          .filter((item) => isPublicListing(item) && hasDisplayImage(item));
+          .filter(
+            (item) => matchesItemTypeFilter(item.itemType, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
+          );
 
         const batchItems = await hydrateVerifiedFromStores(batchItemsRaw);
 
