@@ -76,3 +76,12 @@ firebase deploy --only firestore:indexes,firestore:rules
 ```bash
 firebase deploy --only functions
 ```
+
+### CI deploy permissions for scheduled functions
+
+If your deploy service account cannot delete Cloud Scheduler jobs, Firebase function deploys can fail when removed scheduled functions are detected.
+
+Two safe options:
+
+1. **Preferred:** keep CI deploys non-destructive (this repo uses `firebase deploy --only functions --non-interactive` in GitHub Actions).
+2. **If you need destructive deletes in CI:** grant the deploy service account a role that includes `cloudscheduler.jobs.delete` (for example `roles/cloudscheduler.admin`) in project `sedifex-web`.
