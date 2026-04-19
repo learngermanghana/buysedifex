@@ -507,12 +507,13 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
   }
 
   const storeDocument = await readStoreDocumentById().catch(() => null);
+  const isStoreVerifiedFromStoreData = storeDocument?.verified === true;
+
+  if (!isStoreVerifiedFromStoreData) {
+    return null;
+  }
 
   if (matchedProducts.length === 0) {
-    if (!storeDocument || storeDocument.verified !== true) {
-      return null;
-    }
-
     return {
       storeId: normalizedStoreId,
       storeName: storeDocument.storeName,
@@ -532,7 +533,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
       longitude: storeDocument.longitude,
       sameAs: storeDocument.sameAs.filter(isValidHttpUrl),
       products: [],
-      verified: true,
+      verified: isStoreVerifiedFromStoreData,
     };
   }
 
@@ -555,7 +556,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     area: head.addressLine1,
     sameAs,
     products: matchedProducts.map(toPublicProductDetail),
-    verified: head.verified === true,
+    verified: isStoreVerifiedFromStoreData,
   };
 
   try {
@@ -581,7 +582,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
       openingHours: storeDocument.openingHours ?? profileFromProducts.openingHours,
       latitude: storeDocument.latitude ?? profileFromProducts.latitude,
       longitude: storeDocument.longitude ?? profileFromProducts.longitude,
-      verified: storeDocument.verified || profileFromProducts.verified,
+      verified: isStoreVerifiedFromStoreData,
       sameAs: mergedSameAs,
     };
   } catch {
