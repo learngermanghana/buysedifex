@@ -34,6 +34,7 @@ type IntegrationStorePayload = IntegrationStoreRecord & {
 
 type IntegrationProductRecord = Partial<SedifexProduct> & {
   id?: string;
+  itemType?: string;
   storeId?: string;
   storeName?: string;
   storeCity?: string;
