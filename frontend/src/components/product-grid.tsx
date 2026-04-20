@@ -122,13 +122,27 @@ const asTruthyBoolean = (value: unknown): boolean => {
 };
 
 const getDisplayImages = (item: PublicProduct): string[] => {
+  const isDisplayableImageUrl = (value: string) => {
+    const candidate = value.trim();
+    if (!candidate) return false;
+
+    try {
+      const parsed = new URL(candidate);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
   const imageList = Array.isArray(item.imageUrls) ? item.imageUrls : [];
   const fallbackImages = [item.imageUrl, item.image]
     .filter((value): value is string => typeof value === 'string')
     .map((value) => value.trim())
     .filter(Boolean);
 
-  const merged = [...imageList, ...fallbackImages].map((value) => value.trim()).filter(Boolean);
+  const merged = [...imageList, ...fallbackImages]
+    .map((value) => value.trim())
+    .filter((value) => isDisplayableImageUrl(value));
   return Array.from(new Set(merged));
 };
 
