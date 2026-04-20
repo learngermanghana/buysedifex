@@ -98,7 +98,7 @@ test('listIntegrationProducts paginates locally when upstream omits hasMore', as
   assert.equal(secondPage.hasMore, false);
 });
 
-test('listIntegrationProducts uses integrationPublicCatalog and public collections when API key is absent', async () => {
+test('listIntegrationProducts uses integrationPublicCatalog when API key is absent and no storeId is provided', async () => {
   process.env.SEDIFEX_INTEGRATION_API_BASE_URL = 'https://integration.example.com';
   delete process.env.SEDIFEX_INTEGRATION_API_KEY;
   process.env.SEDIFEX_INTEGRATION_API_VERSION = '2026-04-13';
@@ -130,14 +130,137 @@ test('listIntegrationProducts uses integrationPublicCatalog and public collectio
   };
 
   const { listIntegrationProducts } = await importIntegrationModule();
-  const result = await listIntegrationProducts({ storeId: 'store-1' });
+  const result = await listIntegrationProducts({ promoSlug: 'store-1' });
 
   assert.equal(observed.url.pathname, '/integrationPublicCatalog');
-  assert.equal(observed.url.searchParams.get('storeId'), 'store-1');
+  assert.equal(observed.url.searchParams.get('slug'), 'store-1');
   assert.equal(observed.headers['x-api-key'], undefined);
   assert.deepEqual(
     result.items.map((item) => item.id),
     ['p-1', 's-1'],
   );
+  assert.equal(result.hasMore, false);
+});
+
+test('listIntegrationProducts uses /stores/{id}, /publicProducts/{id}, and /publicServices/{id} for verified stores', async () => {
+  process.env.SEDIFEX_INTEGRATION_API_BASE_URL = 'https://integration.example.com';
+  delete process.env.SEDIFEX_INTEGRATION_API_KEY;
+  process.env.SEDIFEX_INTEGRATION_API_VERSION = '2026-04-13';
+
+  const calledPaths = [];
+
+  global.fetch = async (url) => {
+    const parsed = new URL(String(url));
+    calledPaths.push(parsed.pathname);
+
+    if (parsed.pathname === '/stores/store-verified') {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { storeId: 'store-verified', verified: true };
+        },
+      };
+    }
+
+    if (parsed.pathname === '/publicProducts/store-verified') {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            items: [
+              {
+                id: 'p-verified',
+                storeId: 'store-verified',
+                productName: 'Verified Product',
+                imageUrl: 'https://cdn.example.com/verified-product.jpg',
+              },
+            ],
+          };
+        },
+      };
+    }
+
+    if (parsed.pathname === '/publicServices/store-verified') {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            items: [
+              {
+                id: 's-verified',
+                storeId: 'store-verified',
+                productName: 'Verified Service',
+                imageUrl: 'https://cdn.example.com/verified-service.jpg',
+              },
+            ],
+          };
+        },
+      };
+    }
+
+    return {
+      ok: false,
+      status: 404,
+      async json() {
+        return {};
+      },
+    };
+  };
+
+  const { listIntegrationProducts } = await importIntegrationModule();
+  const result = await listIntegrationProducts({ storeId: 'store-verified' });
+
+  assert.deepEqual(calledPaths, [
+    '/stores/store-verified',
+    '/publicProducts/store-verified',
+    '/publicServices/store-verified',
+  ]);
+  assert.deepEqual(
+    result.items.map((item) => ({ id: item.id, itemType: item.itemType })),
+    [
+      { id: 'p-verified', itemType: 'product' },
+      { id: 's-verified', itemType: 'service' },
+    ],
+  );
+});
+
+test('listIntegrationProducts returns no items when store is not verified', async () => {
+  process.env.SEDIFEX_INTEGRATION_API_BASE_URL = 'https://integration.example.com';
+  delete process.env.SEDIFEX_INTEGRATION_API_KEY;
+  process.env.SEDIFEX_INTEGRATION_API_VERSION = '2026-04-13';
+
+  const calledPaths = [];
+
+  global.fetch = async (url) => {
+    const parsed = new URL(String(url));
+    calledPaths.push(parsed.pathname);
+
+    if (parsed.pathname === '/stores/store-unverified') {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { storeId: 'store-unverified', verified: false };
+        },
+      };
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { items: [] };
+      },
+    };
+  };
+
+  const { listIntegrationProducts } = await importIntegrationModule();
+  const result = await listIntegrationProducts({ storeId: 'store-unverified' });
+
+  assert.deepEqual(calledPaths, ['/stores/store-unverified']);
+  assert.equal(result.items.length, 0);
   assert.equal(result.hasMore, false);
 });
