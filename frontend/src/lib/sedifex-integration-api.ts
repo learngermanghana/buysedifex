@@ -25,6 +25,13 @@ type IntegrationProductsPayload = {
   hasMore?: boolean;
 };
 
+type IntegrationStorePayload = IntegrationStoreRecord & {
+  store?: IntegrationStoreRecord | null;
+  data?: IntegrationStoreRecord | null;
+  profile?: IntegrationStoreRecord | null;
+  item?: IntegrationStoreRecord | null;
+};
+
 type IntegrationProductRecord = Partial<SedifexProduct> & {
   id?: string;
   storeId?: string;
@@ -39,6 +46,7 @@ type IntegrationProductRecord = Partial<SedifexProduct> & {
   imageUrls?: string[];
   price?: number;
   stockCount?: number | null;
+  sourceProductId?: string;
 };
 
 type IntegrationStoreRecord = {
@@ -195,6 +203,81 @@ const normalizeProducts = (products: IntegrationProductRecord[]): SedifexProduct
   products
     .map(normalizeProduct)
     .filter((product): product is SedifexProduct => Boolean(product));
+
+const normalizeCollectionPayload = (
+  payload: unknown,
+  forcedItemType: 'product' | 'service',
+): IntegrationProductRecord[] => {
+  if (Array.isArray(payload)) {
+    return payload.map((item) => ({ ...(item as IntegrationProductRecord), itemType: forcedItemType }));
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return [];
+  }
+
+  const source = payload as IntegrationProductsPayload & {
+    data?: IntegrationProductRecord[];
+    list?: IntegrationProductRecord[];
+  };
+
+  const items =
+    source.publicProducts ??
+    source.publicServices ??
+    source.items ??
+    source.products ??
+    source.data ??
+    source.list;
+
+  if (Array.isArray(items)) {
+    return items.map((item) => ({ ...item, itemType: forcedItemType }));
+  }
+
+  const maybeSingle = payload as IntegrationProductRecord;
+  const singleId = cleanString(maybeSingle.id) ?? cleanString(maybeSingle.sourceProductId as string | undefined);
+  const singleName = cleanString(maybeSingle.productName) ?? cleanString(maybeSingle.name);
+  const singleStoreId = cleanString(maybeSingle.storeId);
+
+  if (singleId && singleName && singleStoreId) {
+    return [{ ...maybeSingle, itemType: forcedItemType }];
+  }
+
+  return [];
+};
+
+const extractStoreRecord = (payload: IntegrationStorePayload | null): IntegrationStoreRecord | null => {
+  if (!payload) return null;
+  if (payload.storeId || payload.id) return payload;
+  return payload.store ?? payload.data ?? payload.profile ?? payload.item ?? null;
+};
+
+const listVerifiedStoreCatalogItems = async (storeId: string): Promise<IntegrationProductsPayload> => {
+  const encodedStoreId = encodeURIComponent(storeId);
+  const storePayload = await integrationPublicFetch<IntegrationStorePayload>(`/stores/${encodedStoreId}`).catch(() => null);
+  const storeRecord = extractStoreRecord(storePayload);
+  const safeStore = toSafeStoreRecord(storeRecord);
+
+  if (!safeStore || safeStore.verified !== true) {
+    return {
+      storeId,
+      publicProducts: [],
+      publicServices: [],
+      hasMore: false,
+    };
+  }
+
+  const [productsResponse, servicesResponse] = await Promise.all([
+    integrationPublicFetch<unknown>(`/publicProducts/${encodedStoreId}`).catch(() => null),
+    integrationPublicFetch<unknown>(`/publicServices/${encodedStoreId}`).catch(() => null),
+  ]);
+
+  return {
+    storeId,
+    publicProducts: normalizeCollectionPayload(productsResponse, 'product'),
+    publicServices: normalizeCollectionPayload(servicesResponse, 'service'),
+    hasMore: false,
+  };
+};
 
 const toSafeStoreRecord = (
   store: IntegrationStoreRecord | IntegrationPromoRecord | null | undefined,
@@ -504,6 +587,10 @@ const fetchCatalogProducts = async (query?: {
 
   if (apiKey) {
     return integrationFetch<IntegrationProductsPayload>('/v1IntegrationProducts', query);
+  }
+
+  if (query?.storeId) {
+    return listVerifiedStoreCatalogItems(query.storeId);
   }
 
   const catalogQuery = {
