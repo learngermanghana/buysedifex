@@ -153,13 +153,6 @@ const isValidHttpUrl = (input?: string): input is string => {
   }
 };
 
-const normalizeImageCandidate = (value: string): string =>
-  value
-    .trim()
-    .replace(/^['"]+|['"]+$/g, '')
-    .replace(/\\u002F/gi, '/')
-    .replace(/\\\//g, '/');
-
 const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
   const fields = doc.fields ?? {};
   const imageUrls = Array.from(
