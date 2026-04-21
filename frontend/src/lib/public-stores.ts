@@ -167,16 +167,8 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
       ...readStringArray(fields, 'imageUrls'),
       ...readStringArray(fields, 'imageUrl'),
       ...readStringArray(fields, 'image'),
-      ...readStringArray(fields, 'serviceImageUrls'),
-      ...readStringArray(fields, 'serviceImageUrl'),
-      ...readStringArray(fields, 'serviceImage'),
-      ...readStringArray(fields, 'images'),
-      ...readStringArray(fields, 'thumbnailUrl'),
-      ...readStringArray(fields, 'photoUrl'),
     ]),
-  )
-    .map((value) => normalizeImageCandidate(value))
-    .filter(isValidHttpUrl);
+  ).filter(isValidHttpUrl);
 
   return {
     id: readString(fields, ['productId']) ?? doc.name?.split('/').at(-1) ?? '',
@@ -426,12 +418,6 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
         { fieldPath: 'imageUrls' },
         { fieldPath: 'imageUrl' },
         { fieldPath: 'image' },
-        { fieldPath: 'serviceImageUrls' },
-        { fieldPath: 'serviceImageUrl' },
-        { fieldPath: 'serviceImage' },
-        { fieldPath: 'images' },
-        { fieldPath: 'thumbnailUrl' },
-        { fieldPath: 'photoUrl' },
         { fieldPath: 'price' },
         { fieldPath: 'currency' },
         { fieldPath: 'storeName' },
@@ -653,12 +639,6 @@ export const getProductsByCategory = async (
         { fieldPath: 'imageUrls' },
         { fieldPath: 'imageUrl' },
         { fieldPath: 'image' },
-        { fieldPath: 'serviceImageUrls' },
-        { fieldPath: 'serviceImageUrl' },
-        { fieldPath: 'serviceImage' },
-        { fieldPath: 'images' },
-        { fieldPath: 'thumbnailUrl' },
-        { fieldPath: 'photoUrl' },
         { fieldPath: 'price' },
         { fieldPath: 'currency' },
         { fieldPath: 'storeName' },

@@ -136,16 +136,8 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
       ...readStringArray(fields, 'imageUrls'),
       ...readStringArray(fields, 'imageUrl'),
       ...readStringArray(fields, 'image'),
-      ...readStringArray(fields, 'serviceImageUrls'),
-      ...readStringArray(fields, 'serviceImageUrl'),
-      ...readStringArray(fields, 'serviceImage'),
-      ...readStringArray(fields, 'images'),
-      ...readStringArray(fields, 'thumbnailUrl'),
-      ...readStringArray(fields, 'photoUrl'),
     ]),
-  )
-    .map((value) => normalizeImageCandidate(value))
-    .filter(isValidImageUrl);
+  ).filter(isValidImageUrl);
 
   return {
     id: doc.name.split('/').at(-1) ?? '',
@@ -192,12 +184,6 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     'imageUrls',
     'imageUrl',
     'image',
-    'serviceImageUrls',
-    'serviceImageUrl',
-    'serviceImage',
-    'images',
-    'thumbnailUrl',
-    'photoUrl',
     'imageAlt',
     'price',
     'amount',

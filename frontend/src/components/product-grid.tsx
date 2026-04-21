@@ -147,25 +147,12 @@ const getDisplayImages = (item: PublicProduct): string[] => {
     }
   };
 
-  const readStringOrArray = (value: string[] | string | undefined): string[] => {
-    if (Array.isArray(value)) return value;
-    if (typeof value === 'string') return [value];
-    return [];
-  };
-
-  const imageList = [
-    ...readStringOrArray(item.imageUrls),
-    ...readStringOrArray(item.serviceImageUrls),
-    ...readStringOrArray(item.images),
-  ];
-  const fallbackImages = [
-    item.imageUrl,
-    item.image,
-    item.serviceImageUrl,
-    item.serviceImage,
-    item.thumbnailUrl,
-    item.photoUrl,
-  ]
+  const imageList = Array.isArray(item.imageUrls)
+    ? item.imageUrls
+    : typeof item.imageUrls === 'string'
+      ? [item.imageUrls]
+      : [];
+  const fallbackImages = [item.imageUrl, item.image]
     .filter((value): value is string => typeof value === 'string')
     .map((value) => value.trim())
     .filter(Boolean);
