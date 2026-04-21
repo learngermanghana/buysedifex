@@ -31,7 +31,7 @@ type PublicProduct = {
   description?: string;
   categoryKey?: string;
   category?: string;
-  imageUrls?: string[];
+  imageUrls?: string[] | string;
   imageUrl?: string;
   image?: string;
   imageAlt?: string;
@@ -134,7 +134,11 @@ const getDisplayImages = (item: PublicProduct): string[] => {
     }
   };
 
-  const imageList = Array.isArray(item.imageUrls) ? item.imageUrls : [];
+  const imageList = Array.isArray(item.imageUrls)
+    ? item.imageUrls
+    : typeof item.imageUrls === 'string'
+      ? [item.imageUrls]
+      : [];
   const fallbackImages = [item.imageUrl, item.image]
     .filter((value): value is string => typeof value === 'string')
     .map((value) => value.trim())
@@ -750,6 +754,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                       src={getDisplayImages(item)[0] ?? 'https://placehold.co/640x640'}
                       alt={item.imageAlt?.trim() || getProductName(item) || 'Product image'}
                       loading="lazy"
+                      unoptimized
                       width={360}
                       height={360}
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
