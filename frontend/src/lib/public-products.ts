@@ -74,7 +74,18 @@ const readStringArray = (fields: Record<string, FirestoreValue>, key: string): s
 
   if ('stringValue' in value) {
     const normalized = value.stringValue.trim();
-    return normalized ? [normalized] : [];
+    if (!normalized) return [];
+    if (normalized.startsWith('[') && normalized.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(normalized);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim()).filter(Boolean);
+        }
+      } catch {
+        return [normalized];
+      }
+    }
+    return [normalized];
   }
 
   if (!('arrayValue' in value) || !Array.isArray(value.arrayValue.values)) {
@@ -103,13 +114,22 @@ const readBoolean = (fields: Record<string, FirestoreValue>, keys: string[]): bo
 };
 
 const isValidImageUrl = (value: string): boolean => {
+  const normalizedValue = value.trim().toLowerCase().startsWith('gs://')
+    ? value.trim().replace(/^gs:\/\//i, 'https://storage.googleapis.com/')
+    : value;
+
   try {
-    const parsed = new URL(value);
+    const parsed = new URL(normalizedValue);
     return parsed.protocol === 'http:' || parsed.protocol === 'https:';
   } catch {
     return false;
   }
 };
+
+const normalizeImageUrl = (value: string): string =>
+  value.trim().toLowerCase().startsWith('gs://')
+    ? value.trim().replace(/^gs:\/\//i, 'https://storage.googleapis.com/')
+    : value.trim();
 
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? process.env.FIREBASE_PROJECT_ID;
 const normalizeRouteId = (value: string): string => {
@@ -129,8 +149,13 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
       ...readStringArray(fields, 'imageUrls'),
       ...readStringArray(fields, 'imageUrl'),
       ...readStringArray(fields, 'image'),
+      ...readStringArray(fields, 'serviceImageUrls'),
+      ...readStringArray(fields, 'serviceImageUrl'),
+      ...readStringArray(fields, 'serviceImage'),
     ]),
-  ).filter(isValidImageUrl);
+  )
+    .map(normalizeImageUrl)
+    .filter(isValidImageUrl);
 
   return {
     id: doc.name.split('/').at(-1) ?? '',
@@ -177,6 +202,9 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     'imageUrls',
     'imageUrl',
     'image',
+    'serviceImageUrls',
+    'serviceImageUrl',
+    'serviceImage',
     'imageAlt',
     'price',
     'amount',

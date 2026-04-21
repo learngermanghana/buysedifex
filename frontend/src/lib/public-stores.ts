@@ -114,7 +114,18 @@ const readStringArray = (fields: Record<string, FirestoreValue>, key: string): s
 
   if ('stringValue' in value) {
     const normalized = value.stringValue.trim();
-    return normalized ? [normalized] : [];
+    if (!normalized) return [];
+    if (normalized.startsWith('[') && normalized.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(normalized);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim()).filter(Boolean);
+        }
+      } catch {
+        return [normalized];
+      }
+    }
+    return [normalized];
   }
 
   if (!('arrayValue' in value) || !Array.isArray(value.arrayValue.values)) {
@@ -144,14 +155,22 @@ const readBoolean = (fields: Record<string, FirestoreValue>, keys: string[]): bo
 
 const isValidHttpUrl = (input?: string): input is string => {
   if (!input) return false;
+  const normalizedInput = input.trim().toLowerCase().startsWith('gs://')
+    ? input.trim().replace(/^gs:\/\//i, 'https://storage.googleapis.com/')
+    : input;
 
   try {
-    const parsed = new URL(input);
+    const parsed = new URL(normalizedInput);
     return parsed.protocol === 'http:' || parsed.protocol === 'https:';
   } catch {
     return false;
   }
 };
+
+const normalizeImageUrl = (value: string): string =>
+  value.trim().toLowerCase().startsWith('gs://')
+    ? value.trim().replace(/^gs:\/\//i, 'https://storage.googleapis.com/')
+    : value.trim();
 
 const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
   const fields = doc.fields ?? {};
@@ -160,8 +179,13 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
       ...readStringArray(fields, 'imageUrls'),
       ...readStringArray(fields, 'imageUrl'),
       ...readStringArray(fields, 'image'),
+      ...readStringArray(fields, 'serviceImageUrls'),
+      ...readStringArray(fields, 'serviceImageUrl'),
+      ...readStringArray(fields, 'serviceImage'),
     ]),
-  ).filter(isValidHttpUrl);
+  )
+    .map(normalizeImageUrl)
+    .filter(isValidHttpUrl);
 
   return {
     id: readString(fields, ['productId']) ?? doc.name?.split('/').at(-1) ?? '',
