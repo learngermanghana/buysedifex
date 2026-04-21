@@ -67,7 +67,17 @@ const readNumber = (fields: Record<string, FirestoreValue>, keys: string[]): num
 
 const readStringArray = (fields: Record<string, FirestoreValue>, key: string): string[] => {
   const value = fields[key];
-  if (!value || !('arrayValue' in value) || !Array.isArray(value.arrayValue.values)) {
+
+  if (!value) {
+    return [];
+  }
+
+  if ('stringValue' in value) {
+    const normalized = value.stringValue.trim();
+    return normalized ? [normalized] : [];
+  }
+
+  if (!('arrayValue' in value) || !Array.isArray(value.arrayValue.values)) {
     return [];
   }
 
@@ -101,6 +111,13 @@ const isValidImageUrl = (value: string): boolean => {
   }
 };
 
+const normalizeImageCandidate = (value: string): string =>
+  value
+    .trim()
+    .replace(/^['"]+|['"]+$/g, '')
+    .replace(/\\u002F/gi, '/')
+    .replace(/\\\//g, '/');
+
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? process.env.FIREBASE_PROJECT_ID;
 const normalizeRouteId = (value: string): string => {
   try {
@@ -114,7 +131,21 @@ const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? process.env.F
 
 const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
   const fields = doc.fields ?? {};
-  const imageUrls = readStringArray(fields, 'imageUrls').filter(isValidImageUrl);
+  const imageUrls = Array.from(
+    new Set([
+      ...readStringArray(fields, 'imageUrls'),
+      ...readStringArray(fields, 'imageUrl'),
+      ...readStringArray(fields, 'image'),
+      ...readStringArray(fields, 'serviceImageUrls'),
+      ...readStringArray(fields, 'serviceImageUrl'),
+      ...readStringArray(fields, 'serviceImage'),
+      ...readStringArray(fields, 'images'),
+      ...readStringArray(fields, 'thumbnailUrl'),
+      ...readStringArray(fields, 'photoUrl'),
+    ]),
+  )
+    .map((value) => normalizeImageCandidate(value))
+    .filter(isValidImageUrl);
 
   return {
     id: doc.name.split('/').at(-1) ?? '',
@@ -159,6 +190,14 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     'description',
     'details',
     'imageUrls',
+    'imageUrl',
+    'image',
+    'serviceImageUrls',
+    'serviceImageUrl',
+    'serviceImage',
+    'images',
+    'thumbnailUrl',
+    'photoUrl',
     'imageAlt',
     'price',
     'amount',

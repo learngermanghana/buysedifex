@@ -107,7 +107,17 @@ const readNumber = (fields: Record<string, FirestoreValue>, keys: string[]): num
 
 const readStringArray = (fields: Record<string, FirestoreValue>, key: string): string[] => {
   const value = fields[key];
-  if (!value || !('arrayValue' in value) || !Array.isArray(value.arrayValue.values)) {
+
+  if (!value) {
+    return [];
+  }
+
+  if ('stringValue' in value) {
+    const normalized = value.stringValue.trim();
+    return normalized ? [normalized] : [];
+  }
+
+  if (!('arrayValue' in value) || !Array.isArray(value.arrayValue.values)) {
     return [];
   }
 
@@ -143,9 +153,30 @@ const isValidHttpUrl = (input?: string): input is string => {
   }
 };
 
+const normalizeImageCandidate = (value: string): string =>
+  value
+    .trim()
+    .replace(/^['"]+|['"]+$/g, '')
+    .replace(/\\u002F/gi, '/')
+    .replace(/\\\//g, '/');
+
 const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
   const fields = doc.fields ?? {};
-  const imageUrls = readStringArray(fields, 'imageUrls').filter(isValidHttpUrl);
+  const imageUrls = Array.from(
+    new Set([
+      ...readStringArray(fields, 'imageUrls'),
+      ...readStringArray(fields, 'imageUrl'),
+      ...readStringArray(fields, 'image'),
+      ...readStringArray(fields, 'serviceImageUrls'),
+      ...readStringArray(fields, 'serviceImageUrl'),
+      ...readStringArray(fields, 'serviceImage'),
+      ...readStringArray(fields, 'images'),
+      ...readStringArray(fields, 'thumbnailUrl'),
+      ...readStringArray(fields, 'photoUrl'),
+    ]),
+  )
+    .map((value) => normalizeImageCandidate(value))
+    .filter(isValidHttpUrl);
 
   return {
     id: readString(fields, ['productId']) ?? doc.name?.split('/').at(-1) ?? '',
@@ -393,6 +424,14 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
         { fieldPath: 'name' },
         { fieldPath: 'description' },
         { fieldPath: 'imageUrls' },
+        { fieldPath: 'imageUrl' },
+        { fieldPath: 'image' },
+        { fieldPath: 'serviceImageUrls' },
+        { fieldPath: 'serviceImageUrl' },
+        { fieldPath: 'serviceImage' },
+        { fieldPath: 'images' },
+        { fieldPath: 'thumbnailUrl' },
+        { fieldPath: 'photoUrl' },
         { fieldPath: 'price' },
         { fieldPath: 'currency' },
         { fieldPath: 'storeName' },
@@ -612,6 +651,14 @@ export const getProductsByCategory = async (
         { fieldPath: 'name' },
         { fieldPath: 'description' },
         { fieldPath: 'imageUrls' },
+        { fieldPath: 'imageUrl' },
+        { fieldPath: 'image' },
+        { fieldPath: 'serviceImageUrls' },
+        { fieldPath: 'serviceImageUrl' },
+        { fieldPath: 'serviceImage' },
+        { fieldPath: 'images' },
+        { fieldPath: 'thumbnailUrl' },
+        { fieldPath: 'photoUrl' },
         { fieldPath: 'price' },
         { fieldPath: 'currency' },
         { fieldPath: 'storeName' },

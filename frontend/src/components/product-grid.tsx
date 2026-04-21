@@ -31,9 +31,15 @@ type PublicProduct = {
   description?: string;
   categoryKey?: string;
   category?: string;
-  imageUrls?: string[];
+  imageUrls?: string[] | string;
   imageUrl?: string;
   image?: string;
+  serviceImageUrl?: string;
+  serviceImage?: string;
+  serviceImageUrls?: string[] | string;
+  thumbnailUrl?: string;
+  photoUrl?: string;
+  images?: string[] | string;
   imageAlt?: string;
   price?: number;
   currency?: string;
@@ -122,8 +128,15 @@ const asTruthyBoolean = (value: unknown): boolean => {
 };
 
 const getDisplayImages = (item: PublicProduct): string[] => {
+  const normalizeImageCandidate = (value: string): string =>
+    value
+      .trim()
+      .replace(/^['"]+|['"]+$/g, '')
+      .replace(/\\u002F/gi, '/')
+      .replace(/\\\//g, '/');
+
   const isDisplayableImageUrl = (value: string) => {
-    const candidate = value.trim();
+    const candidate = normalizeImageCandidate(value);
     if (!candidate) return false;
 
     try {
@@ -134,14 +147,31 @@ const getDisplayImages = (item: PublicProduct): string[] => {
     }
   };
 
-  const imageList = Array.isArray(item.imageUrls) ? item.imageUrls : [];
-  const fallbackImages = [item.imageUrl, item.image]
+  const readStringOrArray = (value: string[] | string | undefined): string[] => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') return [value];
+    return [];
+  };
+
+  const imageList = [
+    ...readStringOrArray(item.imageUrls),
+    ...readStringOrArray(item.serviceImageUrls),
+    ...readStringOrArray(item.images),
+  ];
+  const fallbackImages = [
+    item.imageUrl,
+    item.image,
+    item.serviceImageUrl,
+    item.serviceImage,
+    item.thumbnailUrl,
+    item.photoUrl,
+  ]
     .filter((value): value is string => typeof value === 'string')
     .map((value) => value.trim())
     .filter(Boolean);
 
   const merged = [...imageList, ...fallbackImages]
-    .map((value) => value.trim())
+    .map((value) => normalizeImageCandidate(value))
     .filter((value) => isDisplayableImageUrl(value));
   return Array.from(new Set(merged));
 };
@@ -254,12 +284,6 @@ const mixProductsByCategoryThenStore = (items: PublicProduct[]) => {
   return mixedByCategory;
 };
 
-const selectStoreBalancedProducts = (items: PublicProduct[], count: number) => {
-  if (items.length <= count) return items;
-  const randomized = shuffleProducts(items);
-  return mixProductsAcrossStores(randomized).slice(0, count);
-};
-
 const getPublishedAtSeconds = (item: PublicProduct) => {
   const seconds = item.publishedAt?.seconds;
   return typeof seconds === 'number' ? seconds : 0;
@@ -356,7 +380,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     const text = searchText.trim().toLowerCase();
     const normalizedProducts = normalizeStoreNamesByStoreId(products);
     const matchingProducts = normalizedProducts.filter((product) => {
-      if (!isVerifiedStore(product.verified)) return false;
       const typeMatches = matchesItemTypeFilter(product.itemType, itemTypeFilter);
       if (!typeMatches) return false;
       const cityMatches = selectedCity === 'all' || getStoreCity(product).toLowerCase() === selectedCity.toLowerCase();
@@ -455,7 +478,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                   matchesItemTypeFilter(item.itemType, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
               );
 
-            const batchItems = (await hydrateVerifiedFromStores(batchItemsRaw)).filter((item) => isVerifiedStore(item.verified));
+            const batchItems = await hydrateVerifiedFromStores(batchItemsRaw);
 
             collectedItems.push(...batchItems);
             latestSnapshotDoc = scanSnapshot.docs.at(-1) ?? latestSnapshotDoc;
@@ -511,9 +534,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                 continue;
               }
 
-              const fallbackBatch = (await hydrateVerifiedFromStores(fallbackBatchRaw)).filter((item) =>
-                isVerifiedStore(item.verified),
-              );
+              const fallbackBatch = await hydrateVerifiedFromStores(fallbackBatchRaw);
               fallbackBatch.forEach((item) => {
                 if (!seenIds.has(item.id)) {
                   seenIds.add(item.id);
@@ -528,7 +549,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
           }
 
           snapshot = {
-            docs: selectStoreBalancedProducts(collectedItems, PAGE_SIZE).map((item) => ({
+            docs: collectedItems.slice(0, PAGE_SIZE).map((item) => ({
               id: item.id,
               data: () => item,
             })),
@@ -619,7 +640,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             (item) => matchesItemTypeFilter(item.itemType, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
           );
 
-        const batchItems = (await hydrateVerifiedFromStores(batchItemsRaw)).filter((item) => isVerifiedStore(item.verified));
+        const batchItems = await hydrateVerifiedFromStores(batchItemsRaw);
 
         allItems.push(...batchItems);
 
@@ -750,6 +771,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                       src={getDisplayImages(item)[0] ?? 'https://placehold.co/640x640'}
                       alt={item.imageAlt?.trim() || getProductName(item) || 'Product image'}
                       loading="lazy"
+                      unoptimized
                       width={360}
                       height={360}
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
