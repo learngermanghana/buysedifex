@@ -215,19 +215,6 @@ const bucketProductsByStore = (items: PublicProduct[]) => {
   return buckets;
 };
 
-const shuffleProducts = (items: PublicProduct[]) => {
-  const shuffled = [...items];
-
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    const hold = shuffled[index];
-    shuffled[index] = shuffled[swapIndex];
-    shuffled[swapIndex] = hold;
-  }
-
-  return shuffled;
-};
-
 const mixProductsAcrossStores = (items: PublicProduct[]) => {
   const buckets = bucketProductsByStore(items);
   const mixed: PublicProduct[] = [];
@@ -269,12 +256,6 @@ const mixProductsByCategoryThenStore = (items: PublicProduct[]) => {
   }
 
   return mixedByCategory;
-};
-
-const selectStoreBalancedProducts = (items: PublicProduct[], count: number) => {
-  if (items.length <= count) return items;
-  const randomized = shuffleProducts(items);
-  return mixProductsAcrossStores(randomized).slice(0, count);
 };
 
 const getPublishedAtSeconds = (item: PublicProduct) => {
@@ -545,7 +526,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
           }
 
           snapshot = {
-            docs: selectStoreBalancedProducts(collectedItems, PAGE_SIZE).map((item) => ({
+            docs: collectedItems.slice(0, PAGE_SIZE).map((item) => ({
               id: item.id,
               data: () => item,
             })),
