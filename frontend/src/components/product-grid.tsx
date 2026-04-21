@@ -128,8 +128,40 @@ const asTruthyBoolean = (value: unknown): boolean => {
 };
 
 const getDisplayImages = (item: PublicProduct): string[] => {
+  const decodeImageValues = (value: unknown): string[] => {
+    if (typeof value !== 'string') return [];
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim());
+        }
+      } catch {
+        return [trimmed];
+      }
+    }
+
+    return [trimmed];
+  };
+
+  const normalizeStorageUrl = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed.toLowerCase().startsWith('gs://')) return trimmed;
+
+    const withoutPrefix = trimmed.slice(5);
+    const slashIndex = withoutPrefix.indexOf('/');
+    if (slashIndex === -1) return '';
+    const bucket = withoutPrefix.slice(0, slashIndex);
+    const objectPath = withoutPrefix.slice(slashIndex + 1);
+    if (!bucket || !objectPath) return '';
+    return `https://storage.googleapis.com/${bucket}/${objectPath}`;
+  };
+
   const normalizeImageCandidate = (value: string): string =>
-    value
+    normalizeStorageUrl(value)
       .trim()
       .replace(/^['"]+|['"]+$/g, '')
       .replace(/\\u002F/gi, '/')
@@ -147,7 +179,7 @@ const getDisplayImages = (item: PublicProduct): string[] => {
     }
   };
 
-  const imageList = Array.isArray(item.imageUrls)
+  const imageListRaw = Array.isArray(item.imageUrls)
     ? item.imageUrls
     : typeof item.imageUrls === 'string'
       ? [item.imageUrls]
