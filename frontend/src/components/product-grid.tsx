@@ -184,6 +184,7 @@ const getDisplayImages = (item: PublicProduct): string[] => {
     : typeof item.imageUrls === 'string'
       ? [item.imageUrls]
       : [];
+  const imageList = imageListRaw.flatMap((value) => decodeImageValues(value));
   const serviceImageList = Array.isArray(item.serviceImageUrls)
     ? item.serviceImageUrls
     : typeof item.serviceImageUrls === 'string'
