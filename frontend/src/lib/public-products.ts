@@ -129,6 +129,9 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
       ...readStringArray(fields, 'imageUrls'),
       ...readStringArray(fields, 'imageUrl'),
       ...readStringArray(fields, 'image'),
+      ...readStringArray(fields, 'serviceImageUrls'),
+      ...readStringArray(fields, 'serviceImageUrl'),
+      ...readStringArray(fields, 'serviceImage'),
     ]),
   ).filter(isValidImageUrl);
 
@@ -177,6 +180,9 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     'imageUrls',
     'imageUrl',
     'image',
+    'serviceImageUrls',
+    'serviceImageUrl',
+    'serviceImage',
     'imageAlt',
     'price',
     'amount',

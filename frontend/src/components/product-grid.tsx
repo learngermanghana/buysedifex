@@ -152,12 +152,17 @@ const getDisplayImages = (item: PublicProduct): string[] => {
     : typeof item.imageUrls === 'string'
       ? [item.imageUrls]
       : [];
-  const fallbackImages = [item.imageUrl, item.image]
+  const serviceImageList = Array.isArray(item.serviceImageUrls)
+    ? item.serviceImageUrls
+    : typeof item.serviceImageUrls === 'string'
+      ? [item.serviceImageUrls]
+      : [];
+  const fallbackImages = [item.imageUrl, item.image, item.serviceImageUrl, item.serviceImage]
     .filter((value): value is string => typeof value === 'string')
     .map((value) => value.trim())
     .filter(Boolean);
 
-  const merged = [...imageList, ...fallbackImages]
+  const merged = [...imageList, ...serviceImageList, ...fallbackImages]
     .map((value) => normalizeImageCandidate(value))
     .filter((value) => isDisplayableImageUrl(value));
   return Array.from(new Set(merged));

@@ -160,6 +160,9 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
       ...readStringArray(fields, 'imageUrls'),
       ...readStringArray(fields, 'imageUrl'),
       ...readStringArray(fields, 'image'),
+      ...readStringArray(fields, 'serviceImageUrls'),
+      ...readStringArray(fields, 'serviceImageUrl'),
+      ...readStringArray(fields, 'serviceImage'),
     ]),
   ).filter(isValidHttpUrl);
 
