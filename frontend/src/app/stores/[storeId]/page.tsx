@@ -204,44 +204,48 @@ export default async function StorePage({ params }: StorePageProps) {
         </section>
       ) : null}
 
-      {productListings.length > 0 ? (
-        <section className="storeInfoCard" aria-label="Store products">
-          <h2>Products from {profile.storeName}</h2>
+      {productListings.length > 0 || serviceListings.length > 0 ? (
+        <section className="storeInfoCard" aria-label="Store products and services">
+          <h2>Products &amp; Services from {profile.storeName}</h2>
           <p>🚚 Delivery: Discuss with seller · 💳 Payment methods: MoMo, cash, and seller-approved options.</p>
-          <ul>
-            {productListings.map((product) => (
-              <li key={product.id}>
-                <Link href={getProductHref(product.id, product.productName)}>{product.productName}</Link>
-                {product.categoryKey ? (
-                  <>
-                    {' '}
-                    in{' '}
-                    <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
-                  </>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
 
-      {serviceListings.length > 0 ? (
-        <section className="storeInfoCard" aria-label="Store services">
-          <h2>Services from {profile.storeName}</h2>
-          <ul>
-            {serviceListings.map((service) => (
-              <li key={service.id}>
-                <Link href={getProductHref(service.id, service.productName)}>{service.productName}</Link>
-                {service.categoryKey ? (
-                  <>
-                    {' '}
-                    in{' '}
-                    <Link href={`/category/${encodeURIComponent(service.categoryKey)}`}>{service.categoryKey}</Link>
-                  </>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <h3>Products ({productListings.length})</h3>
+          {productListings.length > 0 ? (
+            <ul>
+              {productListings.map((product) => (
+                <li key={product.id}>
+                  <Link href={getProductHref(product.id, product.productName)}>{product.productName}</Link>
+                  {product.categoryKey ? (
+                    <>
+                      {' '}
+                      in <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
+                    </>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No products listed yet.</p>
+          )}
+
+          <h3>Services ({serviceListings.length})</h3>
+          {serviceListings.length > 0 ? (
+            <ul>
+              {serviceListings.map((service) => (
+                <li key={service.id}>
+                  <Link href={getProductHref(service.id, service.productName)}>{service.productName}</Link>
+                  {service.categoryKey ? (
+                    <>
+                      {' '}
+                      in <Link href={`/category/${encodeURIComponent(service.categoryKey)}`}>{service.categoryKey}</Link>
+                    </>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No services listed yet.</p>
+          )}
         </section>
       ) : null}
     </main>
