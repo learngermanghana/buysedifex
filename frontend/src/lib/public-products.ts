@@ -67,7 +67,17 @@ const readNumber = (fields: Record<string, FirestoreValue>, keys: string[]): num
 
 const readStringArray = (fields: Record<string, FirestoreValue>, key: string): string[] => {
   const value = fields[key];
-  if (!value || !('arrayValue' in value) || !Array.isArray(value.arrayValue.values)) {
+
+  if (!value) {
+    return [];
+  }
+
+  if ('stringValue' in value) {
+    const normalized = value.stringValue.trim();
+    return normalized ? [normalized] : [];
+  }
+
+  if (!('arrayValue' in value) || !Array.isArray(value.arrayValue.values)) {
     return [];
   }
 
@@ -114,7 +124,13 @@ const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? process.env.F
 
 const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
   const fields = doc.fields ?? {};
-  const imageUrls = readStringArray(fields, 'imageUrls').filter(isValidImageUrl);
+  const imageUrls = Array.from(
+    new Set([
+      ...readStringArray(fields, 'imageUrls'),
+      ...readStringArray(fields, 'imageUrl'),
+      ...readStringArray(fields, 'image'),
+    ]),
+  ).filter(isValidImageUrl);
 
   return {
     id: doc.name.split('/').at(-1) ?? '',
@@ -159,6 +175,8 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     'description',
     'details',
     'imageUrls',
+    'imageUrl',
+    'image',
     'imageAlt',
     'price',
     'amount',
