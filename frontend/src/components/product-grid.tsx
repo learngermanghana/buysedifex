@@ -184,16 +184,15 @@ const getDisplayImages = (item: PublicProduct): string[] => {
     : typeof item.imageUrls === 'string'
       ? [item.imageUrls]
       : [];
-  const serviceImageListRaw = Array.isArray(item.serviceImageUrls)
+  const serviceImageList = Array.isArray(item.serviceImageUrls)
     ? item.serviceImageUrls
     : typeof item.serviceImageUrls === 'string'
       ? [item.serviceImageUrls]
       : [];
-  const fallbackImagesRaw = [item.imageUrl, item.image, item.serviceImageUrl, item.serviceImage];
-
-  const imageList = imageListRaw.flatMap(decodeImageValues);
-  const serviceImageList = serviceImageListRaw.flatMap(decodeImageValues);
-  const fallbackImages = fallbackImagesRaw.flatMap(decodeImageValues);
+  const fallbackImages = [item.imageUrl, item.image, item.serviceImageUrl, item.serviceImage]
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.trim())
+    .filter(Boolean);
 
   const merged = [...imageList, ...serviceImageList, ...fallbackImages]
     .map((value) => normalizeImageCandidate(value))
