@@ -169,6 +169,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
                 src={imageUrl}
                 alt={product.imageAlt?.trim() || `${product.productName} at ${resolvedStoreName}`}
                 loading="lazy"
+                unoptimized
                 className="productDetailImage"
                 width={480}
                 height={480}
