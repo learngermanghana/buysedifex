@@ -111,6 +111,13 @@ const isValidImageUrl = (value: string): boolean => {
   }
 };
 
+const normalizeImageCandidate = (value: string): string =>
+  value
+    .trim()
+    .replace(/^['"]+|['"]+$/g, '')
+    .replace(/\\u002F/gi, '/')
+    .replace(/\\\//g, '/');
+
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? process.env.FIREBASE_PROJECT_ID;
 const normalizeRouteId = (value: string): string => {
   try {

@@ -34,6 +34,12 @@ type PublicProduct = {
   imageUrls?: string[] | string;
   imageUrl?: string;
   image?: string;
+  serviceImageUrl?: string;
+  serviceImage?: string;
+  serviceImageUrls?: string[] | string;
+  thumbnailUrl?: string;
+  photoUrl?: string;
+  images?: string[] | string;
   imageAlt?: string;
   price?: number;
   currency?: string;
@@ -122,8 +128,15 @@ const asTruthyBoolean = (value: unknown): boolean => {
 };
 
 const getDisplayImages = (item: PublicProduct): string[] => {
+  const normalizeImageCandidate = (value: string): string =>
+    value
+      .trim()
+      .replace(/^['"]+|['"]+$/g, '')
+      .replace(/\\u002F/gi, '/')
+      .replace(/\\\//g, '/');
+
   const isDisplayableImageUrl = (value: string) => {
-    const candidate = value.trim();
+    const candidate = normalizeImageCandidate(value);
     if (!candidate) return false;
 
     try {
@@ -145,7 +158,7 @@ const getDisplayImages = (item: PublicProduct): string[] => {
     .filter(Boolean);
 
   const merged = [...imageList, ...fallbackImages]
-    .map((value) => value.trim())
+    .map((value) => normalizeImageCandidate(value))
     .filter((value) => isDisplayableImageUrl(value));
   return Array.from(new Set(merged));
 };
