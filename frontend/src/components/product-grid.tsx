@@ -185,12 +185,28 @@ const getDisplayImages = (item: PublicProduct): string[] => {
       ? [item.imageUrls]
       : [];
   const imageList = imageListRaw.flatMap((value) => decodeImageValues(value));
-  const serviceImageList = Array.isArray(item.serviceImageUrls)
+  const serviceImageListRaw = Array.isArray(item.serviceImageUrls)
     ? item.serviceImageUrls
     : typeof item.serviceImageUrls === 'string'
       ? [item.serviceImageUrls]
       : [];
-  const fallbackImages = [item.imageUrl, item.image, item.serviceImageUrl, item.serviceImage]
+  const serviceImageList = serviceImageListRaw.flatMap((value) => decodeImageValues(value));
+  const genericImageListRaw = Array.isArray(item.images)
+    ? item.images
+    : typeof item.images === 'string'
+      ? [item.images]
+      : [];
+  const genericImageList = genericImageListRaw.flatMap((value) => decodeImageValues(value));
+
+  const fallbackImages = [
+    item.imageUrl,
+    item.image,
+    item.serviceImageUrl,
+    item.serviceImage,
+    item.thumbnailUrl,
+    item.photoUrl,
+    ...genericImageList,
+  ]
     .filter((value): value is string => typeof value === 'string')
     .map((value) => value.trim())
     .filter(Boolean);
