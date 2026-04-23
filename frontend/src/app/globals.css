@@ -812,6 +812,12 @@ select:focus {
   padding: 0.65rem;
 }
 
+.checkoutHint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
 .quickSections {
   display: flex;
   flex-wrap: wrap;

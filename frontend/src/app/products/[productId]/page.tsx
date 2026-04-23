@@ -243,7 +243,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         </div>
       </section>
       <aside className="stickyProductActions">
-        <WhatsAppChatButton phone={whatsappPhone} message={whatsappMessage} label="Chat now on WhatsApp" />
+        <WhatsAppChatButton phone={whatsappPhone} message={whatsappMessage} label="Buy now on WhatsApp" />
+        <p className="checkoutHint">Tap “Buy now on WhatsApp” to place your order directly with the seller.</p>
         <a className="requestButton" href={requestHref}>
           Request this product
         </a>
