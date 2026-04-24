@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { FormattedDescription } from '@/components/formatted-description';
 import { ShareButton } from '@/components/share-button';
-import { WhatsAppChatButton } from '@/components/whatsapp-chat-button';
+import { ProductLeadPanel } from '@/components/product-lead-panel';
 import { getPublicProductById } from '@/lib/public-products';
 import { getStoreProfileById } from '@/lib/public-stores';
 import { getStoreHref, getStoreRouteId } from '@/lib/store-route';
@@ -119,8 +119,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const hasWebsite = Boolean(storeProfile?.websiteUrl);
   const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
   const whatsappPhone = product.waLink ?? storeProfile?.storeWhatsapp ?? storeProfile?.storePhone ?? '';
-  const whatsappMessage = `Hi ${resolvedStoreName}, I'm interested in the ${product.productName} I saw on Sedifex Market.`;
-  const requestHref = `mailto:info@sedifex.com?subject=${encodeURIComponent(`Product request: ${product.productName}`)}&body=${encodeURIComponent(`Please help me request ${product.productName} from ${resolvedStoreName}. Product ID: ${product.id}`)}`;
 
   const productUrl = canonicalUrlForPath(getProductHref(product.id, product.productName));
   const jsonLd = {
@@ -242,13 +240,13 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           ) : null}
         </div>
       </section>
-      <aside className="stickyProductActions">
-        <WhatsAppChatButton phone={whatsappPhone} message={whatsappMessage} label="Buy now on WhatsApp" />
-        <p className="checkoutHint">Tap “Buy now on WhatsApp” to place your order directly with the seller.</p>
-        <a className="requestButton" href={requestHref}>
-          Request this product
-        </a>
-      </aside>
+      <ProductLeadPanel
+        productId={product.id}
+        productName={product.productName}
+        city={resolvedLocation}
+        storeName={resolvedStoreName}
+        whatsappPhone={whatsappPhone}
+      />
     </main>
   );
 }

@@ -22,8 +22,7 @@ test('product detail page renders key detail sections', () => {
   assert.match(source, /Store information/);
   assert.match(source, /View store details/);
   assert.match(source, /Visit store website/);
-  assert.match(source, /Buy now on WhatsApp/);
-  assert.match(source, /place your order directly with the seller/);
+  assert.match(source, /ProductLeadPanel/);
   assert.match(source, /Availability:/);
   assert.match(source, /alternates: \{ canonical: canonicalUrl \}/);
 });
