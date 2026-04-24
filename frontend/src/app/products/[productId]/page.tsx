@@ -158,95 +158,100 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   return (
     <main className="productDetailPage">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <section className="productSummaryCard">
-        {product.imageUrls.length > 0 ? (
-          <section className="productImageGrid" aria-label="Product images">
-            {product.imageUrls.map((imageUrl) => (
-              <Image
-                key={imageUrl}
-                src={imageUrl}
-                alt={product.imageAlt?.trim() || `${product.productName} at ${resolvedStoreName}`}
-                loading="lazy"
-                unoptimized
-                className="productDetailImage"
-                width={480}
-                height={480}
-                sizes="(max-width: 768px) 100vw, 33vw"
-              />
-            ))}
+      <div className="productDetailContent">
+        <div className="productDetailMainColumn">
+          <section className="productSummaryCard">
+            {product.imageUrls.length > 0 ? (
+              <section className="productImageGrid" aria-label="Product images">
+                {product.imageUrls.map((imageUrl) => (
+                  <Image
+                    key={imageUrl}
+                    src={imageUrl}
+                    alt={product.imageAlt?.trim() || `${product.productName} at ${resolvedStoreName}`}
+                    loading="lazy"
+                    unoptimized
+                    className="productDetailImage"
+                    width={480}
+                    height={480}
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                  />
+                ))}
+              </section>
+            ) : null}
+            <div>
+              <p className="eyebrow">Product details</p>
+              <h1>{product.productName}</h1>
+              <p className="productTrustLine">
+                {isVerifiedStore ? <span className="verifiedBadge">Verified store</span> : null} 📍 {resolvedLocation} · 🚚 Delivery:
+                Discuss with seller
+              </p>
+              {product.description ? (
+                <FormattedDescription text={product.description} className="formattedDescription" />
+              ) : (
+                <p>No description available for this product yet.</p>
+              )}
+            </div>
+
+            <div className="productStats">
+              <p>
+                <strong>Price:</strong> {priceLabel}
+              </p>
+              {availabilityLabel ? (
+                <p>
+                  <strong>Availability:</strong> {availabilityLabel}
+                </p>
+              ) : null}
+              {product.categoryKey ? (
+                <p>
+                  <strong>Category:</strong>{' '}
+                  <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
+                </p>
+              ) : null}
+            </div>
           </section>
-        ) : null}
-        <div>
-          <p className="eyebrow">Product details</p>
-          <h1>{product.productName}</h1>
-          <p className="productTrustLine">
-            {isVerifiedStore ? <span className="verifiedBadge">Verified store</span> : null} 📍 {resolvedLocation} · 🚚 Delivery:
-            Discuss with seller
-          </p>
-          {product.description ? (
-            <FormattedDescription text={product.description} className="formattedDescription" />
-          ) : (
-            <p>No description available for this product yet.</p>
-          )}
-        </div>
 
-        <div className="productStats">
-          <p>
-            <strong>Price:</strong> {priceLabel}
-          </p>
-          {availabilityLabel ? (
+          <section className="productStoreCard" aria-label="Store contact details">
+            <h2>Store information</h2>
             <p>
-              <strong>Availability:</strong> {availabilityLabel}
+              <strong>Name:</strong> {resolvedStoreName}{' '}
+              {isVerifiedStore ? <span className="verifiedBadge">Verified</span> : null}
             </p>
-          ) : null}
-          {product.categoryKey ? (
             <p>
-              <strong>Category:</strong>{' '}
-              <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
+              <strong>Location:</strong> {resolvedLocation}
             </p>
-          ) : null}
-        </div>
-      </section>
+            <p>
+              <strong>Phone:</strong>{' '}
+              {storePhoneHref ? <a href={`tel:${storePhoneHref}`}>{resolvedStorePhone}</a> : <span>{resolvedStorePhone}</span>}
+            </p>
 
-      <section className="productStoreCard" aria-label="Store contact details">
-        <h2>Store information</h2>
-        <p>
-          <strong>Name:</strong> {resolvedStoreName}{' '}
-          {isVerifiedStore ? <span className="verifiedBadge">Verified</span> : null}
-        </p>
-        <p>
-          <strong>Location:</strong> {resolvedLocation}
-        </p>
-        <p>
-          <strong>Phone:</strong>{' '}
-          {storePhoneHref ? <a href={`tel:${storePhoneHref}`}>{resolvedStorePhone}</a> : <span>{resolvedStorePhone}</span>}
-        </p>
-
-        <div className="productStoreActions">
-          {hasStorePage ? (
-            <Link href={storeHref ?? '#'}>View store details</Link>
-          ) : null}
-          <ShareButton
-            className="secondaryButton"
-            url={getProductHref(product.id, product.productName)}
-            title={product.productName || 'Product on Sedifex'}
-            text={`Check out ${product.productName || 'this product'} on Sedifex.`}
-            label="Share product"
-          />
-          {hasWebsite ? (
-            <a href={storeProfile?.websiteUrl} target="_blank" rel="noopener noreferrer">
-              Visit store website
-            </a>
-          ) : null}
+            <div className="productStoreActions">
+              {hasStorePage ? (
+                <Link href={storeHref ?? '#'}>View store details</Link>
+              ) : null}
+              <ShareButton
+                className="secondaryButton"
+                url={getProductHref(product.id, product.productName)}
+                title={product.productName || 'Product on Sedifex'}
+                text={`Check out ${product.productName || 'this product'} on Sedifex.`}
+                label="Share product"
+              />
+              {hasWebsite ? (
+                <a href={storeProfile?.websiteUrl} target="_blank" rel="noopener noreferrer">
+                  Visit store website
+                </a>
+              ) : null}
+            </div>
+          </section>
         </div>
-      </section>
-      <ProductLeadPanel
-        productId={product.id}
-        productName={product.productName}
-        city={resolvedLocation}
-        storeName={resolvedStoreName}
-        whatsappPhone={whatsappPhone}
-      />
+
+        <ProductLeadPanel
+          productId={product.id}
+          productName={product.productName}
+          city={resolvedLocation}
+          storeName={resolvedStoreName}
+          whatsappPhone={whatsappPhone}
+        />
+      </div>
     </main>
   );
 }
