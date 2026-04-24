@@ -633,6 +633,16 @@ select:focus {
   gap: 1rem;
 }
 
+.productDetailContent {
+  display: grid;
+  gap: 1rem;
+}
+
+.productDetailMainColumn {
+  display: grid;
+  gap: 1rem;
+}
+
 .productSummaryCard,
 .productStoreCard {
   background: #fff;
@@ -859,13 +869,15 @@ select:focus {
 
 .stickyProductActions {
   position: sticky;
-  bottom: 0.6rem;
+  top: 5.5rem;
+  align-self: start;
   display: grid;
   gap: 0.6rem;
   background: #ffffffe8;
   border: 1px solid #e2e8f0;
   border-radius: 0.9rem;
-  padding: 0.65rem;
+  padding: 0.85rem;
+  z-index: 1;
 }
 
 .checkoutHint {
@@ -927,6 +939,19 @@ select:focus {
 
 .requestFeedback.error {
   color: #b91c1c;
+}
+
+@media (min-width: 980px) {
+  .productDetailContent {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+    align-items: start;
+  }
+}
+
+@media (max-width: 979px) {
+  .stickyProductActions {
+    position: static;
+  }
 }
 
 .quickSections {
