@@ -18,7 +18,6 @@ import {
 } from 'firebase/firestore';
 import { db, firebaseConfigError } from '@/lib/firebase';
 import { FormattedDescription } from '@/components/formatted-description';
-import { WhatsAppChatButton } from '@/components/whatsapp-chat-button';
 import { getStoreHref } from '@/lib/store-route';
 import { getProductHref } from '@/lib/product-route';
 import { CANONICAL_CATEGORY_KEYS, resolveClosestCategoryKey } from '@/lib/category-taxonomy';
@@ -98,6 +97,17 @@ const buildWhatsAppMessage = (item: PublicProduct) => {
   const productLabel = (item.productName ?? item.name)?.trim() || 'this item';
   const storeLabel = item.storeName?.trim() || 'this shop';
   return `Hi ${storeLabel}, I'm interested in the ${productLabel} I saw on Sedifex Market.`;
+};
+
+const getWhatsAppHref = (item: PublicProduct) => {
+  const contactPhone = getContactPhone(item);
+  if (!contactPhone) return '';
+
+  const normalizedPhone = contactPhone.replace(/[^\d]/g, '');
+  if (!normalizedPhone) return '';
+
+  const encodedMessage = encodeURIComponent(buildWhatsAppMessage(item));
+  return `https://wa.me/${normalizedPhone}?text=${encodedMessage}`;
 };
 
 const getProductName = (item: PublicProduct) => (item.productName ?? item.name)?.trim() || 'Untitled item';
@@ -791,6 +801,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             ))
           : visibleProducts.map((item) => {
               const storeHref = getStoreHref(item.storeId, item.storeName);
+              const whatsAppHref = getWhatsAppHref(item);
               const shouldCollapseDescription = (item.description?.trim().length ?? 0) > 260;
               const isExpanded = expandedDescriptionIds.has(item.id);
               const descriptionClassName = `formattedDescription compact ${shouldCollapseDescription && !isExpanded ? 'isCollapsed' : ''}`.trim();
@@ -810,7 +821,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                     />
                   </div>
                   <h3>{getProductName(item)}</h3>
-                  <Link href={getProductHref(item.id, item.productName)}>View product details</Link>
                   <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
                   {shouldCollapseDescription && (
                     <button type="button" className="descriptionToggle" onClick={() => toggleDescription(item.id)}>
@@ -834,12 +844,26 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                   </div>
                   <p>City: {getStoreCity(item)}</p>
                   <p>Phone: {getStorePhone(item)}</p>
-                  <WhatsAppChatButton
-                    phone={getContactPhone(item)}
-                    message={buildWhatsAppMessage(item)}
-                    label="Chat now on WhatsApp"
-                    fallbackLabel="WhatsApp unavailable"
-                  />
+                  <div className="cardActions">
+                    <Link href={getProductHref(item.id, item.productName)} className="buyNowButton" aria-label={`Buy ${getProductName(item)} now`}>
+                      Buy now
+                    </Link>
+                    {whatsAppHref ? (
+                      <a
+                        className="contactStoreButton"
+                        href={whatsAppHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Contact ${item.storeName ?? 'store'} on WhatsApp`}
+                      >
+                        Contact store
+                      </a>
+                    ) : (
+                      <span className="contactStoreButton" aria-disabled="true">
+                        Contact store unavailable
+                      </span>
+                    )}
+                  </div>
                 </article>
               );
             })}

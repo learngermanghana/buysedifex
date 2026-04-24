@@ -338,6 +338,40 @@ select:focus {
   margin-top: auto;
 }
 
+.cardActions {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.buyNowButton,
+.contactStoreButton {
+  border-radius: 0.65rem;
+  text-decoration: none;
+  padding: 0.62rem 0.72rem;
+  text-align: center;
+  border: 1px solid transparent;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.buyNowButton {
+  background: linear-gradient(135deg, #0f172a, #1d4ed8);
+  color: #fff;
+}
+
+.contactStoreButton {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.contactStoreButton[aria-disabled='true'] {
+  opacity: 0.65;
+}
+
 .actions button {
   background: linear-gradient(135deg, #0f172a, #1d4ed8);
 }
@@ -465,6 +499,16 @@ select:focus {
 
   .chip {
     font-size: 0.8rem;
+  }
+
+  .cardActions {
+    grid-template-columns: 1fr;
+  }
+
+  .buyNowButton,
+  .contactStoreButton {
+    padding: 0.72rem;
+    font-size: 0.92rem;
   }
 }
 
