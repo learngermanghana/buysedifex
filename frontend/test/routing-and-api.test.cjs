@@ -71,3 +71,14 @@ test('google merchant rss feed route builds XML feed items from integration prod
   assert.match(merchantFeedRouteSource, /canonicalUrlForPath\(getProductHref\(item\.id, item\.productName\)\)/);
   assert.match(merchantFeedRouteSource, /Content-Type': 'application\/xml; charset=utf-8'/);
 });
+
+
+test('checkout leads API stores order requests in Firestore', () => {
+  const leadsRouteSource = read('src/app/api/leads/route.ts');
+
+  assert.match(leadsRouteSource, /collection\(db, 'checkoutRequests'\)/);
+  assert.match(leadsRouteSource, /Invalid checkout payload/);
+  assert.match(leadsRouteSource, /Checkout capture is not configured/);
+  assert.match(leadsRouteSource, /paymentMethod/);
+  assert.match(leadsRouteSource, /deliveryLocation/);
+});

@@ -708,6 +708,18 @@ select:focus {
   border-color: #818cf8;
 }
 
+.enquiryWhatsAppButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.enquiryWhatsAppButton[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .shareMenu {
   position: relative;
 }
@@ -816,6 +828,61 @@ select:focus {
   margin: 0;
   font-size: 0.9rem;
   color: #334155;
+}
+
+
+.paymentMethodList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.paymentChip {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+}
+
+.requestForm {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.requestForm h3 {
+  margin: 0;
+}
+
+.requestForm label {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.requestForm input,
+.requestForm textarea,
+.requestForm select {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  background: #fff;
+}
+
+.requestFeedback {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+}
+
+.requestFeedback.success {
+  color: #166534;
+}
+
+.requestFeedback.error {
+  color: #b91c1c;
 }
 
 .quickSections {

@@ -1,58 +1,60 @@
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
-import { persistAnalytics } from '@/lib/server-analytics';
+import { db, firebaseConfigError } from '@/lib/firebase';
 
 type LeadPayload = {
   productId?: string;
   productName?: string;
-  name?: string;
-  phone?: string;
-  notes?: string;
-  location?: string;
-  branchLocationId?: string;
-  branchId?: string;
-  locationId?: string;
-  storeBranchId?: string;
+  customerName?: string;
+  contact?: string;
+  companyName?: string;
+  paymentMethod?: string;
+  deliveryLocation?: string;
   quantity?: number;
+  notes?: string;
+  pagePath?: string;
 };
 
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as LeadPayload;
-  const normalizedNotes =
-    body.notes ??
-    body.location ??
-    body.branchLocationId ??
-    body.branchId ??
-    body.locationId ??
-    body.storeBranchId;
 
   if (
     !isNonEmptyString(body.productId) ||
     !isNonEmptyString(body.productName) ||
-    !isNonEmptyString(body.name) ||
-    !isNonEmptyString(body.phone) ||
-    !isNonEmptyString(normalizedNotes) ||
+    !isNonEmptyString(body.customerName) ||
+    !isNonEmptyString(body.contact) ||
+    !isNonEmptyString(body.paymentMethod) ||
+    !isNonEmptyString(body.deliveryLocation) ||
     typeof body.quantity !== 'number' ||
     Number.isNaN(body.quantity) ||
     body.quantity < 1
   ) {
-    return NextResponse.json({ error: 'Invalid lead payload' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid checkout payload' }, { status: 400 });
+  }
+
+  if (!db || firebaseConfigError) {
+    return NextResponse.json({ error: 'Checkout capture is not configured' }, { status: 503 });
   }
 
   const lead = {
     productId: body.productId.trim(),
     productName: body.productName.trim(),
-    name: body.name.trim(),
-    phone: body.phone.trim(),
-    notes: normalizedNotes.trim(),
+    customerName: body.customerName.trim(),
+    contact: body.contact.trim(),
+    companyName: isNonEmptyString(body.companyName) ? body.companyName.trim() : '',
+    paymentMethod: body.paymentMethod.trim(),
+    deliveryLocation: body.deliveryLocation.trim(),
     quantity: Math.floor(body.quantity),
+    notes: isNonEmptyString(body.notes) ? body.notes.trim() : '',
+    source: 'product-direct-checkout-form',
+    pagePath: isNonEmptyString(body.pagePath) ? body.pagePath.trim() : '/',
     createdAt: new Date().toISOString(),
-    source: 'product-request-form',
+    createdAtServer: serverTimestamp(),
   };
 
-  await persistAnalytics('leads', lead);
-  console.info('[lead_created]', lead);
+  const docRef = await addDoc(collection(db, 'checkoutRequests'), lead);
 
-  return NextResponse.json({ ok: true, lead });
+  return NextResponse.json({ ok: true, checkoutRequestId: docRef.id });
 }
