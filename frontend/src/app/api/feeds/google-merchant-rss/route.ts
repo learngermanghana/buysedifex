@@ -9,9 +9,11 @@ const FEED_TITLE = 'Sedifex Product Feed';
 const FEED_DESCRIPTION = 'Google Merchant compatible RSS product feed for Sedifex.';
 const DEFAULT_CURRENCY = 'GHS';
 const DEFAULT_CONDITION = 'new';
-const DEFAULT_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGES = 20;
-const PAGE_FETCH_TIMEOUT_MS = 8000;
+const PAGE_FETCH_TIMEOUT_MS = 30000;
+const PAGE_FETCH_RETRY_ATTEMPTS = 3;
+const PAGE_FETCH_BACKOFF_MS = 1000;
 
 const buildFeedTitle = (storeId?: string): string =>
   storeId ? `${FEED_TITLE} - Store ${storeId}` : FEED_TITLE;
@@ -125,29 +127,58 @@ const fetchFeedItems = async (storeId?: string) => {
   }> = [];
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const response = await Promise.race([
-      listIntegrationProducts({
-        storeId,
-        page,
-        pageSize: DEFAULT_PAGE_SIZE,
-        sort: 'newest',
-      }),
-      new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(
-            new Error(
-              `Timed out while fetching Google Merchant feed page ${page}.`,
-            ),
-          );
-        }, PAGE_FETCH_TIMEOUT_MS);
-      }),
-    ]).catch((error) => {
-      if (page === 1) {
-        throw error;
-      }
+    let response:
+      | {
+          items: Array<{
+            id: string;
+            productName: string;
+            description?: string;
+            imageUrls: string[];
+            price?: number;
+            currency?: string;
+            stockCount?: number;
+            storeName?: string;
+            sku?: string;
+            categoryKey?: string;
+          }>;
+          hasMore: boolean;
+        }
+      | null = null;
 
-      return null;
-    });
+    for (let attempt = 1; attempt <= PAGE_FETCH_RETRY_ATTEMPTS; attempt += 1) {
+      try {
+        response = await Promise.race([
+          listIntegrationProducts({
+            storeId,
+            page,
+            pageSize: DEFAULT_PAGE_SIZE,
+            sort: 'newest',
+          }),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => {
+              reject(
+                new Error(
+                  `Timed out while fetching Google Merchant feed page ${page} (attempt ${attempt}/${PAGE_FETCH_RETRY_ATTEMPTS}).`,
+                ),
+              );
+            }, PAGE_FETCH_TIMEOUT_MS);
+          }),
+        ]);
+        break;
+      } catch (error) {
+        if (attempt === PAGE_FETCH_RETRY_ATTEMPTS) {
+          if (page === 1) {
+            throw error;
+          }
+          response = null;
+          break;
+        }
+
+        await new Promise((resolve) => {
+          setTimeout(resolve, PAGE_FETCH_BACKOFF_MS * attempt);
+        });
+      }
+    }
 
     if (!response) {
       break;
