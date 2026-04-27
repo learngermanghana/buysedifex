@@ -9,9 +9,9 @@ const FEED_TITLE = 'Sedifex Product Feed';
 const FEED_DESCRIPTION = 'Google Merchant compatible RSS product feed for Sedifex.';
 const DEFAULT_CURRENCY = 'GHS';
 const DEFAULT_CONDITION = 'new';
-const DEFAULT_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGES = 20;
-const PAGE_FETCH_TIMEOUT_MS = 8000;
+const PAGE_FETCH_TIMEOUT_MS = 30000;
 
 const buildFeedTitle = (storeId?: string): string =>
   storeId ? `${FEED_TITLE} - Store ${storeId}` : FEED_TITLE;
