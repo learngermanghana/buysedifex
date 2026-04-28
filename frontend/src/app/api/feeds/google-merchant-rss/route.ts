@@ -12,6 +12,37 @@ const DEFAULT_CONDITION = 'new';
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGES = 20;
 const PAGE_FETCH_TIMEOUT_MS = 30000;
+const PAGE_FETCH_RETRY_ATTEMPTS = 3;
+const PAGE_FETCH_BACKOFF_MS = 500;
+const BLOCKED_CATEGORY_KEYS = new Set(['health', 'medicine', 'supplements', 'pharmacy']);
+const RESTRICTED_KEYWORDS = [
+  'medicine',
+  'drug',
+  'pharmacy',
+  'supplement',
+  'prescription',
+  'cure',
+  'treatment',
+];
+const MIN_TITLE_LENGTH = 3;
+const MAX_TITLE_LENGTH = 150;
+const MIN_DESCRIPTION_LENGTH = 10;
+const MAX_DESCRIPTION_LENGTH = 5000;
+const REQUIRE_VERIFIED_STORE = process.env.MERCHANT_FEED_REQUIRE_VERIFIED_STORE === 'true';
+
+type FeedProduct = {
+  id: string;
+  productName: string;
+  description?: string;
+  imageUrls: string[];
+  price?: number;
+  currency?: string;
+  stockCount?: number;
+  storeName?: string;
+  sku?: string;
+  categoryKey?: string;
+  verified?: boolean;
+};
 
 const buildFeedTitle = (storeId?: string): string =>
   storeId ? `${FEED_TITLE} - Store ${storeId}` : FEED_TITLE;
@@ -64,18 +95,62 @@ const extractStoreId = (rawStoreParam?: string | null): string | undefined => {
   return candidate;
 };
 
-const toFeedItemXml = (item: {
-  id: string;
-  productName: string;
-  description?: string;
-  imageUrls: string[];
-  price?: number;
-  currency?: string;
-  stockCount?: number;
-  storeName?: string;
-  sku?: string;
-  categoryKey?: string;
-}) => {
+const hasRestrictedKeyword = (value: string): boolean => {
+  const normalized = value.toLowerCase();
+  return RESTRICTED_KEYWORDS.some((keyword) => normalized.includes(keyword));
+};
+
+const isHttpUrl = (value: string): boolean => {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+};
+
+const isMerchantEligible = (product: FeedProduct): boolean => {
+  const normalizedCategory = product.categoryKey?.trim().toLowerCase();
+  if (normalizedCategory && BLOCKED_CATEGORY_KEYS.has(normalizedCategory)) {
+    return false;
+  }
+
+  const normalizedTitle = product.productName.trim();
+  if (normalizedTitle.length < MIN_TITLE_LENGTH || normalizedTitle.length > MAX_TITLE_LENGTH) {
+    return false;
+  }
+
+  const normalizedDescription = product.description?.trim() ?? '';
+  if (normalizedDescription) {
+    if (
+      normalizedDescription.length < MIN_DESCRIPTION_LENGTH ||
+      normalizedDescription.length > MAX_DESCRIPTION_LENGTH
+    ) {
+      return false;
+    }
+  }
+
+  if (hasRestrictedKeyword(`${normalizedTitle} ${normalizedDescription}`)) {
+    return false;
+  }
+
+  const primaryImage = product.imageUrls[0]?.trim();
+  if (!primaryImage || !isHttpUrl(primaryImage)) {
+    return false;
+  }
+
+  if (typeof product.price !== 'number' || !Number.isFinite(product.price) || product.price <= 0) {
+    return false;
+  }
+
+  if (REQUIRE_VERIFIED_STORE && !product.verified) {
+    return false;
+  }
+
+  return true;
+};
+
+const toFeedItemXml = (item: FeedProduct) => {
   const link = canonicalUrlForPath(getProductHref(item.id, item.productName));
   const imageLink = item.imageUrls[0];
   const priceValue = normalizePrice(item.price);
@@ -111,34 +186,12 @@ const toFeedItemXml = (item: {
 };
 
 const fetchFeedItems = async (storeId?: string) => {
-  const items: Array<{
-    id: string;
-    productName: string;
-    description?: string;
-    imageUrls: string[];
-    price?: number;
-    currency?: string;
-    stockCount?: number;
-    storeName?: string;
-    sku?: string;
-    categoryKey?: string;
-  }> = [];
+  const items: FeedProduct[] = [];
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     let response:
       | {
-          items: Array<{
-            id: string;
-            productName: string;
-            description?: string;
-            imageUrls: string[];
-            price?: number;
-            currency?: string;
-            stockCount?: number;
-            storeName?: string;
-            sku?: string;
-            categoryKey?: string;
-          }>;
+          items: FeedProduct[];
           hasMore: boolean;
         }
       | null = null;
@@ -198,6 +251,7 @@ export async function GET(request: Request) {
     const storeId = extractStoreId(searchParams.get('storeId'));
     const products = await fetchFeedItems(storeId);
     const itemXml = products
+      .filter(isMerchantEligible)
       .map(toFeedItemXml)
       .filter((item): item is string => Boolean(item));
 
