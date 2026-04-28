@@ -55,11 +55,13 @@ test('info and legal routes exist', () => {
   const contactSource = read('src/app/contact/page.tsx');
   const privacySource = read('src/app/privacy/page.tsx');
   const termsSource = read('src/app/terms/page.tsx');
+  const shippingSource = read('src/app/shipping-delivery-policy/page.tsx');
 
   assert.match(aboutSource, /How Sedifex works/);
   assert.match(sellSource, /Sell on Sedifex/);
   assert.match(contactSource, /info@sedifex\.com/);
-  assert.match(contactSource, /0205706589/);
+  assert.match(contactSource, /\+233205706589/);
   assert.match(privacySource, /Privacy Policy/);
   assert.match(termsSource, /Terms of Service/);
+  assert.match(shippingSource, /Shipping and Delivery Policy/);
 });

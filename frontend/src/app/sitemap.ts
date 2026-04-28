@@ -23,6 +23,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: canonicalUrlForPath('/search'), changeFrequency: 'daily', priority: 0.8 },
     { url: canonicalUrlForPath('/privacy'), changeFrequency: 'monthly', priority: 0.4 },
     { url: canonicalUrlForPath('/return-policy'), changeFrequency: 'monthly', priority: 0.4 },
+    { url: canonicalUrlForPath('/shipping-delivery-policy'), changeFrequency: 'monthly', priority: 0.4 },
     { url: canonicalUrlForPath('/terms'), changeFrequency: 'monthly', priority: 0.4 },
   ];
 
