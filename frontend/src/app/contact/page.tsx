@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 };
 
 export default function ContactPage() {
-  const rawPhone = '0205706589';
+  const phoneNumber = '+233205706589';
   const whatsappNumber = '233205706589';
 
   return (
@@ -47,7 +47,7 @@ export default function ContactPage() {
             Email: <a href="mailto:info@sedifex.com">info@sedifex.com</a>
           </li>
           <li>
-            Phone / WhatsApp: <a href={`tel:${rawPhone}`}>{rawPhone}</a>
+            Phone / WhatsApp: <a href={`tel:${phoneNumber}`}>{phoneNumber}</a>
           </li>
           <li>
             WhatsApp direct: <a href={`https://wa.me/${whatsappNumber}`}>chat on WhatsApp</a>
