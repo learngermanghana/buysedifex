@@ -20,7 +20,7 @@ import { db, firebaseConfigError } from '@/lib/firebase';
 import { FormattedDescription } from '@/components/formatted-description';
 import { getStoreHref } from '@/lib/store-route';
 import { getProductHref } from '@/lib/product-route';
-import { CANONICAL_CATEGORY_KEYS, resolveClosestCategoryKey } from '@/lib/category-taxonomy';
+import { resolveClosestCategoryKey } from '@/lib/category-taxonomy';
 
 type PublicProduct = {
   id: string;
@@ -369,15 +369,12 @@ const matchesItemTypeFilter = (itemType: string | undefined, filter: ItemTypeFil
 
 export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [products, setProducts] = useState<PublicProduct[]>([]);
-  const [categories, setCategories] = useState<string[]>(['all']);
   const [cities, setCities] = useState<string[]>(['all']);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedCity, setSelectedCity] = useState<string>('all');
   const [selectedSort, setSelectedSort] = useState<SortOption>('newest');
   const [searchText, setSearchText] = useState<string>('');
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<Set<string>>(new Set());
@@ -423,8 +420,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
       if (!typeMatches) return false;
       const cityMatches = selectedCity === 'all' || getStoreCity(product).toLowerCase() === selectedCity.toLowerCase();
       if (!cityMatches) return false;
-      const categoryMatches = selectedCategory === 'all' || getCategory(product) === selectedCategory;
-      if (!categoryMatches) return false;
       if (!text) return true;
       const haystack = [
         getProductName(product),
@@ -443,7 +438,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     const imageReadyProducts = matchingProducts.filter((product) => isPublicListing(product) && hasDisplayImage(product));
     const sortedProducts = sortProducts(imageReadyProducts, selectedSort);
     return mixProductsByCategoryThenStore(sortedProducts);
-  }, [itemTypeFilter, products, searchText, selectedCategory, selectedCity, selectedSort]);
+  }, [itemTypeFilter, products, searchText, selectedCity, selectedSort]);
 
   const toggleDescription = (productId: string) => {
     setExpandedDescriptionIds((current) => {
@@ -455,12 +450,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
       }
       return next;
     });
-  };
-
-  const fetchCategories = async () => {
-    setIsLoadingCategories(true);
-    setCategories(['all', ...CANONICAL_CATEGORY_KEYS]);
-    setIsLoadingCategories(false);
   };
 
   const fetchProducts = useCallback(async (cursor?: QueryDocumentSnapshot) => {
@@ -627,7 +616,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
       const firestoreError = err as FirestoreError;
       const debugDetails = {
         operation: 'fetchProducts',
-        selectedCategory,
         selectedSort,
         firestoreCode: firestoreError?.code ?? 'unknown',
         firestoreMessage: firestoreError?.message ?? 'No message provided',
@@ -647,7 +635,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [hasServerSideItemTypeFilter, hydrateVerifiedFromStores, itemTypeFilter, selectedCategory, selectedSort]);
+  }, [hasServerSideItemTypeFilter, hydrateVerifiedFromStores, itemTypeFilter, selectedSort]);
 
   const fetchProductsForSearch = useCallback(async () => {
     if (!db) {
@@ -708,10 +696,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   }, [hydrateVerifiedFromStores, itemTypeFilter]);
 
   useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  useEffect(() => {
     setProducts([]);
     setLastDoc(null);
     if (searchText.trim().length > 0) return;
@@ -759,25 +743,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             ))}
           </select>
         </div>
-      </div>
-
-      <div className="categories" role="tablist" aria-label="Product categories">
-        {categories.map((category) => {
-          const active = category === selectedCategory;
-          return (
-            <button
-              type="button"
-              key={category}
-              role="tab"
-              aria-selected={active}
-              className={`chip ${active ? 'active' : ''}`}
-              disabled={isLoadingCategories}
-              onClick={() => setSelectedCategory(category)}
-            >
-              {category}
-            </button>
-          );
-        })}
       </div>
 
       {error && <p className="error">{error}</p>}
