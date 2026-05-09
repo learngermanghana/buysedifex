@@ -43,25 +43,42 @@ export default function HomePage() {
           <p className="eyebrow">Sedifex Market</p>
           <h1>Discover trusted local stores near you</h1>
           <p>Start by opening a verified store, then search only inside that store for better product results.</p>
-          <p>
-            Need filters? <Link href="/search">Use advanced search</Link>.
-          </p>
-          <p>
-            Learn more <Link href="/about">about Sedifex</Link>.
-          </p>
-          <p>
-            Store owner? <Link href="/sell">Start selling</Link>.
-          </p>
-          <p>
-            Need help? <Link href="/contact">Contact support</Link>.
-          </p>
+          <div className="heroActions">
+            <Link href="/stores" className="btn btnPrimary">
+              Browse stores
+            </Link>
+            <Link href="/search" className="btn btnSecondary">
+              Advanced search
+            </Link>
+            <Link href="/sell" className="btn btnGhost">
+              Start selling
+            </Link>
+          </div>
           <div className="heroHighlights">
             <span>🏪 Pick a verified store first</span>
             <span>🔎 Search within that store</span>
             <span>📦 Discover categories faster</span>
           </div>
+          <p className="heroMeta">
+            Learn more <Link href="/about">about Sedifex</Link> or <Link href="/contact">contact support</Link>.
+          </p>
         </div>
       </header>
+
+      <section className="featureRow" aria-label="Shopping benefits">
+        <article className="featureCard">
+          <h2>Verified storefronts</h2>
+          <p>Discover sellers with clear store profiles before browsing items.</p>
+        </article>
+        <article className="featureCard">
+          <h2>Store-first discovery</h2>
+          <p>Search inside a selected store so results are faster and more relevant.</p>
+        </article>
+        <article className="featureCard">
+          <h2>Direct WhatsApp contact</h2>
+          <p>Chat with sellers instantly to confirm stock, delivery, and price updates.</p>
+        </article>
+      </section>
 
       <div className="homeColumns">
         <div className="productsColumn">
