@@ -27,7 +27,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
   padding-top: 0.75rem;
   padding-bottom: 0.75rem;
 }
@@ -95,9 +95,9 @@ body {
 }
 
 .container {
-  max-width: 1240px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 2.2rem clamp(1rem, 3vw, 2.25rem) 4rem;
+  padding: 2.2rem clamp(1rem, 4vw, 3rem) 4rem;
 }
 
 .hero {
@@ -202,7 +202,7 @@ body {
 .featureRow {
   display: grid;
   gap: 0.8rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   margin-bottom: 1.3rem;
 }
 
@@ -232,10 +232,10 @@ body {
 }
 
 .marketplace {
-  width: min(100%, 1160px);
+  width: min(100%, 1120px);
   margin-inline: auto;
   display: grid;
-  gap: 1rem;
+  gap: 1.15rem;
 }
 
 .toolbar {
@@ -316,14 +316,14 @@ select:focus {
 .grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 
 .card {
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border-radius: 0.95rem;
   border: 1px solid #e2e8f0;
-  padding: 0.8rem;
+  padding: 0.9rem;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
@@ -529,6 +529,15 @@ select:focus {
 }
 
 @media (max-width: 780px) {
+
+  .siteHeaderInner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mainNav {
+    justify-content: center;
+  }
   .hero {
     grid-template-columns: 1fr;
   }
@@ -556,7 +565,7 @@ select:focus {
 
 @media (max-width: 520px) {
   .container {
-    padding: 1.2rem 0.75rem 2.2rem;
+    padding: 1.1rem 0.85rem 2.2rem;
   }
 
   .heroImage {
@@ -565,6 +574,7 @@ select:focus {
 
   .grid {
     grid-template-columns: 1fr;
+    gap: 0.9rem;
   }
 
   .chip {
@@ -1146,6 +1156,8 @@ select:focus {
   grid-template-columns: 320px minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
+  max-width: 1180px;
+  margin-inline: auto;
 }
 
 .productsColumn {
