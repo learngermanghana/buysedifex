@@ -97,7 +97,7 @@ body {
 .container {
   max-width: 1240px;
   margin: 0 auto;
-  padding: 2.2rem 1rem 4rem;
+  padding: 2.2rem clamp(1rem, 3vw, 2.25rem) 4rem;
 }
 
 .hero {
@@ -170,6 +170,8 @@ body {
 }
 
 .marketplace {
+  width: min(100%, 1160px);
+  margin-inline: auto;
   display: grid;
   gap: 1rem;
 }
