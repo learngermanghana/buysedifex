@@ -78,6 +78,13 @@ const formatPromoDate = (value: unknown) => {
   });
 };
 
+
+const isBlockedPromo = (promo: StorePromo) => {
+  const slug = promo.storeSlug?.trim().toLowerCase();
+  const name = promo.storeName?.trim().toLowerCase();
+  return slug === 'sedfiexmarket' || name === 'sedfiexmarket';
+};
+
 const getStorePath = (promo: StorePromo) => {
   const slug = promo.storeSlug?.trim();
   if (slug) {
@@ -121,7 +128,8 @@ export function PromoCarousel() {
               isVerifiedStore(item.verified) &&
               isWithinPromoWindow(item, now) &&
               Boolean(item.promoImageUrl?.trim()) &&
-              Boolean(item.promoTitle?.trim() || item.promoSummary?.trim()),
+              Boolean(item.promoTitle?.trim() || item.promoSummary?.trim()) &&
+              !isBlockedPromo(item),
           )
           .slice(0, 10);
 
@@ -140,7 +148,8 @@ export function PromoCarousel() {
               isVerifiedStore(item.verified) &&
               isWithinPromoWindow(item, now) &&
               Boolean(item.promoImageUrl?.trim()) &&
-              Boolean(item.promoTitle?.trim() || item.promoSummary?.trim()),
+              Boolean(item.promoTitle?.trim() || item.promoSummary?.trim()) &&
+              !isBlockedPromo(item),
           )
           .sort((a, b) => (coerceDate(b.promoStartDate)?.getTime() ?? 0) - (coerceDate(a.promoStartDate)?.getTime() ?? 0))
           .slice(0, 10);
@@ -166,7 +175,8 @@ export function PromoCarousel() {
                 isVerifiedStore(item.verified) &&
                 isWithinPromoWindow(item, now) &&
                 Boolean(item.promoImageUrl?.trim()) &&
-                Boolean(item.promoTitle?.trim() || item.promoSummary?.trim()),
+                Boolean(item.promoTitle?.trim() || item.promoSummary?.trim()) &&
+                !isBlockedPromo(item),
             )
             .sort((a, b) => (coerceDate(b.promoStartDate)?.getTime() ?? 0) - (coerceDate(a.promoStartDate)?.getTime() ?? 0))
             .slice(0, 10);
