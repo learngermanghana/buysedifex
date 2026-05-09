@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProductGrid } from '@/components/product-grid';
-import { PromoCarousel } from '@/components/promo-carousel';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 const title = 'Discover trusted local stores near you';
@@ -65,7 +64,6 @@ export default function HomePage() {
       </header>
 
       <div className="homeColumns">
-        <PromoCarousel />
         <div className="productsColumn">
           <ProductGrid />
         </div>
