@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { FormattedDescription } from '@/components/formatted-description';
 import { ShareButton } from '@/components/share-button';
 import { ProductLeadPanel } from '@/components/product-lead-panel';
+import { ProductEngagementPanel } from '@/components/product-engagement-panel';
 import { getPublicProductById } from '@/lib/public-products';
 import { getStoreProfileById } from '@/lib/public-stores';
 import { getStoreHref, getStoreRouteId } from '@/lib/store-route';
@@ -242,6 +243,13 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               ) : null}
             </div>
           </section>
+
+          <ProductEngagementPanel
+            publicProductId={product.id}
+            storeId={product.storeId}
+            sourceProductId={product.sourceProductId}
+            isPublished={product.isPublished}
+          />
         </div>
 
         <ProductLeadPanel
