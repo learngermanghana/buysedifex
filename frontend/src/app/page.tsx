@@ -31,59 +31,92 @@ export const metadata: Metadata = {
   },
 };
 
+const trendingCategories = [
+  'Skincare & Beauty',
+  'Phones & Accessories',
+  'Fashion Deals',
+  'Home Essentials',
+  'Health & Wellness',
+  'Groceries',
+];
+
 export default function HomePage() {
   return (
     <main className="container">
       <section className="commerceHero" aria-label="Professional shopping hero">
         <div className="commerceHeroContent">
           <p className="eyebrow">Sedifex Marketplace</p>
-          <h1>Search all products quickly, then refine as our catalog grows.</h1>
+          <h1>Shop smarter with trusted stores, fast deals, and verified sellers.</h1>
           <p>
-            We are still expanding inventory, so search is now more general across all stores. Use categories for
-            discovery—even if some are still being filled with products.
+            Inspired by leading marketplaces, Sedifex gives you a professional shopping experience with store-first
+            discovery, real-time chat, and secure order confidence.
           </p>
           <div className="heroActions">
-            <Link href="/search" className="btn btnPrimary">
-              Search all products
+            <Link href="/stores" className="btn btnPrimary">
+              Shop by store
             </Link>
             <Link href="/categories" className="btn btnSecondary">
-              Browse all categories
+              Explore categories
             </Link>
-            <Link href="/stores" className="btn btnGhost">
-              View stores
+            <Link href="/sell" className="btn btnGhost">
+              Become a seller
             </Link>
           </div>
         </div>
         <div className="commerceHeroVisual" role="img" aria-label="Modern ecommerce showcase with featured products" />
       </section>
 
-      <section className="categoriesShowcase" aria-label="Homepage categories showcase">
-        <div className="categoriesHeader">
-          <h2>Shop by category</h2>
-          <p>Some categories may be empty for now. Check back often as new products are added daily.</p>
-        </div>
-        <div className="categoriesGrid">
-          {CANONICAL_CATEGORY_KEYS.map((category) => (
-            <Link href={`/category/${encodeURIComponent(category)}`} className="categoryCard" key={category}>
-              <h3>{category}</h3>
-              <p>Explore {category.toLowerCase()} listings</p>
+      <section className="quickLinksStrip" aria-label="Trending categories">
+        {trendingCategories.map((category) => (
+          <Link key={category} href="/categories" className="quickLinkChip">
+            {category}
+          </Link>
+        ))}
+      </section>
+
+      <section className="promoGrid" aria-label="Marketplace promotional banners">
+        <article className="promoCard promoCardLarge">
+          <div>
+            <p className="promoLabel">Mega Sale</p>
+            <h2>Up to 50% off top products this week</h2>
+            <p>Discover limited-time offers from verified stores across beauty, electronics, and home essentials.</p>
+            <Link href="/products" className="promoLink">
+              View flash deals →
             </Link>
-          ))}
-        </div>
+          </div>
+        </article>
+        <article className="promoCard promoCardBeauty">
+          <p className="promoLabel">Beauty Spotlight</p>
+          <h2>New arrivals in skincare & cosmetics</h2>
+          <Link href="/category/beauty" className="promoLink">
+            Shop beauty →
+          </Link>
+        </article>
+        <article className="promoCard promoCardElectro">
+          <p className="promoLabel">Tech Picks</p>
+          <h2>Mobile accessories and smart gadgets</h2>
+          <Link href="/category/electronics" className="promoLink">
+            Shop electronics →
+          </Link>
+        </article>
       </section>
 
       <section className="featureRow" aria-label="Shopping benefits">
         <article className="featureCard">
-          <h2>General search first</h2>
-          <p>Find available products across stores in one place without strict store-by-store filtering.</p>
+          <h2>Verified storefronts</h2>
+          <p>Every listing starts with a transparent seller profile so you can shop with confidence.</p>
         </article>
         <article className="featureCard">
-          <h2>Category-led browsing</h2>
-          <p>Jump into the type of products you need and discover new listings as inventory grows.</p>
+          <h2>Store-first search</h2>
+          <p>Find relevant products faster by browsing inside the stores you trust most.</p>
         </article>
         <article className="featureCard">
           <h2>Instant WhatsApp support</h2>
           <p>Chat directly with sellers to confirm stock, delivery windows, and latest pricing.</p>
+        </article>
+        <article className="featureCard">
+          <h2>Professional deal discovery</h2>
+          <p>Browse curated promos, trending categories, and featured products in one clean homepage.</p>
         </article>
       </section>
 
