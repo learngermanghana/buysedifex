@@ -3,7 +3,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import {
   getPurchaseHistory,
-  getAuthErrorMessage,
   registerCustomer,
   signInCustomer,
   signOutCustomer,
@@ -21,15 +20,12 @@ export default function AccountPage() {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [history, setHistory] = useState<PurchaseHistoryItem[]>([]);
   const [error, setError] = useState<string | null>(firebaseConfigError);
-  const [isAuthReady, setIsAuthReady] = useState(false);
-  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   useEffect(() => {
     if (firebaseConfigError) return;
     const unsubscribe = subscribeToAuth((user) => {
       setSessionEmail(user?.email ?? null);
       setSessionUserId(user?.uid ?? null);
-      setIsAuthReady(true);
     });
     return unsubscribe;
   }, []);
@@ -40,11 +36,9 @@ export default function AccountPage() {
       return;
     }
 
-    setIsHistoryLoading(true);
     void getPurchaseHistory(sessionUserId)
       .then(setHistory)
-      .catch((historyError) => setError(historyError instanceof Error ? historyError.message : 'Unable to load history.'))
-      .finally(() => setIsHistoryLoading(false));
+      .catch((historyError) => setError(historyError instanceof Error ? historyError.message : 'Unable to load history.'));
   }, [sessionUserId]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -60,17 +54,13 @@ export default function AccountPage() {
       try {
         await registerCustomer({ fullName: fullName.trim(), email: email.trim(), password });
       } catch (signupError) {
-        const code = signupError && typeof signupError === 'object' && 'code' in signupError ? String((signupError as { code?: string }).code) : '';
-        setError(code ? getAuthErrorMessage(code) : 'Unable to create account.');
+        setError(signupError instanceof Error ? signupError.message : 'Unable to create account.');
       }
       return;
     }
 
-    try {
-      await signInCustomer(email, password);
-    } catch (signinError) {
-      const code = signinError && typeof signinError === 'object' && 'code' in signinError ? String((signinError as { code?: string }).code) : '';
-      setError(code ? getAuthErrorMessage(code) : 'Unable to sign in.');
+    if (!(await signInCustomer(email, password))) {
+      setError('Invalid email or password.');
       return;
     }
   };
@@ -85,17 +75,7 @@ export default function AccountPage() {
         {sessionEmail ? (
           <div>
             <p className="requestFeedback success">Signed in as {sessionEmail}</p>
-            <button
-              className="secondaryButton"
-              onClick={async () => {
-                try {
-                  await signOutCustomer();
-                } catch (signoutError) {
-                  const code = signoutError && typeof signoutError === 'object' && 'code' in signoutError ? String((signoutError as { code?: string }).code) : '';
-                  setError(code ? getAuthErrorMessage(code) : 'Unable to sign out.');
-                }
-              }}
-            >
+            <button className="secondaryButton" onClick={() => void signOutCustomer()}>
               Sign out
             </button>
           </div>
@@ -126,9 +106,7 @@ export default function AccountPage() {
       <section className="accountCard">
         <h2>Purchase history</h2>
         {!sessionEmail ? <p>Sign in to view your purchase history.</p> : null}
-        {!isAuthReady ? <p>Loading your account...</p> : null}
-        {sessionEmail && isHistoryLoading ? <p>Loading purchase history...</p> : null}
-        {sessionEmail && !isHistoryLoading && history.length === 0 ? <p>No purchases yet. Place an order request to start tracking.</p> : null}
+        {sessionEmail && history.length === 0 ? <p>No purchases yet. Place an order request to start tracking.</p> : null}
         {sessionEmail && history.length > 0 ? (
           <ul className="historyList">
             {history.map((item) => (

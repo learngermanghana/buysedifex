@@ -6,7 +6,7 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth';
-import { addDoc, collection, getDocs, orderBy, query, serverTimestamp, where } from 'firebase/firestore';
+import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { auth, db, firebaseConfigError } from '@/lib/firebase';
 
 export type PurchaseHistoryItem = {
@@ -33,26 +33,14 @@ export const registerCustomer = async (input: { fullName: string; email: string;
   }
 };
 
-export const getAuthErrorMessage = (code: string): string => {
-  switch (code) {
-    case 'auth/email-already-in-use':
-      return 'This email is already in use. Try signing in instead.';
-    case 'auth/invalid-email':
-      return 'Please enter a valid email address.';
-    case 'auth/weak-password':
-      return 'Password should be at least 6 characters.';
-    case 'auth/user-not-found':
-    case 'auth/wrong-password':
-    case 'auth/invalid-credential':
-      return 'Invalid email or password.';
-    default:
-      return 'Something went wrong. Please try again.';
-  }
-};
-
-export const signInCustomer = async (emailInput: string, password: string): Promise<void> => {
+export const signInCustomer = async (emailInput: string, password: string): Promise<boolean> => {
   assertFirebaseReady();
-  await signInWithEmailAndPassword(auth!, emailInput.trim(), password);
+  try {
+    await signInWithEmailAndPassword(auth!, emailInput.trim(), password);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 export const signOutCustomer = async () => {
@@ -82,18 +70,14 @@ export const addPurchaseHistoryItem = async (
 
 export const getPurchaseHistory = async (userId: string): Promise<PurchaseHistoryItem[]> => {
   assertFirebaseReady();
-  const historyQuery = query(
-    collection(db!, 'customerPurchaseHistory'),
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc'),
-  );
-  const snapshot = await getDocs(historyQuery);
+  const snapshot = await getDocs(query(collection(db!, 'customerPurchaseHistory'), orderBy('createdAt', 'desc')));
 
   return snapshot.docs
     .map((doc) => ({
       id: doc.id,
-      ...(doc.data() as Omit<PurchaseHistoryItem, 'id'> & { createdAt?: { toDate?: () => Date } }),
+      ...(doc.data() as Omit<PurchaseHistoryItem, 'id'> & { userId: string; createdAt?: { toDate?: () => Date } }),
     }))
+    .filter((item) => item.userId === userId)
     .map((item) => ({
       id: item.id,
       productId: item.productId,
