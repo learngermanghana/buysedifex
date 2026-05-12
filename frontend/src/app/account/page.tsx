@@ -20,12 +20,15 @@ export default function AccountPage() {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [history, setHistory] = useState<PurchaseHistoryItem[]>([]);
   const [error, setError] = useState<string | null>(firebaseConfigError);
+  const [loadingAccount, setLoadingAccount] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     if (firebaseConfigError) return;
     const unsubscribe = subscribeToAuth((user) => {
       setSessionEmail(user?.email ?? null);
       setSessionUserId(user?.uid ?? null);
+      setLoadingAccount(false);
     });
     return unsubscribe;
   }, []);
@@ -33,12 +36,15 @@ export default function AccountPage() {
   useEffect(() => {
     if (!sessionUserId) {
       setHistory([]);
+      setLoadingHistory(false);
       return;
     }
 
+    setLoadingHistory(true);
     void getPurchaseHistory(sessionUserId)
       .then(setHistory)
-      .catch((historyError) => setError(historyError instanceof Error ? historyError.message : 'Unable to load history.'));
+      .catch((historyError) => setError(historyError instanceof Error ? historyError.message : 'Unable to load history.'))
+      .finally(() => setLoadingHistory(false));
   }, [sessionUserId]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -75,7 +81,7 @@ export default function AccountPage() {
         {sessionEmail ? (
           <div>
             <p className="requestFeedback success">Signed in as {sessionEmail}</p>
-            <button className="secondaryButton" onClick={() => void signOutCustomer()}>
+            <button className="secondaryButton" onClick={() => void signOutCustomer().catch(() => setError('Unable to sign out.'))}>
               Sign out
             </button>
           </div>
@@ -105,6 +111,8 @@ export default function AccountPage() {
 
       <section className="accountCard">
         <h2>Purchase history</h2>
+        {loadingAccount ? <p>Loading your account...</p> : null}
+        {loadingHistory ? <p>Loading purchase history...</p> : null}
         {!sessionEmail ? <p>Sign in to view your purchase history.</p> : null}
         {sessionEmail && history.length === 0 ? <p>No purchases yet. Place an order request to start tracking.</p> : null}
         {sessionEmail && history.length > 0 ? (
