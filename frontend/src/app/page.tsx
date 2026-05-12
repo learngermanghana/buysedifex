@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProductGrid } from '@/components/product-grid';
+import { CANONICAL_CATEGORY_KEYS } from '@/lib/category-taxonomy';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 const title = 'Discover trusted local stores near you';
@@ -33,50 +34,56 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <main className="container">
-      <header className="hero">
-        <div
-          className="heroImage"
-          role="img"
-          aria-label="Minimal shopping setup with products staged for online browsing"
-        />
-        <div className="heroContent">
-          <p className="eyebrow">Sedifex Market</p>
-          <h1>Discover trusted local stores near you</h1>
-          <p>Start by opening a verified store, then search only inside that store for better product results.</p>
-          <div className="heroActions">
-            <Link href="/stores" className="btn btnPrimary">
-              Browse stores
-            </Link>
-            <Link href="/search" className="btn btnSecondary">
-              Advanced search
-            </Link>
-            <Link href="/sell" className="btn btnGhost">
-              Start selling
-            </Link>
-          </div>
-          <div className="heroHighlights">
-            <span>🏪 Pick a verified store first</span>
-            <span>🔎 Search within that store</span>
-            <span>📦 Discover categories faster</span>
-          </div>
-          <p className="heroMeta">
-            Learn more <Link href="/about">about Sedifex</Link> or <Link href="/contact">contact support</Link>.
+      <section className="commerceHero" aria-label="Professional shopping hero">
+        <div className="commerceHeroContent">
+          <p className="eyebrow">Sedifex Marketplace</p>
+          <h1>Search all products quickly, then refine as our catalog grows.</h1>
+          <p>
+            We are still expanding inventory, so search is now more general across all stores. Use categories for
+            discovery—even if some are still being filled with products.
           </p>
+          <div className="heroActions">
+            <Link href="/search" className="btn btnPrimary">
+              Search all products
+            </Link>
+            <Link href="/categories" className="btn btnSecondary">
+              Browse all categories
+            </Link>
+            <Link href="/stores" className="btn btnGhost">
+              View stores
+            </Link>
+          </div>
         </div>
-      </header>
+        <div className="commerceHeroVisual" role="img" aria-label="Modern ecommerce showcase with featured products" />
+      </section>
+
+      <section className="categoriesShowcase" aria-label="Homepage categories showcase">
+        <div className="categoriesHeader">
+          <h2>Shop by category</h2>
+          <p>Some categories may be empty for now. Check back often as new products are added daily.</p>
+        </div>
+        <div className="categoriesGrid">
+          {CANONICAL_CATEGORY_KEYS.map((category) => (
+            <Link href={`/category/${encodeURIComponent(category)}`} className="categoryCard" key={category}>
+              <h3>{category}</h3>
+              <p>Explore {category.toLowerCase()} listings</p>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <section className="featureRow" aria-label="Shopping benefits">
         <article className="featureCard">
-          <h2>Verified storefronts</h2>
-          <p>Discover sellers with clear store profiles before browsing items.</p>
+          <h2>General search first</h2>
+          <p>Find available products across stores in one place without strict store-by-store filtering.</p>
         </article>
         <article className="featureCard">
-          <h2>Store-first discovery</h2>
-          <p>Search inside a selected store so results are faster and more relevant.</p>
+          <h2>Category-led browsing</h2>
+          <p>Jump into the type of products you need and discover new listings as inventory grows.</p>
         </article>
         <article className="featureCard">
-          <h2>Direct WhatsApp contact</h2>
-          <p>Chat with sellers instantly to confirm stock, delivery, and price updates.</p>
+          <h2>Instant WhatsApp support</h2>
+          <p>Chat directly with sellers to confirm stock, delivery windows, and latest pricing.</p>
         </article>
       </section>
 
