@@ -68,6 +68,40 @@ const FILTERED_FETCH_SCAN_BATCHES = 12;
 const SEARCH_SCAN_LIMIT = 300;
 const SEARCH_BATCH_SIZE = 100;
 
+const SEARCH_HISTORY_KEY = 'sedifex-recent-searches';
+const MAX_HISTORY_ITEMS = 6;
+const MAX_SUGGESTIONS = 8;
+
+const SYNONYM_GROUPS = [
+  ['sneakers', 'trainers', 'running shoes', 'kicks'],
+  ['tee', 'tshirt', 't-shirt', 'shirt'],
+  ['trouser', 'trousers', 'pants'],
+  ['phone', 'mobile', 'smartphone'],
+  ['laptop', 'notebook'],
+  ['fridge', 'refrigerator'],
+  ['tv', 'television'],
+  ['beauty', 'cosmetics', 'makeup'],
+];
+
+const levenshteinDistance = (left: string, right: string) => {
+  if (left === right) return 0;
+  if (!left.length) return right.length;
+  if (!right.length) return left.length;
+
+  const dp = Array.from({ length: left.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= right.length; j += 1) dp[0][j] = j;
+
+  for (let i = 1; i <= left.length; i += 1) {
+    for (let j = 1; j <= right.length; j += 1) {
+      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+
+  return dp[left.length][right.length];
+};
+
+
 const normalizeDisplayCurrency = (currency?: string) => {
   const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
   return normalizedCurrency === 'USD' ? 'GHS' : normalizedCurrency;
@@ -373,6 +407,8 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [selectedCity, setSelectedCity] = useState<string>('all');
   const [selectedSort, setSelectedSort] = useState<SortOption>('newest');
   const [searchText, setSearchText] = useState<string>('');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -411,6 +447,85 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     });
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(SEARCH_HISTORY_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      setRecentSearches(parsed.filter((item): item is string => typeof item === 'string').slice(0, MAX_HISTORY_ITEMS));
+    } catch {
+      // ignore malformed local storage
+    }
+  }, []);
+
+  const searchableTerms = useMemo(() => {
+    const terms = new Set<string>();
+    products.forEach((product) => {
+      [getProductName(product), product.storeName, getCategory(product)].forEach((term) => {
+        const normalized = term?.trim().toLowerCase();
+        if (normalized) terms.add(normalized);
+      });
+    });
+    return Array.from(terms);
+  }, [products]);
+
+  const normalizedSearchText = searchText.trim().toLowerCase();
+
+  const expandedSearchTerms = useMemo(() => {
+    if (!normalizedSearchText) return [] as string[];
+    const expanded = new Set<string>([normalizedSearchText]);
+
+    SYNONYM_GROUPS.forEach((group) => {
+      if (group.some((entry) => entry.includes(normalizedSearchText) || normalizedSearchText.includes(entry))) {
+        group.forEach((entry) => expanded.add(entry));
+      }
+    });
+
+    searchableTerms.forEach((term) => {
+      const distance = levenshteinDistance(normalizedSearchText, term);
+      const threshold = Math.max(1, Math.floor(normalizedSearchText.length * 0.3));
+      if (distance <= threshold) expanded.add(term);
+    });
+
+    return Array.from(expanded);
+  }, [normalizedSearchText, searchableTerms]);
+
+  const suggestions = useMemo(() => {
+    if (!normalizedSearchText) return recentSearches;
+
+    const synonymSuggestions = new Set<string>();
+    SYNONYM_GROUPS.forEach((group) => {
+      if (group.some((entry) => entry.includes(normalizedSearchText) || normalizedSearchText.includes(entry))) {
+        group.forEach((entry) => synonymSuggestions.add(entry));
+      }
+    });
+
+    const ranked = searchableTerms
+      .filter((term) => term.includes(normalizedSearchText) || levenshteinDistance(normalizedSearchText, term) <= 2)
+      .sort((a, b) => levenshteinDistance(normalizedSearchText, a) - levenshteinDistance(normalizedSearchText, b));
+
+    return Array.from(new Set([...ranked, ...synonymSuggestions])).slice(0, MAX_SUGGESTIONS);
+  }, [normalizedSearchText, recentSearches, searchableTerms]);
+
+  const commitSearch = useCallback((value: string) => {
+    const normalized = value.trim();
+    setSearchText(normalized);
+    if (!normalized) return;
+
+    setRecentSearches((current) => {
+      const next = [normalized, ...current.filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(
+        0,
+        MAX_HISTORY_ITEMS,
+      );
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next));
+      }
+      return next;
+    });
+  }, []);
+
   const visibleProducts = useMemo(() => {
     const text = searchText.trim().toLowerCase();
     const normalizedProducts = normalizeStoreNamesByStoreId(products);
@@ -432,13 +547,13 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
-      return haystack.includes(text);
+      return expandedSearchTerms.some((term) => haystack.includes(term));
     });
 
     const imageReadyProducts = matchingProducts.filter((product) => isPublicListing(product) && hasDisplayImage(product));
     const sortedProducts = sortProducts(imageReadyProducts, selectedSort);
     return mixProductsByCategoryThenStore(sortedProducts);
-  }, [itemTypeFilter, products, searchText, selectedCity, selectedSort]);
+  }, [expandedSearchTerms, itemTypeFilter, products, searchText, selectedCity, selectedSort]);
 
   const toggleDescription = (productId: string) => {
     setExpandedDescriptionIds((current) => {
@@ -718,9 +833,28 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             id="search"
             type="search"
             value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
+            onChange={(event) => { setSearchText(event.target.value); setIsSuggestionOpen(true); }}
+            onFocus={() => setIsSuggestionOpen(true)}
             placeholder="Search products, services, stores, or categories"
+            onKeyDown={(event) => { if (event.key === 'Enter') { commitSearch(searchText); setIsSuggestionOpen(false); } }}
           />
+          {isSuggestionOpen && suggestions.length > 0 && (
+            <ul className="searchSuggestions" role="listbox" aria-label="Search suggestions">
+              {suggestions.map((suggestion) => (
+                <li key={suggestion}>
+                  <button
+                    type="button"
+                    onMouseDown={() => {
+                      commitSearch(suggestion);
+                      setIsSuggestionOpen(false);
+                    }}
+                  >
+                    {suggestion}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="sortWrap">
