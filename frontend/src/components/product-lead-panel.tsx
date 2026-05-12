@@ -5,6 +5,7 @@ import { addPurchaseHistoryItem, getSignedInUserId } from '@/lib/customer-auth';
 
 type ProductLeadPanelProps = {
   productId: string;
+  merchantId: string;
   productName: string;
   city?: string;
   storeName: string;
@@ -71,9 +72,10 @@ const trackEvent = async (eventName: string, payload: Record<string, unknown>) =
   }
 };
 
-export function ProductLeadPanel({ productId, productName, city, storeName, whatsappPhone }: ProductLeadPanelProps) {
+export function ProductLeadPanel({ productId, merchantId, productName, city, storeName, whatsappPhone }: ProductLeadPanelProps) {
   const [formState, setFormState] = useState<CheckoutFormState>(initialFormState);
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
+  const [checkoutCards, setCheckoutCards] = useState<Array<{ merchantId: string; reference: string; checkoutUrl?: string }>>([]);
 
   useEffect(() => {
     void trackEvent('product_view', { productId, productName });
@@ -93,20 +95,15 @@ export function ProductLeadPanel({ productId, productName, city, storeName, what
 
     try {
       const quantity = Number(formState.quantity);
-      const response = await fetch('/api/leads', {
+      const response = await fetch('/api/integration/checkout/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          productId,
-          productName,
-          customerName: formState.customerName.trim(),
-          contact: formState.contact.trim(),
-          companyName: formState.companyName.trim(),
-          quantity,
-          paymentMethod: formState.paymentMethod,
-          deliveryLocation: formState.deliveryLocation.trim(),
-          notes: formState.notes.trim(),
-          pagePath: window.location.pathname,
+          cart: [{ productId, merchantId, quantity }],
+          customer: {
+            email: formState.contact.includes('@') ? formState.contact.trim() : undefined,
+            phone: formState.contact.includes('@') ? undefined : formState.contact.trim(),
+          },
         }),
       });
 
@@ -114,21 +111,28 @@ export function ProductLeadPanel({ productId, productName, city, storeName, what
         throw new Error('Failed to submit checkout request');
       }
 
-      await trackEvent('checkout_request_submit', { productId, productName, quantity, paymentMethod: formState.paymentMethod });
+      const payload = (await response.json()) as { merchantCheckouts?: Array<{ merchantId: string; reference: string; checkoutUrl?: string }> };
+      setCheckoutCards(payload.merchantCheckouts ?? []);
+      await trackEvent('checkout_create_succeeded', { productId, productName, quantity, paymentMethod: formState.paymentMethod });
       const signedInUserId = getSignedInUserId();
       if (signedInUserId) {
+        const firstCheckout = payload.merchantCheckouts?.[0];
         await addPurchaseHistoryItem(signedInUserId, {
           productId,
           productName,
           quantity,
           paymentMethod: formState.paymentMethod,
           deliveryLocation: formState.deliveryLocation.trim(),
+          reference: firstCheckout?.reference,
+          paymentStatus: 'pending',
+          orderStatus: 'pending',
         });
       }
       setSubmitState('success');
       setFormState(initialFormState);
     } catch (error) {
       console.error(error);
+      void trackEvent('checkout_create_failed', { productId, productName });
       setSubmitState('error');
     }
   };
@@ -162,6 +166,7 @@ export function ProductLeadPanel({ productId, productName, city, storeName, what
           id="checkout-contact"
           name="contact"
           type="text"
+          pattern="(^[^\s@]+@[^\s@]+\.[^\s@]+$)|(^[+0-9\s()-]{7,}$)"
           required
           value={formState.contact}
           onChange={(event) => setFormState((current) => ({ ...current, contact: event.target.value }))}
@@ -200,6 +205,7 @@ export function ProductLeadPanel({ productId, productName, city, storeName, what
           value={formState.deliveryLocation}
           onChange={(event) => setFormState((current) => ({ ...current, deliveryLocation: event.target.value }))}
           placeholder="Town / suburb / landmark"
+          minLength={3}
         />
 
         <label htmlFor="checkout-quantity">Quantity</label>
@@ -224,13 +230,23 @@ export function ProductLeadPanel({ productId, productName, city, storeName, what
           placeholder="Color, preferred call time, gate number, etc."
         />
 
-        <button className="requestButton" type="submit" disabled={submitState === 'submitting'}>
-          {submitState === 'submitting' ? 'Submitting checkout...' : 'Place order request'}
+        <button className="requestButton" type="submit" disabled={submitState === 'submitting' || !formState.customerName.trim() || !formState.contact.trim() || !formState.deliveryLocation.trim()}>
+          {submitState === 'submitting' ? 'Creating secure checkout...' : 'Continue to secure checkout'}
         </button>
 
-        {submitState === 'success' ? <p className="requestFeedback success">Checkout request sent successfully.</p> : null}
-        {submitState === 'error' ? <p className="requestFeedback error">Unable to submit checkout request. Try again.</p> : null}
+        {submitState === 'success' ? <p className="requestFeedback success">Checkout created. Use the merchant checkout card below to pay.</p> : null}
+        {submitState === 'error' ? <p className="requestFeedback error">Unable to create checkout. Check your location/contact or merchant availability.</p> : null}
       </form>
+      {checkoutCards.map((card) => (
+        <div key={card.reference} className="storeShowcaseCard">
+          <strong>Merchant checkout ready</strong>
+          <p>Merchant: {card.merchantId}</p>
+          <p>Reference: {card.reference}</p>
+          {card.checkoutUrl ? <a className="requestButton" href={card.checkoutUrl}>Pay now</a> : <p className="requestFeedback error">Checkout URL unavailable.</p>}
+        </div>
+      ))}
+      <p className="checkoutHint">Payment confirmed only after Sedifex webhook verification.</p>
+      <p className="checkoutHint">Need help? <a href="/contact">WhatsApp/email support</a> · <a href="/return-policy">Returns/refunds policy</a></p>
       <p className="checkoutHint">Need clarification before ordering?</p>
       {whatsappLinkWithMessage ? (
         <a
