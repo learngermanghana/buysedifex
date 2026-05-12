@@ -1342,3 +1342,41 @@ select:focus {
     max-height: 180px;
   }
 }
+
+.accountPage {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.accountCard {
+  background: #ffffffd9;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.accountModeSwitch {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.accountModeSwitch button {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+}
+
+.accountModeSwitch button.active {
+  background: #eef2ff;
+  border-color: #818cf8;
+}
+
+.historyList {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.6rem;
+}
