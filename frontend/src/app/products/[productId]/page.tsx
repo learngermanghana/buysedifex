@@ -246,7 +246,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
         <ProductLeadPanel
           productId={product.id}
-          merchantId={product.storeId}
+          merchantId={product.storeId ?? ''}
           productName={product.productName}
           city={resolvedLocation}
           storeName={resolvedStoreName}

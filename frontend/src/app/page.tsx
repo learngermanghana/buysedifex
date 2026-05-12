@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProductGrid } from '@/components/product-grid';
-import { CANONICAL_CATEGORY_KEYS } from '@/lib/category-taxonomy';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 const title = 'Discover trusted local stores near you';
