@@ -15,6 +15,8 @@ export type PublicProductDetail = {
   country?: string;
   waLink?: string;
   verified?: boolean;
+  isPublished?: boolean;
+  sourceProductId?: string;
   itemType?: string;
   rankingScore?: number;
 };
@@ -174,6 +176,8 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
     country: readString(fields, ['country', 'storeCountry']),
     waLink: readString(fields, ['waLink', 'storePhone', 'phone', 'telephone', 'whatsappNumber']),
     verified: readBoolean(fields, ['verified']),
+    isPublished: readBoolean(fields, ['isPublished', 'isVisible']),
+    sourceProductId: readString(fields, ['sourceProductId']),
     itemType: readString(fields, ['itemType', 'type']),
   };
 };
@@ -229,6 +233,9 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     'telephone',
     'whatsappNumber',
     'verified',
+    'isPublished',
+    'isVisible',
+    'sourceProductId',
     'itemType',
     'type',
   ].forEach((fieldPath) => endpoint.searchParams.append('mask.fieldPaths', fieldPath));
