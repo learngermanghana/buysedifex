@@ -82,3 +82,15 @@ test('checkout leads API stores order requests in Firestore', () => {
   assert.match(leadsRouteSource, /paymentMethod/);
   assert.match(leadsRouteSource, /deliveryLocation/);
 });
+
+
+test('customer auth library uses user-scoped history query and Firebase auth helpers', () => {
+  const authSource = read('src/lib/customer-auth.ts');
+
+  assert.match(authSource, /createUserWithEmailAndPassword/);
+  assert.match(authSource, /signInWithEmailAndPassword/);
+  assert.match(authSource, /onAuthStateChanged/);
+  assert.match(authSource, /where\('userId', '==', userId\)/);
+  assert.match(authSource, /orderBy\('createdAt', 'desc'\)/);
+  assert.match(authSource, /getAuthErrorMessage/);
+});

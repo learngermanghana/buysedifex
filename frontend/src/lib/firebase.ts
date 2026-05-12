@@ -1,4 +1,5 @@
 import { getApps, initializeApp } from 'firebase/app';
+import { Auth, getAuth } from 'firebase/auth';
 import { Firestore, getFirestore } from 'firebase/firestore';
 
 const firstDefined = (...values: Array<string | undefined>): string | undefined => {
@@ -28,10 +29,12 @@ export const firebaseConfigError =
     : null;
 
 let db: Firestore | null = null;
+let auth: Auth | null = null;
 
 if (!firebaseConfigError) {
   const app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
   db = getFirestore(app);
+  auth = getAuth(app);
 }
 
-export { db };
+export { db, auth };
