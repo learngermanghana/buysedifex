@@ -6,7 +6,7 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth';
-import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, getDocs, orderBy, query, serverTimestamp, where } from 'firebase/firestore';
 import { auth, db, firebaseConfigError } from '@/lib/firebase';
 
 export type PurchaseHistoryItem = {
@@ -24,6 +24,8 @@ const assertFirebaseReady = () => {
     throw new Error(firebaseConfigError ?? 'Firebase is not configured.');
   }
 };
+
+const getAuthErrorMessage = (fallback: string) => fallback;
 
 export const registerCustomer = async (input: { fullName: string; email: string; password: string }) => {
   assertFirebaseReady();
@@ -70,14 +72,15 @@ export const addPurchaseHistoryItem = async (
 
 export const getPurchaseHistory = async (userId: string): Promise<PurchaseHistoryItem[]> => {
   assertFirebaseReady();
-  const snapshot = await getDocs(query(collection(db!, 'customerPurchaseHistory'), orderBy('createdAt', 'desc')));
+  const snapshot = await getDocs(
+    query(collection(db!, 'customerPurchaseHistory'), where('userId', '==', userId), orderBy('createdAt', 'desc')),
+  );
 
   return snapshot.docs
     .map((doc) => ({
       id: doc.id,
       ...(doc.data() as Omit<PurchaseHistoryItem, 'id'> & { userId: string; createdAt?: { toDate?: () => Date } }),
     }))
-    .filter((item) => item.userId === userId)
     .map((item) => ({
       id: item.id,
       productId: item.productId,
@@ -85,6 +88,6 @@ export const getPurchaseHistory = async (userId: string): Promise<PurchaseHistor
       quantity: item.quantity,
       paymentMethod: item.paymentMethod,
       deliveryLocation: item.deliveryLocation,
-      createdAt: item.createdAt?.toDate ? item.createdAt.toDate().toISOString() : new Date().toISOString(),
+      createdAt: item.createdAt?.toDate ? item.createdAt.toDate().toISOString() : getAuthErrorMessage(new Date().toISOString()),
     }));
 };
