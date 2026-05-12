@@ -17,6 +17,11 @@ export type PurchaseHistoryItem = {
   paymentMethod: string;
   deliveryLocation: string;
   createdAt: string;
+  reference?: string;
+  paymentStatus?: 'pending' | 'confirmed' | 'failed' | string;
+  orderStatus?: 'pending' | 'processing' | 'completed' | string;
+  paymentConfirmedAt?: string;
+  orderCompletedAt?: string;
 };
 
 const assertFirebaseReady = () => {

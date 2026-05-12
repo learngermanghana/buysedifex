@@ -15,10 +15,12 @@ type CheckoutCreateBody = {
 };
 
 export async function POST(request: NextRequest) {
+  console.info('checkout.create.requested');
   const body = (await request.json()) as CheckoutCreateBody;
   const cart = Array.isArray(body.cart) ? body.cart : [];
 
   if (cart.length === 0) {
+    console.warn('checkout.create.failed', { reason: 'empty_cart' });
     return NextResponse.json({ error: 'Cart is required' }, { status: 400 });
   }
 
@@ -67,5 +69,6 @@ export async function POST(request: NextRequest) {
     }),
   );
 
+  console.info('checkout.create.succeeded', { merchants: merchantResults.length });
   return NextResponse.json({ ok: true, merchantCheckouts: merchantResults });
 }

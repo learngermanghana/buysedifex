@@ -71,6 +71,13 @@ export default function AccountPage() {
     }
   };
 
+  const statusClass = (status?: string) => {
+    const normalized = (status ?? 'pending').toLowerCase();
+    if (normalized === 'confirmed' || normalized === 'completed') return 'success';
+    if (normalized === 'failed' || normalized === 'rejected') return 'error';
+    return 'pending';
+  };
+
   return (
     <main className="container accountPage">
       <section className="accountCard">
@@ -121,7 +128,14 @@ export default function AccountPage() {
               <li key={item.id}>
                 <strong>{item.productName}</strong> × {item.quantity} · {item.paymentMethod} · {item.deliveryLocation}
                 <br />
+                <small>
+                  Ref: {item.reference ?? 'N/A'} · Payment: <span className={`statusBadge ${statusClass(item.paymentStatus)}`}>{item.paymentStatus ?? 'pending'}</span> · Order:{' '}
+                  <span className={`statusBadge ${statusClass(item.orderStatus)}`}>{item.orderStatus ?? 'pending'}</span>
+                </small>
+                <br />
                 <small>{new Date(item.createdAt).toLocaleString()}</small>
+                {item.paymentConfirmedAt ? <><br /><small>Payment confirmed: {new Date(item.paymentConfirmedAt).toLocaleString()}</small></> : null}
+                {item.orderCompletedAt ? <><br /><small>Order completed: {new Date(item.orderCompletedAt).toLocaleString()}</small></> : null}
               </li>
             ))}
           </ul>

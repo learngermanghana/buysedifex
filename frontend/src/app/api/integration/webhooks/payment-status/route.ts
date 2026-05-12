@@ -6,8 +6,10 @@ import { verifyWebhookSignature } from '@/lib/sedifex-checkout';
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const signature = request.headers.get('x-sedifex-signature');
+  const deliveryId = request.headers.get('x-sedifex-delivery-id')?.trim();
 
   if (!verifyWebhookSignature(rawBody, signature)) {
+    console.warn('webhook.rejected', { reason: 'invalid_signature', deliveryId: deliveryId ?? null });
     return NextResponse.json({ ok: false, error: 'Invalid signature' }, { status: 401 });
   }
 
@@ -22,6 +24,17 @@ export async function POST(request: NextRequest) {
 
   if (!db || firebaseConfigError) {
     return NextResponse.json({ ok: true, warning: 'Firestore not configured' });
+  }
+
+  if (deliveryId) {
+    const existingDelivery = await getDocs(
+      query(collection(db, 'integrationWebhookEvents'), where('deliveryId', '==', deliveryId), limit(1)),
+    );
+
+    if (!existingDelivery.empty) {
+      console.info('webhook.rejected', { reason: 'duplicate_delivery', deliveryId });
+      return NextResponse.json({ ok: true, duplicate: true });
+    }
   }
 
   const ref = payload.reference?.trim();
@@ -45,10 +58,13 @@ export async function POST(request: NextRequest) {
 
   await addDoc(collection(db, 'integrationWebhookEvents'), {
     eventName,
+    deliveryId: deliveryId ?? null,
     payload,
     receivedAt: new Date().toISOString(),
     receivedAtServer: serverTimestamp(),
   });
+
+  console.info('webhook.accepted', { eventName, deliveryId: deliveryId ?? null, reference: payload.reference ?? null });
 
   return NextResponse.json({ ok: true });
 }
