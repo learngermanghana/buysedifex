@@ -65,3 +65,13 @@ test('info and legal routes exist', () => {
   assert.match(termsSource, /Terms of Service/);
   assert.match(shippingSource, /Shipping and Delivery Policy/);
 });
+
+
+test('account page includes loading states and Firebase account messaging', () => {
+  const source = read('src/app/account/page.tsx');
+
+  assert.match(source, /Loading your account\.\.\./);
+  assert.match(source, /Loading purchase history\.\.\./);
+  assert.match(source, /track your purchase history with Firebase/);
+  assert.match(source, /Unable to sign out\./);
+});
