@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { addPurchaseHistoryItem, getSignedInUserId } from '@/lib/customer-auth';
 
 type ProductLeadPanelProps = {
   productId: string;
@@ -114,6 +115,16 @@ export function ProductLeadPanel({ productId, productName, city, storeName, what
       }
 
       await trackEvent('checkout_request_submit', { productId, productName, quantity, paymentMethod: formState.paymentMethod });
+      const signedInUserId = getSignedInUserId();
+      if (signedInUserId) {
+        await addPurchaseHistoryItem(signedInUserId, {
+          productId,
+          productName,
+          quantity,
+          paymentMethod: formState.paymentMethod,
+          deliveryLocation: formState.deliveryLocation.trim(),
+        });
+      }
       setSubmitState('success');
       setFormState(initialFormState);
     } catch (error) {

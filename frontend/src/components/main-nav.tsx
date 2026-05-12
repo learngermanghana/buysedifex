@@ -22,6 +22,7 @@ const navItems = [
   },
   { href: '/sell', label: 'How to Sell', match: (pathname: string) => pathname.startsWith('/sell') },
   { href: '/contact', label: 'Contact', match: (pathname: string) => pathname.startsWith('/contact') },
+  { href: '/account', label: 'Account', match: (pathname: string) => pathname.startsWith('/account') },
 ];
 
 export function MainNav() {
