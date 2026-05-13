@@ -7,9 +7,9 @@ export async function GET(request: NextRequest) {
     const response = await listIntegrationProducts({
       categoryKey: params.get('categoryKey') ?? undefined,
       page: Number(params.get('page') ?? '1'),
-      pageSize: Number(params.get('pageSize') ?? '12'),
+      pageSize: Number(params.get('pageSize') ?? '20'),
       sort: params.get('sort') ?? 'store-diverse',
-      maxPerStore: params.get('maxPerStore') ? Number(params.get('maxPerStore')) : undefined,
+      maxPerStore: params.get('maxPerStore') ? Number(params.get('maxPerStore')) : 3,
     });
 
     return NextResponse.json(response, { status: 200 });

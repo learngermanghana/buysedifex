@@ -587,7 +587,12 @@ const fetchCatalogProducts = async (query?: {
   const { apiKey } = getIntegrationConfig();
 
   if (apiKey) {
-    return integrationFetch<IntegrationProductsPayload>('/v1IntegrationProducts', query);
+    return integrationFetch<IntegrationProductsPayload>('/v1IntegrationProducts', {
+      sort: query?.sort ?? 'store-diverse',
+      maxPerStore: query?.maxPerStore ?? 3,
+      pageSize: query?.pageSize ?? 20,
+      ...query,
+    });
   }
 
   if (query?.storeId) {
