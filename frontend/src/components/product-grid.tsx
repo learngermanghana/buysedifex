@@ -458,7 +458,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
-  const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<Set<string>>(new Set());
   const hasServerSideItemTypeFilter = itemTypeFilter !== 'all';
 
   const buildServerFilters = useCallback((): QueryConstraint[] => {
@@ -576,17 +575,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     return mixProductsByCategoryThenStore(sortedProducts);
   }, [expandedSearchTerms, itemTypeFilter, products, searchText, selectedCity, selectedSort]);
 
-  const toggleDescription = (productId: string) => {
-    setExpandedDescriptionIds((current) => {
-      const next = new Set(current);
-      if (next.has(productId)) {
-        next.delete(productId);
-      } else {
-        next.add(productId);
-      }
-      return next;
-    });
-  };
 
   const fetchProducts = useCallback(async (cursor?: QueryDocumentSnapshot) => {
     if (!db) {
@@ -919,8 +907,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
               const storeHref = getStoreHref(item.storeId, item.storeName);
               const whatsAppHref = getWhatsAppHref(item);
               const shouldCollapseDescription = (item.description?.trim().length ?? 0) > 260;
-              const isExpanded = expandedDescriptionIds.has(item.id);
-              const descriptionClassName = `formattedDescription compact ${shouldCollapseDescription && !isExpanded ? 'isCollapsed' : ''}`.trim();
+              const descriptionClassName = `formattedDescription compact ${shouldCollapseDescription ? 'isCollapsed' : ''}`.trim();
 
               return (
                 <article key={item.id} className="card">
@@ -938,11 +925,11 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                   </div>
                   <h3>{getProductName(item)}</h3>
                   <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
-                  {shouldCollapseDescription && (
-                    <button type="button" className="descriptionToggle" onClick={() => toggleDescription(item.id)}>
-                      {isExpanded ? 'View less' : 'View more'}
-                    </button>
-                  )}
+                  {shouldCollapseDescription ? (
+                    <Link href={getProductHref(item.id, item.productName)} className="descriptionToggle">
+                      View details
+                    </Link>
+                  ) : null}
                   <div className="meta">
                     <span className="storeIdentity">
                       {storeHref ? (
