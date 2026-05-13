@@ -48,8 +48,27 @@ const getRequiredEnv = (key: string) => {
 
 const getContractVersion = () => process.env.SEDIFEX_INTEGRATION_API_VERSION ?? '2026-04-13';
 
+const getIntegrationApiBaseUrl = () => {
+  const rawBaseUrl = getRequiredEnv('SEDIFEX_INTEGRATION_API_BASE_URL').trim();
+
+  let parsed: URL;
+  try {
+    parsed = new URL(rawBaseUrl);
+  } catch {
+    throw new Error(
+      'SEDIFEX_INTEGRATION_API_BASE_URL must be an absolute URL (for example: https://api.example.com).',
+    );
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('SEDIFEX_INTEGRATION_API_BASE_URL must use http or https protocol.');
+  }
+
+  return parsed.toString().replace(/\/$/, '');
+};
+
 const integrationFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const baseUrl = getRequiredEnv('SEDIFEX_INTEGRATION_API_BASE_URL').replace(/\/$/, '');
+  const baseUrl = getIntegrationApiBaseUrl();
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
