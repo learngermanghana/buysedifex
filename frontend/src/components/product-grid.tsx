@@ -426,8 +426,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const storeVerifiedCacheRef = useRef<Map<string, boolean>>(new Map());
 
   const filterByVerifiedStore = useCallback(async (items: PublicProduct[]) => {
-    if (!db || items.length === 0) return items;
-    const firestore = db;
+    if (items.length === 0) return items;
+    if (db == null) return items;
+    const firestore: NonNullable<typeof db> = db;
 
     const uniqueStoreIds = Array.from(
       new Set(items.map((item) => item.storeId?.trim()).filter((value): value is string => Boolean(value))),
