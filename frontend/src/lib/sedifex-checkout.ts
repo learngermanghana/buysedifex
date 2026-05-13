@@ -4,6 +4,7 @@ export type CheckoutItem = {
   productId: string;
   quantity: number;
   merchantId: string;
+  type?: 'PRODUCT' | 'SERVICE';
 };
 
 export type MerchantCheckoutPreview = {
@@ -16,7 +17,27 @@ export type MerchantCheckoutInit = {
   reference: string;
   checkoutUrl?: string;
   bookingId: string;
-  pricingSnapshot: unknown;
+  pricingSnapshot: SedifexCheckoutPreviewResponse;
+};
+
+export type SedifexCheckoutPreviewRequest = {
+  merchant_id: string;
+  currency?: string;
+  fulfillment_type?: 'PICKUP' | 'DELIVERY';
+  delivery_address_id?: string | null;
+  items: Array<{ type: 'PRODUCT' | 'SERVICE'; item_id: string; qty: number }>;
+};
+
+export type SedifexCheckoutPreviewResponse = {
+  pricing_version?: string;
+  subtotal?: number;
+  tax_total?: number;
+  delivery_fee?: number;
+  pre_processing_total?: number;
+  processing_fee_to_add?: number;
+  final_total?: number;
+  breakdown?: Array<{ code: string; amount: number }>;
+  [key: string]: unknown;
 };
 
 const getRequiredEnv = (key: string) => {
@@ -64,20 +85,28 @@ export const createCheckoutReference = (merchantId: string) =>
 
 export const previewMerchantCheckout = async (merchantId: string, items: CheckoutItem[]) => {
   const merchantToken = getRequiredEnv(`SEDIFEX_MERCHANT_TOKEN_${merchantId}`);
-  return integrationFetch<unknown>('/integration/checkout/preview', {
+  const payload: SedifexCheckoutPreviewRequest = {
+    merchant_id: merchantId,
+    fulfillment_type: 'PICKUP',
+    delivery_address_id: null,
+    items: items.map((item) => ({ type: item.type ?? 'PRODUCT', item_id: item.productId, qty: item.quantity })),
+  };
+  return integrationFetch<SedifexCheckoutPreviewResponse>('/integration/checkout/preview', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${merchantToken}`,
       'x-api-key': merchantToken,
     },
-    body: JSON.stringify({
-      merchantId,
-      items: items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
-    }),
+    body: JSON.stringify(payload),
   });
 };
 
-export const createMerchantCheckout = async (merchantId: string, items: CheckoutItem[], reference: string) => {
+export const createMerchantCheckout = async (
+  merchantId: string,
+  items: CheckoutItem[],
+  reference: string,
+  pricingSnapshot?: SedifexCheckoutPreviewResponse,
+) => {
   const merchantToken = getRequiredEnv(`SEDIFEX_MERCHANT_TOKEN_${merchantId}`);
   return integrationFetch<unknown>('/integration/checkout/create', {
     method: 'POST',
@@ -86,10 +115,13 @@ export const createMerchantCheckout = async (merchantId: string, items: Checkout
       'x-api-key': merchantToken,
     },
     body: JSON.stringify({
-      merchantId,
-      clientOrderId: reference,
-      reference,
-      items: items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+      merchant_id: merchantId,
+      payment_reference: reference,
+      client_order_id: reference,
+      items: items.map((item) => ({ type: item.type ?? 'PRODUCT', item_id: item.productId, qty: item.quantity })),
+      pricing_snapshot: pricingSnapshot,
+      payment_status: 'pending',
+      order_status: 'pending',
       returnUrl: process.env.SEDIFEX_CHECKOUT_RETURN_URL,
     }),
   });
