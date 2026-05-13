@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
 type PollState = { paymentStatus?: string; orderStatus?: string; reference?: string; error?: string };
 
-export default function CheckoutProcessingPage() {
+function CheckoutProcessingContent() {
   const params = useSearchParams();
   const reference = params.get('reference') ?? '';
   const [state, setState] = useState<PollState>({ reference });
@@ -42,5 +42,13 @@ export default function CheckoutProcessingPage() {
         <p><Link href="/contact">WhatsApp / Email support</Link></p>
       </section>
     </main>
+  );
+}
+
+export default function CheckoutProcessingPage() {
+  return (
+    <Suspense fallback={<main className="container accountPage"><section className="accountCard"><p>Loading payment details…</p></section></main>}>
+      <CheckoutProcessingContent />
+    </Suspense>
   );
 }
