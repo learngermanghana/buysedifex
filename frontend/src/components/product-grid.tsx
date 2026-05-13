@@ -52,7 +52,7 @@ type PublicProduct = {
   storeCity?: string;
   itemType?: string;
   isVisible?: boolean | string | number;
-  verified?: boolean | string;
+  verified?: boolean | string | number;
   featuredRank?: number;
   rankingScore?: number;
   publishedAt?: { seconds: number };
@@ -265,7 +265,9 @@ const hasDisplayImage = (item: PublicProduct) => getDisplayImages(item).length >
 const isPublicListing = (item: PublicProduct) => asTruthyBoolean(item.isVisible) || asTruthyBoolean(item.isPublished);
 
 const isVerifiedStore = (value: PublicProduct['verified']) => {
+  if (value == null) return true;
   if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase();
     return normalized === 'true' || normalized === '1' || normalized === 'yes';
