@@ -14,14 +14,32 @@ export type SedifexCommentSummary = {
   isFavoritedByViewer: boolean;
 };
 
+type EngagementIdentityInput = {
+  publicProductId: string;
+  storeId?: string;
+  sourceProductId?: string;
+};
+
+type EngagementIdentityPayload = {
+  public_product_id: string;
+  store_id?: string;
+  source_product_id?: string;
+};
+
 const engagementApiBase =
   process.env.NEXT_PUBLIC_SEDIFEX_ENGAGEMENT_API_BASE_URL ?? process.env.SEDIFEX_ENGAGEMENT_API_BASE_URL ?? '';
 
-const buildIdentity = (input: { publicProductId: string; storeId?: string; sourceProductId?: string }) => ({
-  publicProductId: input.publicProductId,
-  ...(input.storeId ? { storeId: input.storeId } : {}),
-  ...(input.sourceProductId ? { sourceProductId: input.sourceProductId } : {}),
+const buildIdentityPayload = (input: EngagementIdentityInput): EngagementIdentityPayload => ({
+  public_product_id: input.publicProductId,
+  ...(input.storeId ? { store_id: input.storeId } : {}),
+  ...(input.sourceProductId ? { source_product_id: input.sourceProductId } : {}),
 });
+
+const applyIdentityQueryParams = (endpoint: URL, input: EngagementIdentityInput) => {
+  endpoint.searchParams.set('public_product_id', input.publicProductId);
+  if (input.storeId) endpoint.searchParams.set('store_id', input.storeId);
+  if (input.sourceProductId) endpoint.searchParams.set('source_product_id', input.sourceProductId);
+};
 
 const buildHeaders = (token?: string): HeadersInit => ({
   'Content-Type': 'application/json',
@@ -39,9 +57,7 @@ export const listEngagementComments = async (input: {
 }): Promise<SedifexComment[]> => {
   assertBase();
   const endpoint = new URL('/v1/engagement/comments', engagementApiBase);
-  endpoint.searchParams.set('publicProductId', input.publicProductId);
-  if (input.storeId) endpoint.searchParams.set('storeId', input.storeId);
-  if (input.sourceProductId) endpoint.searchParams.set('sourceProductId', input.sourceProductId);
+  applyIdentityQueryParams(endpoint, input);
 
   const response = await fetch(endpoint.toString(), { cache: 'no-store' });
   if (!response.ok) throw new Error(`Unable to load comments. Status ${response.status}`);
@@ -58,9 +74,7 @@ export const getEngagementSummary = async (input: {
 }): Promise<SedifexCommentSummary> => {
   assertBase();
   const endpoint = new URL('/v1/engagement/summary', engagementApiBase);
-  endpoint.searchParams.set('publicProductId', input.publicProductId);
-  if (input.storeId) endpoint.searchParams.set('storeId', input.storeId);
-  if (input.sourceProductId) endpoint.searchParams.set('sourceProductId', input.sourceProductId);
+  applyIdentityQueryParams(endpoint, input);
 
   const response = await fetch(endpoint.toString(), { headers: buildHeaders(input.token), cache: 'no-store' });
   if (!response.ok) throw new Error(`Unable to load summary. Status ${response.status}`);
@@ -83,7 +97,7 @@ export const postEngagementComment = async (input: {
   const response = await fetch(new URL('/v1/engagement/comments', engagementApiBase).toString(), {
     method: 'POST',
     headers: buildHeaders(input.token),
-    body: JSON.stringify({ ...buildIdentity(input), text: input.text }),
+    body: JSON.stringify({ ...buildIdentityPayload(input), text: input.text }),
   });
   if (!response.ok) throw new Error(`Unable to post comment. Status ${response.status}`);
 };
@@ -99,7 +113,7 @@ export const postEngagementFavorite = async (input: {
   const response = await fetch(new URL('/v1/engagement/reactions', engagementApiBase).toString(), {
     method: 'POST',
     headers: buildHeaders(input.token),
-    body: JSON.stringify({ ...buildIdentity(input), reaction: input.reaction }),
+    body: JSON.stringify({ ...buildIdentityPayload(input), reaction: input.reaction }),
   });
   if (!response.ok) throw new Error(`Unable to update favorite. Status ${response.status}`);
 };
