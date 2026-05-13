@@ -16,18 +16,20 @@ type CheckoutCreateBody = {
 
 export async function POST(request: NextRequest) {
   console.info('checkout.create.requested');
-  const body = (await request.json()) as CheckoutCreateBody;
-  const cart = Array.isArray(body.cart) ? body.cart : [];
 
-  if (cart.length === 0) {
-    console.warn('checkout.create.failed', { reason: 'empty_cart' });
-    return NextResponse.json({ error: 'Cart is required' }, { status: 400 });
-  }
+  try {
+    const body = (await request.json()) as CheckoutCreateBody;
+    const cart = Array.isArray(body.cart) ? body.cart : [];
 
-  const grouped = groupCartByMerchant(cart);
+    if (cart.length === 0) {
+      console.warn('checkout.create.failed', { reason: 'empty_cart' });
+      return NextResponse.json({ error: 'Cart is required' }, { status: 400 });
+    }
 
-  const merchantResults = await Promise.all(
-    Array.from(grouped.entries()).map(async ([merchantId, merchantCart]) => {
+    const grouped = groupCartByMerchant(cart);
+
+    const merchantResults = await Promise.all(
+      Array.from(grouped.entries()).map(async ([merchantId, merchantCart]) => {
       const preview = await previewMerchantCheckout(merchantId, merchantCart);
       const reference = createCheckoutReference(merchantId);
       const checkout = await createMerchantCheckout(merchantId, merchantCart, reference);
@@ -66,9 +68,14 @@ export async function POST(request: NextRequest) {
         checkoutUrl: checkoutPayload.authorizationUrl ?? checkoutPayload.checkoutUrl,
         preview,
       };
-    }),
-  );
+      }),
+    );
 
-  console.info('checkout.create.succeeded', { merchants: merchantResults.length });
-  return NextResponse.json({ ok: true, merchantCheckouts: merchantResults });
+    console.info('checkout.create.succeeded', { merchants: merchantResults.length });
+    return NextResponse.json({ ok: true, merchantCheckouts: merchantResults });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown checkout error';
+    console.error('checkout.create.failed', { message });
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 }

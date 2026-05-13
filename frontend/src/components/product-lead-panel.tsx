@@ -108,7 +108,8 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
       });
 
       if (!response.ok) {
-        throw new Error('Failed to submit checkout request');
+        const errorPayload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(errorPayload?.error ?? 'Failed to submit checkout request');
       }
 
       const payload = (await response.json()) as { merchantCheckouts?: Array<{ merchantId: string; reference: string; checkoutUrl?: string }> };
