@@ -427,6 +427,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
   const filterByVerifiedStore = useCallback(async (items: PublicProduct[]) => {
     if (!db || items.length === 0) return items;
+    const firestore = db;
 
     const uniqueStoreIds = Array.from(
       new Set(items.map((item) => item.storeId?.trim()).filter((value): value is string => Boolean(value))),
@@ -437,7 +438,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     await Promise.all(
       unresolvedStoreIds.map(async (storeId) => {
         try {
-          const snapshot = await getDoc(doc(db, 'stores', storeId));
+          const snapshot = await getDoc(doc(firestore, 'stores', storeId));
           const verified = snapshot.exists() ? asStoreVerified((snapshot.data() as Record<string, unknown>).verified) : false;
           storeVerifiedCacheRef.current.set(storeId, verified);
         } catch {
