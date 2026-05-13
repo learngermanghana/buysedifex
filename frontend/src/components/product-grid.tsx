@@ -416,36 +416,13 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<Set<string>>(new Set());
   const hasServerSideItemTypeFilter = itemTypeFilter !== 'all';
 
-  const hydrateVerifiedFromStores = useCallback(async (items: PublicProduct[]): Promise<PublicProduct[]> => {
-    const storeIds = Array.from(
-      new Set(items.map((item) => item.storeId?.trim()).filter((storeId): storeId is string => Boolean(storeId))),
-    );
-
-    if (storeIds.length === 0 || !db) {
-      return items;
+  const buildServerFilters = useCallback((): QueryConstraint[] => {
+    const filters: QueryConstraint[] = [where('isVisible', '==', true), where('verified', '==', true)];
+    if (hasServerSideItemTypeFilter) {
+      filters.push(where('itemType', '==', itemTypeFilter));
     }
-
-    const verifiedByStoreId = new Map<string, boolean>();
-
-    for (let index = 0; index < storeIds.length; index += 10) {
-      const chunk = storeIds.slice(index, index + 10);
-      const storesSnapshot = await getDocs(
-        query(collection(db, 'stores'), where(documentId(), 'in', chunk), limit(chunk.length)),
-      );
-
-      storesSnapshot.docs.forEach((storeDoc) => {
-        const storeData = storeDoc.data() as { verified?: boolean | string };
-        verifiedByStoreId.set(storeDoc.id, isVerifiedStore(storeData.verified));
-      });
-    }
-
-    return items.map((item) => {
-      const storeId = item.storeId?.trim();
-      if (!storeId) return item;
-      if (!verifiedByStoreId.has(storeId)) return item;
-      return { ...item, verified: verifiedByStoreId.get(storeId) === true };
-    });
-  }, []);
+    return filters;
+  }, [hasServerSideItemTypeFilter, itemTypeFilter]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -578,7 +555,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setDebugInfo(null);
 
     try {
-      const filters: QueryConstraint[] = [];
+      const filters = buildServerFilters();
 
       const orderOptions: QueryConstraint[][] =
         selectedSort === 'price'
@@ -621,7 +598,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                   matchesItemTypeFilter(item.itemType, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
               );
 
-            const batchItems = (await hydrateVerifiedFromStores(batchItemsRaw)).filter((item) => isVerifiedStore(item.verified));
+            const batchItems = batchItemsRaw.filter((item) => isVerifiedStore(item.verified));
 
             collectedItems.push(...batchItems);
             latestSnapshotDoc = scanSnapshot.docs.at(-1) ?? latestSnapshotDoc;
@@ -677,9 +654,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                 continue;
               }
 
-              const fallbackBatch = (await hydrateVerifiedFromStores(fallbackBatchRaw)).filter((item) =>
-                isVerifiedStore(item.verified),
-              );
+              const fallbackBatch = fallbackBatchRaw.filter((item) => isVerifiedStore(item.verified));
               fallbackBatch.forEach((item) => {
                 if (!seenIds.has(item.id)) {
                   seenIds.add(item.id);
@@ -750,7 +725,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [hasServerSideItemTypeFilter, hydrateVerifiedFromStores, itemTypeFilter, selectedSort]);
+  }, [buildServerFilters, hasServerSideItemTypeFilter, itemTypeFilter, selectedSort]);
 
   const fetchProductsForSearch = useCallback(async () => {
     if (!db) {
@@ -763,7 +738,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setDebugInfo(null);
 
     try {
-      const filters: QueryConstraint[] = [];
+      const filters = buildServerFilters();
 
       const allItems: PublicProduct[] = [];
       let cursor: QueryDocumentSnapshot | undefined;
@@ -784,7 +759,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             (item) => matchesItemTypeFilter(item.itemType, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
           );
 
-        const batchItems = (await hydrateVerifiedFromStores(batchItemsRaw)).filter((item) => isVerifiedStore(item.verified));
+        const batchItems = batchItemsRaw.filter((item) => isVerifiedStore(item.verified));
 
         allItems.push(...batchItems);
 
@@ -808,7 +783,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [hydrateVerifiedFromStores, itemTypeFilter]);
+  }, [buildServerFilters, itemTypeFilter]);
 
   useEffect(() => {
     setProducts([]);
