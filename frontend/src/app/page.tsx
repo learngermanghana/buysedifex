@@ -42,14 +42,19 @@ const trendingCategories = [
 export default function HomePage() {
   return (
     <main className="container">
-      <section className="commerceHero" aria-label="Professional shopping hero">
+      <section className="commerceHero" aria-label="Sedifex commerce ecosystem hero">
         <div className="commerceHeroContent">
           <p className="eyebrow">Sedifex Marketplace</p>
-          <h1>Shop smarter with trusted stores, fast deals, and verified sellers.</h1>
+          <h1>From storefront to marketplace — powered by Sedifex.</h1>
           <p>
-            Inspired by leading marketplaces, Sedifex gives you a professional shopping experience with store-first
-            discovery, real-time chat, and secure order confidence.
+            We connect the full commerce journey: store operations, inventory visibility, websites, WhatsApp support,
+            delivery, and payments in one trusted ecosystem.
           </p>
+          <div className="heroStats" aria-label="Sedifex platform capabilities">
+            <div><strong>6</strong><span>systems connected</span></div>
+            <div><strong>1</strong><span>commerce engine</span></div>
+            <div><strong>24/7</strong><span>buyer touchpoints</span></div>
+          </div>
           <div className="heroActions">
             <Link href="/stores" className="btn btnPrimary">
               Shop by store
@@ -62,7 +67,16 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
-        <div className="commerceHeroVisual" role="img" aria-label="Modern ecommerce showcase with featured products" />
+        <div className="commerceHeroVisual" role="img" aria-label="Sedifex ecosystem connecting storefront, inventory, website, WhatsApp, delivery, marketplace, and payments">
+          <div className="ecosystemHub">Sedifex</div>
+          <span className="ecosystemNode nodeStore">Store</span>
+          <span className="ecosystemNode nodeInventory">Inventory</span>
+          <span className="ecosystemNode nodeWebsite">Website</span>
+          <span className="ecosystemNode nodeWhatsapp">WhatsApp</span>
+          <span className="ecosystemNode nodeDelivery">Delivery</span>
+          <span className="ecosystemNode nodeMarketplace">Marketplace</span>
+          <span className="ecosystemNode nodePayments">Payments</span>
+        </div>
       </section>
 
       <section className="quickLinksStrip" aria-label="Trending categories">
