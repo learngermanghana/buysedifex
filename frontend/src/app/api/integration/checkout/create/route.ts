@@ -7,6 +7,7 @@ import {
   groupCartByMerchant,
   previewMerchantCheckout,
   type CheckoutItem,
+  type SedifexCheckoutPreviewResponse,
 } from '@/lib/sedifex-checkout';
 
 type CheckoutCreateBody = {
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
       Array.from(grouped.entries()).map(async ([merchantId, merchantCart]) => {
       const preview = await previewMerchantCheckout(merchantId, merchantCart);
       const reference = createCheckoutReference(merchantId);
-      const checkout = await createMerchantCheckout(merchantId, merchantCart, reference);
+      const checkout = await createMerchantCheckout(merchantId, merchantCart, reference, preview);
 
       const checkoutRecord = {
         merchantId,
@@ -40,9 +41,13 @@ export async function POST(request: NextRequest) {
         customer: body.customer ?? null,
         cart: merchantCart,
         pricingSnapshot: preview,
+        pricing_snapshot: preview,
         paymentReference: reference,
+        payment_reference: reference,
         paymentStatus: 'pending',
+        payment_status: 'pending',
         orderStatus: 'pending',
+        order_status: 'pending',
         bookingStatus: 'booked',
         paymentCollectionMode: 'online_checkout',
         syncStatus: 'pending',
@@ -59,14 +64,21 @@ export async function POST(request: NextRequest) {
         authorizationUrl?: string;
         checkoutUrl?: string;
         bookingId?: string;
+        payment_reference?: string;
+        payment_status?: string;
+        order_status?: string;
+        pricing_snapshot?: SedifexCheckoutPreviewResponse;
       };
 
       return {
         merchantId,
         reference,
+        payment_reference: checkoutPayload.payment_reference ?? reference,
+        payment_status: checkoutPayload.payment_status ?? 'pending',
+        order_status: checkoutPayload.order_status ?? 'pending',
         bookingId: checkoutPayload.bookingId ?? reference,
         checkoutUrl: checkoutPayload.authorizationUrl ?? checkoutPayload.checkoutUrl,
-        preview,
+        preview: checkoutPayload.pricing_snapshot ?? preview,
       };
       }),
     );
