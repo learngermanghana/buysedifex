@@ -417,7 +417,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const hasServerSideItemTypeFilter = itemTypeFilter !== 'all';
 
   const buildServerFilters = useCallback((): QueryConstraint[] => {
-    const filters: QueryConstraint[] = [where('isVisible', '==', true), where('verified', '==', true)];
+    const filters: QueryConstraint[] = [];
     if (hasServerSideItemTypeFilter) {
       filters.push(where('itemType', '==', itemTypeFilter));
     }
