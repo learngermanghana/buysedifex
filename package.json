@@ -7,7 +7,9 @@
     "build": "npm run install:frontend && npm --prefix frontend run build",
     "dev": "npm --prefix frontend run dev",
     "start": "npm --prefix frontend run start",
-    "deploy:firestore": "firebase deploy --only firestore:indexes,firestore:rules"
+    "deploy:firestore": "firebase deploy --only firestore:indexes,firestore:rules",
+    "test:functions:unit": "npm --prefix functions test",
+    "test:functions:integration": "npm --prefix functions run build && npx firebase-tools emulators:exec --project demo-buy-sedifex --only firestore,functions \"npm --prefix functions run test:integration\""
   },
   "engines": {
     "node": ">=18.18.0"

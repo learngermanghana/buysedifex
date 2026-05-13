@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import { logger } from 'firebase-functions';
+import { logPublicProductOperation } from './observability';
 import { getDb } from './db';
 import { normalizeCategory, normalizeProduct, normalizeStore, normalizeText } from './normalization';
 import { computeRankingScore } from './ranking';
@@ -90,7 +91,9 @@ async function safeDeletePublicProduct(storeId: string, productId: string, reaso
   const db = getDb();
   try {
     await db.collection(PUBLIC_PRODUCTS_COLLECTION).doc(publicProductId(storeId, productId)).delete();
+    logPublicProductOperation({ operation: 'delete', storeId, productId, reason });
   } catch (error) {
+    logPublicProductOperation({ operation: 'failure', storeId, productId, reason, error });
     logger.error('Failed to delete public product document', { storeId, productId, reason, error });
   }
 }
@@ -113,6 +116,7 @@ export async function upsertOrDeletePublicProduct(params: {
   }
 
   await ref.set(toPublicProductDoc({ storeId, productId, store, product }), { merge: true });
+  logPublicProductOperation({ operation: 'upsert', storeId, productId, reason: 'visible' });
 }
 
 export async function rebuildPublicProductsForStore(storeId: string): Promise<void> {
@@ -154,6 +158,7 @@ export async function rebuildPublicProductsForStore(storeId: string): Promise<vo
   }
 
   if (ops > 0) await batch.commit();
+  logPublicProductOperation({ operation: 'replay', storeId, reason: 'rebuild-complete', count: productsSnap.size, source: 'rebuildPublicProductsForStore' });
   logger.info('Rebuild completed', { storeId, productsProcessed: productsSnap.size });
 }
 
