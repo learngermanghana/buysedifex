@@ -478,41 +478,12 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     },
     from: [{ collectionId: 'publicProducts' }],
     where: {
-      compositeFilter: {
-        op: 'AND',
-        filters: [
-          {
-            fieldFilter: {
-              field: { fieldPath },
-              op: 'EQUAL',
-              value: { stringValue: value },
-            },
-          },
-          {
-            compositeFilter: {
-              op: 'OR',
-              filters: [
-                {
-                  fieldFilter: {
-                    field: { fieldPath: 'isVisible' },
-                    op: 'EQUAL',
-                    value: { booleanValue: true },
-                  },
-                },
-                {
-                  fieldFilter: {
-                    field: { fieldPath: 'isPublished' },
-                    op: 'EQUAL',
-                    value: { booleanValue: true },
-                  },
-                },
-              ],
-            },
-          },
-        ],
+      fieldFilter: {
+        field: { fieldPath },
+        op: 'EQUAL',
+        value: { stringValue: value },
       },
     },
-    orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
     limit: 60,
   });
 
@@ -755,38 +726,14 @@ export const listPublicCategoryKeys = async (limitCount = 600): Promise<string[]
 export const listPublicStoreIds = async (limitCount = 200): Promise<string[]> => {
   const query = {
     select: {
-      fields: [{ fieldPath: 'storeId' }, { fieldPath: 'publishedAt' }],
+      fields: [
+        { fieldPath: 'storeId' },
+        { fieldPath: 'publishedAt' },
+        { fieldPath: 'isVisible' },
+        { fieldPath: 'isPublished' },
+      ],
     },
     from: [{ collectionId: 'publicProducts' }],
-    where: {
-      compositeFilter: {
-        op: 'AND',
-        filters: [
-          {
-            compositeFilter: {
-              op: 'OR',
-              filters: [
-                {
-                  fieldFilter: {
-                    field: { fieldPath: 'isVisible' },
-                    op: 'EQUAL',
-                    value: { booleanValue: true },
-                  },
-                },
-                {
-                  fieldFilter: {
-                    field: { fieldPath: 'isPublished' },
-                    op: 'EQUAL',
-                    value: { booleanValue: true },
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      },
-    },
-    orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
     limit: limitCount,
   };
 
