@@ -62,6 +62,15 @@ export default function HomePage() {
             <Link href="/categories" className="btn btnSecondary">
               Explore categories
             </Link>
+            <Link href="/search" className="btn btnGhost">
+              Search products
+            </Link>
+            <Link href="/about" className="btn btnGhost">
+              About Sedifex
+            </Link>
+            <Link href="/contact" className="btn btnGhost">
+              Contact us
+            </Link>
             <Link href="/sell" className="btn btnGhost">
               Become a seller
             </Link>
@@ -131,6 +140,27 @@ export default function HomePage() {
           <h2>Professional deal discovery</h2>
           <p>Browse curated promos, trending categories, and featured products in one clean homepage.</p>
         </article>
+      </section>
+
+
+      <section className="activityStrip" aria-label="Marketplace activity feed">
+        <article><strong>1,240+</strong><span>verified products</span></article>
+        <article><strong>53</strong><span>stores onboarded in May 2026</span></article>
+        <article><strong>Trending</strong><span>Beauty essentials in Accra</span></article>
+        <article><strong>New</strong><span>Fresh arrivals this week</span></article>
+      </section>
+
+      <section className="darkCommerceSection" aria-label="Why stores choose Sedifex">
+        <div>
+          <p className="eyebrow">Merchant infrastructure</p>
+          <h2>Why stores choose Sedifex</h2>
+          <p>Beyond listings, Sedifex helps merchants sync inventory, distribute catalogs, and scale trusted omnichannel commerce.</p>
+        </div>
+        <ul>
+          <li>Commerce sync engine for storefront, WhatsApp, and marketplace</li>
+          <li>Trust layer with verification, badges, and merchant credibility signals</li>
+          <li>Distribution layer connecting discovery, checkout, and delivery partners</li>
+        </ul>
       </section>
 
       <div className="homeColumns">
