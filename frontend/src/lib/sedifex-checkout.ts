@@ -111,8 +111,6 @@ export const previewMerchantCheckout = async (merchantId: string, items: Checkou
   const payload: SedifexCheckoutPreviewRequest = {
     store_id: merchantId,
     merchant_id: merchantId,
-    storeId: merchantId,
-    merchantId: merchantId,
     fulfillment_type: 'PICKUP',
     delivery_address_id: null,
     items: items.map((item) => ({ type: item.type ?? 'PRODUCT', item_id: item.productId, qty: item.quantity })),
