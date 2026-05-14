@@ -22,9 +22,7 @@ export type MerchantCheckoutInit = {
 
 export type SedifexCheckoutPreviewRequest = {
   store_id: string;
-  storeId?: string;
   merchant_id?: string;
-  merchantId?: string;
   currency?: string;
   fulfillment_type?: 'PICKUP' | 'DELIVERY';
   delivery_address_id?: string | null;
@@ -110,7 +108,7 @@ export const createCheckoutReference = (merchantId: string) =>
 
 export const previewMerchantCheckout = async (merchantId: string, items: CheckoutItem[]) => {
   const merchantToken = getRequiredEnv(`SEDIFEX_MERCHANT_TOKEN_${merchantId}`);
-  const payload = {
+  const payload: SedifexCheckoutPreviewRequest = {
     store_id: merchantId,
     merchant_id: merchantId,
     storeId: merchantId,
