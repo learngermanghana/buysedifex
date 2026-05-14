@@ -21,7 +21,10 @@ export type MerchantCheckoutInit = {
 };
 
 export type SedifexCheckoutPreviewRequest = {
-  merchant_id: string;
+  store_id: string;
+  storeId?: string;
+  merchant_id?: string;
+  merchantId?: string;
   currency?: string;
   fulfillment_type?: 'PICKUP' | 'DELIVERY';
   delivery_address_id?: string | null;
@@ -92,6 +95,9 @@ export const groupCartByMerchant = (items: CheckoutItem[]) => {
   const grouped = new Map<string, CheckoutItem[]>();
   for (const item of items) {
     const merchantId = item.merchantId.trim();
+    if (!merchantId) {
+      throw new Error(`Cart item ${item.productId} is missing merchantId/storeId`);
+    }
     const next = grouped.get(merchantId) ?? [];
     next.push(item);
     grouped.set(merchantId, next);
@@ -104,8 +110,11 @@ export const createCheckoutReference = (merchantId: string) =>
 
 export const previewMerchantCheckout = async (merchantId: string, items: CheckoutItem[]) => {
   const merchantToken = getRequiredEnv(`SEDIFEX_MERCHANT_TOKEN_${merchantId}`);
-  const payload: SedifexCheckoutPreviewRequest = {
+  const payload = {
+    store_id: merchantId,
     merchant_id: merchantId,
+    storeId: merchantId,
+    merchantId: merchantId,
     fulfillment_type: 'PICKUP',
     delivery_address_id: null,
     items: items.map((item) => ({ type: item.type ?? 'PRODUCT', item_id: item.productId, qty: item.quantity })),
@@ -134,7 +143,10 @@ export const createMerchantCheckout = async (
       'x-api-key': merchantToken,
     },
     body: JSON.stringify({
+      store_id: merchantId,
       merchant_id: merchantId,
+      storeId: merchantId,
+      merchantId: merchantId,
       payment_reference: reference,
       client_order_id: reference,
       items: items.map((item) => ({ type: item.type ?? 'PRODUCT', item_id: item.productId, qty: item.quantity })),
