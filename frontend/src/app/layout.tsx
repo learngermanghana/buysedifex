@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Inter, Sora } from 'next/font/google';
 import Image from 'next/image';
 import Link from 'next/link';
 import { MainNav } from '@/components/main-nav';
@@ -39,6 +40,9 @@ export const metadata: Metadata = {
   },
 };
 
+const inter = Inter({ subsets: ['latin'], variable: '--font-body' });
+const sora = Sora({ subsets: ['latin'], variable: '--font-heading' });
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -49,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           crossOrigin="anonymous"
         ></script>
       </head>
-      <body>
+      <body className={`${inter.variable} ${sora.variable}`}>
         <WebVitalsReporter />
         <header className="siteHeader">
           <div className="container siteHeaderInner">

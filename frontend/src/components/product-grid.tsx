@@ -953,8 +953,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                         item.storeName ?? 'Unknown store'
                       )}
                       {isVerifiedStore(item.verified) ? (
-                        <span className="verifiedBadge" aria-label="Verified store">
-                          Verified
+                        <span className="verifiedBadge" aria-label="Verified by Sedifex">
+                          <span className="verifiedPulse" aria-hidden="true" />
+                          Verified by Sedifex
                         </span>
                       ) : null}
                     </span>
@@ -962,6 +963,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                   </div>
                   <p>City: {getStoreCity(item)}</p>
                   <p>Phone: {getStorePhone(item)}</p>
+                  {isVerifiedStore(item.verified) ? <p className="trustScoreCard">Trust score: 98 / 100</p> : null}
                   <div className="cardActions">
                     <Link href={getProductHref(item.id, item.productName)} className="buyNowButton" aria-label={`Buy ${getProductName(item)} now`}>
                       Buy now
