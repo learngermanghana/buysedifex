@@ -93,6 +93,9 @@ export const groupCartByMerchant = (items: CheckoutItem[]) => {
   const grouped = new Map<string, CheckoutItem[]>();
   for (const item of items) {
     const merchantId = item.merchantId.trim();
+    if (!merchantId) {
+      throw new Error(`Cart item ${item.productId} is missing merchantId/storeId`);
+    }
     const next = grouped.get(merchantId) ?? [];
     next.push(item);
     grouped.set(merchantId, next);
