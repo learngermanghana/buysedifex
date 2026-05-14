@@ -22,9 +22,7 @@ export type MerchantCheckoutInit = {
 
 export type SedifexCheckoutPreviewRequest = {
   store_id: string;
-  storeId?: string;
   merchant_id?: string;
-  merchantId?: string;
   currency?: string;
   fulfillment_type?: 'PICKUP' | 'DELIVERY';
   delivery_address_id?: string | null;

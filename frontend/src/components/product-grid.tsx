@@ -19,7 +19,6 @@ import {
   where,
 } from 'firebase/firestore';
 import { db, firebaseConfigError } from '@/lib/firebase';
-import { FormattedDescription } from '@/components/formatted-description';
 import { getStoreHref } from '@/lib/store-route';
 import { getProductHref } from '@/lib/product-route';
 import { resolveClosestCategoryKey } from '@/lib/category-taxonomy';
@@ -166,7 +165,6 @@ const getCategory = (item: PublicProduct) =>
     itemType: item.itemType,
   });
 
-const getStorePhone = (item: PublicProduct) => getContactPhone(item) || 'Phone unavailable';
 
 const getStoreCity = (item: PublicProduct) => {
   const rawCity = item.city ?? item.storeCity;
@@ -460,7 +458,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
-  const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<Set<string>>(new Set());
   const hasServerSideItemTypeFilter = itemTypeFilter !== 'all';
 
   const buildServerFilters = useCallback((): QueryConstraint[] => {
@@ -578,17 +575,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     return mixProductsByCategoryThenStore(sortedProducts);
   }, [expandedSearchTerms, itemTypeFilter, products, searchText, selectedCity, selectedSort]);
 
-  const toggleDescription = (productId: string) => {
-    setExpandedDescriptionIds((current) => {
-      const next = new Set(current);
-      if (next.has(productId)) {
-        next.delete(productId);
-      } else {
-        next.add(productId);
-      }
-      return next;
-    });
-  };
 
   const fetchProducts = useCallback(async (cursor?: QueryDocumentSnapshot) => {
     if (!db) {
@@ -920,9 +906,10 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
           : visibleProducts.map((item) => {
               const storeHref = getStoreHref(item.storeId, item.storeName);
               const whatsAppHref = getWhatsAppHref(item);
-              const shouldCollapseDescription = (item.description?.trim().length ?? 0) > 260;
-              const isExpanded = expandedDescriptionIds.has(item.id);
-              const descriptionClassName = `formattedDescription compact ${shouldCollapseDescription && !isExpanded ? 'isCollapsed' : ''}`.trim();
+              const shortDescription = (item.description ?? '')
+                .split(/\n+/)
+                .map((line) => line.trim())
+                .filter(Boolean)[0] ?? '';
 
               return (
                 <article key={item.id} className="card">
@@ -939,12 +926,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                     />
                   </div>
                   <h3>{getProductName(item)}</h3>
-                  <FormattedDescription text={item.description ?? ''} className={descriptionClassName} />
-                  {shouldCollapseDescription && (
-                    <button type="button" className="descriptionToggle" onClick={() => toggleDescription(item.id)}>
-                      {isExpanded ? 'View less' : 'View more'}
-                    </button>
-                  )}
+                  <p className="productShortDescription">{shortDescription}</p>
                   <div className="meta">
                     <span className="storeIdentity">
                       {storeHref ? (
@@ -961,9 +943,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                     </span>
                     <strong>{formatPrice(item.price, item.currency)}</strong>
                   </div>
-                  <p>City: {getStoreCity(item)}</p>
-                  <p>Phone: {getStorePhone(item)}</p>
-                  {isVerifiedStore(item.verified) ? <p className="trustScoreCard">Trust score: 98 / 100</p> : null}
+                  {isVerifiedStore(item.verified) ? <p className="trustScoreCard">🛡 Sedifex Trust+ 98%</p> : null}
                   <div className="cardActions">
                     <Link href={getProductHref(item.id, item.productName)} className="buyNowButton" aria-label={`Buy ${getProductName(item)} now`}>
                       Buy now
