@@ -906,8 +906,10 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
           : visibleProducts.map((item) => {
               const storeHref = getStoreHref(item.storeId, item.storeName);
               const whatsAppHref = getWhatsAppHref(item);
-              const shortDescription = (item.description ?? '').split(/
-+/).map((line) => line.trim()).filter(Boolean)[0] ?? '';
+              const shortDescription = (item.description ?? '')
+                .split(/\n+/)
+                .map((line) => line.trim())
+                .filter(Boolean)[0] ?? '';
 
               return (
                 <article key={item.id} className="card">
