@@ -2,13 +2,14 @@
   --brand-deep-indigo: #4338ca;
   --brand-bright-indigo: #6366f1;
   --brand-accent-emerald: #10b981;
+  --brand-signature-gradient: linear-gradient(120deg, var(--brand-deep-indigo) 0%, var(--brand-bright-indigo) 52%, var(--brand-accent-emerald) 100%);
   --bg-surface: #f8fafc;
   --bg-card: #ffffff;
   --border-neutral: #e5e7eb;
   --text-primary: #0f172a;
   --text-muted: #475569;
   color-scheme: light;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-body), Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   background: linear-gradient(170deg, #f8fafc 0%, #eef2ff 46%, #ecfeff 100%);
   color: var(--text-primary);
 }
@@ -17,6 +18,27 @@
   box-sizing: border-box;
 }
 
+
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading), var(--font-body), Inter, system-ui, sans-serif;
+  letter-spacing: -0.022em;
+  line-height: 1.1;
+  font-weight: 750;
+}
+
+p,
+li,
+a,
+label,
+input,
+select,
+button {
+  font-family: var(--font-body), Inter, system-ui, sans-serif;
+}
 body {
   margin: 0;
   min-height: 100vh;
@@ -130,7 +152,9 @@ body {
 .commerceHeroContent h1 {
   margin: 0;
   font-size: clamp(1.7rem, 2.8vw, 2.4rem);
-  line-height: 1.15;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  font-weight: 800;
 }
 
 .commerceHeroContent p {
@@ -325,7 +349,10 @@ body {
 
 .hero h1 {
   margin: 0;
-  font-size: clamp(1.6rem, 2.6vw, 2.3rem);
+  font-size: clamp(1.9rem, 3.1vw, 2.8rem);
+  line-height: 1.03;
+  letter-spacing: -0.03em;
+  font-weight: 800;
 }
 
 .hero p {
@@ -349,8 +376,9 @@ body {
 }
 
 .btnPrimary {
-  background: linear-gradient(135deg, var(--brand-deep-indigo), var(--brand-bright-indigo));
+  background: var(--brand-signature-gradient);
   color: #fff;
+  box-shadow: 0 10px 25px -16px rgba(6, 95, 70, 0.8);
 }
 
 .btnSecondary {
@@ -563,13 +591,37 @@ select:focus {
 }
 
 .verifiedBadge {
-  background: #ecfdf5;
-  border: 1px solid #6ee7b7;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: linear-gradient(120deg, #ecfdf5 0%, #d1fae5 55%, #ccfbf1 100%);
+  border: 1px solid #34d399;
   color: #065f46;
   border-radius: 999px;
   font-size: 0.7rem;
   font-weight: 700;
-  padding: 0.1rem 0.45rem;
+  padding: 0.14rem 0.5rem;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.15), 0 6px 16px -12px rgba(5, 150, 105, 0.9);
+}
+
+.verifiedPulse {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.65);
+  animation: verificationPulse 1.9s ease-out infinite;
+}
+
+.trustScoreCard {
+  margin: 0;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  border-radius: 0.6rem;
+  padding: 0.38rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #065f46;
+  background: linear-gradient(120deg, rgba(236, 253, 245, 0.95), rgba(219, 234, 254, 0.8));
 }
 
 .waButton,
@@ -610,8 +662,9 @@ select:focus {
 }
 
 .buyNowButton {
-  background: linear-gradient(135deg, var(--brand-deep-indigo), var(--brand-bright-indigo));
+  background: var(--brand-signature-gradient);
   color: #fff;
+  box-shadow: 0 10px 25px -16px rgba(6, 95, 70, 0.8);
 }
 
 .contactStoreButton {
@@ -625,11 +678,11 @@ select:focus {
 }
 
 .actions button {
-  background: linear-gradient(135deg, var(--brand-deep-indigo), var(--brand-bright-indigo));
+  background: var(--brand-signature-gradient);
 }
 
 .requestButton {
-  background: linear-gradient(135deg, var(--brand-bright-indigo), var(--brand-deep-indigo));
+  background: var(--brand-signature-gradient);
 }
 
 .waButton:hover,
@@ -697,6 +750,12 @@ select:focus {
 .chip:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+@keyframes verificationPulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  70% { box-shadow: 0 0 0 0.52rem rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
 @keyframes shimmer {
@@ -813,7 +872,8 @@ select:focus {
   padding: 0.3rem;
   border: 1px solid #cbd5e1;
   border-radius: 999px;
-  background: #ffffffcc;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(224, 231, 255, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.15);
   width: fit-content;
   margin-bottom: 1rem;
 }
@@ -833,8 +893,9 @@ select:focus {
 }
 
 .sectionTabs a.active {
-  background: linear-gradient(135deg, var(--brand-deep-indigo), var(--brand-bright-indigo));
+  background: var(--brand-signature-gradient);
   color: #fff;
+  box-shadow: 0 10px 25px -16px rgba(6, 95, 70, 0.8);
 }
 
 .infoPage {
