@@ -56,6 +56,9 @@ export default function HomePage() {
             <div><strong>24/7</strong><span>buyer touchpoints</span></div>
           </div>
           <div className="heroActions">
+            <Link href="/search" className="btn btnPrimary">
+              Search products
+            </Link>
             <Link href="/stores" className="btn btnPrimary">
               Shop by store
             </Link>
@@ -64,6 +67,12 @@ export default function HomePage() {
             </Link>
             <Link href="/sell" className="btn btnGhost">
               Become a seller
+            </Link>
+            <Link href="/about" className="btn btnGhost">
+              About Sedifex
+            </Link>
+            <Link href="/contact" className="btn btnGhost">
+              Contact us
             </Link>
           </div>
         </div>

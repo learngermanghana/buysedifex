@@ -6,7 +6,7 @@ import { FormattedDescription } from '@/components/formatted-description';
 import { ShareButton } from '@/components/share-button';
 import { ProductLeadPanel } from '@/components/product-lead-panel';
 import { ProductEngagementPanel } from '@/components/product-engagement-panel';
-import { getPublicProductById } from '@/lib/public-products';
+import { getPublicProductById, listSimilarPublicProducts } from '@/lib/public-products';
 import { getStoreProfileById } from '@/lib/public-stores';
 import { getStoreHref, getStoreRouteId } from '@/lib/store-route';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
@@ -108,6 +108,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   }
 
   const storeProfile = product.storeId ? await getStoreProfileById(product.storeId) : null;
+  const similarProducts = await listSimilarPublicProducts(product, 6);
   const resolvedStoreName = storeProfile?.storeName ?? product.storeName;
   const resolvedLocation =
     [storeProfile?.city ?? product.city, storeProfile?.country ?? product.country].filter(Boolean).join(', ') ||
@@ -250,6 +251,45 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             sourceProductId={product.sourceProductId}
             isPublished={product.isPublished}
           />
+
+          {similarProducts.length > 0 ? (
+            <section className="productStoreCard" aria-label="Similar products">
+              <h2>Similar products you can explore</h2>
+              <div className="grid">
+                {similarProducts.map((similarProduct) => {
+                  const similarPriceLabel =
+                    similarProduct.price == null
+                      ? 'Price unavailable'
+                      : `${normalizeDisplayCurrency(similarProduct.currency) === 'GHS' ? 'Cedis (GH₵)' : normalizeDisplayCurrency(similarProduct.currency)} ${similarProduct.price.toFixed(2)}`;
+
+                  return (
+                    <article key={similarProduct.id} className="card">
+                      <div className="imageWrap">
+                        <Image
+                          src={similarProduct.imageUrls[0]}
+                          alt={similarProduct.imageAlt?.trim() || similarProduct.productName}
+                          loading="lazy"
+                          unoptimized
+                          width={360}
+                          height={360}
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                          style={{ width: '100%', height: 'auto' }}
+                        />
+                      </div>
+                      <h3>{similarProduct.productName}</h3>
+                      <p>{similarProduct.storeName}</p>
+                      <strong>{similarPriceLabel}</strong>
+                      <div className="cardActions">
+                        <Link href={getProductHref(similarProduct.id, similarProduct.productName)} className="buyNowButton">
+                          View product
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
         </div>
 
         <ProductLeadPanel

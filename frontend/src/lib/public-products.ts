@@ -311,3 +311,81 @@ export const listPublicProductIds = async (limitCount = 200): Promise<string[]> 
     .flatMap((row) => (row.document?.name ? [row.document.name.split('/').at(-1) ?? ''] : []))
     .filter((id) => id.length > 0);
 };
+
+export const listSimilarPublicProducts = async (
+  product: Pick<PublicProductDetail, 'id' | 'categoryKey' | 'storeId'>,
+  limitCount = 6,
+): Promise<PublicProductDetail[]> => {
+  if (!projectId || !product.id) {
+    return [];
+  }
+
+  const endpoint = new URL(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`);
+  if (firebaseApiKey) {
+    endpoint.searchParams.set('key', firebaseApiKey);
+  }
+
+  const baseFilters: Array<Record<string, unknown>> = [
+    {
+      fieldFilter: {
+        field: { fieldPath: 'isVisible' },
+        op: 'EQUAL',
+        value: { booleanValue: true },
+      },
+    },
+  ];
+  const categoryFilters = product.categoryKey
+    ? [
+        ...baseFilters,
+        {
+          fieldFilter: {
+            field: { fieldPath: 'categoryKey' },
+            op: 'EQUAL',
+            value: { stringValue: product.categoryKey },
+          },
+        },
+      ]
+    : baseFilters;
+
+  const runSimilarQuery = async (filters: Array<Record<string, unknown>>, queryLimit: number) => {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'publicProducts' }],
+          where: {
+            compositeFilter: {
+              op: 'AND',
+              filters,
+            },
+          },
+          orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
+          limit: queryLimit,
+        },
+      }),
+      next: { revalidate: 300 },
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const rows = (await response.json()) as Array<{ document?: FirestoreDocument }>;
+    return rows
+      .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
+      .filter((entry) => entry.id !== product.id && entry.imageUrls.length > 0 && entry.storeId !== product.storeId);
+  };
+
+  const primaryResults = await runSimilarQuery(categoryFilters, limitCount + 8);
+  if (primaryResults.length >= limitCount) {
+    return primaryResults.slice(0, limitCount);
+  }
+
+  const fallbackResults = await runSimilarQuery(baseFilters, limitCount + 16);
+  const deduped = [...primaryResults, ...fallbackResults].filter(
+    (item, index, source) => source.findIndex((candidate) => candidate.id === item.id) === index,
+  );
+
+  return deduped.slice(0, limitCount);
+};
