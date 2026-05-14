@@ -23,6 +23,8 @@ export type MerchantCheckoutInit = {
 export type SedifexCheckoutPreviewRequest = {
   store_id: string;
   merchant_id?: string;
+  storeId?: string;
+  merchantId?: string;
   currency?: string;
   fulfillment_type?: 'PICKUP' | 'DELIVERY';
   delivery_address_id?: string | null;
@@ -94,7 +96,7 @@ export const groupCartByMerchant = (items: CheckoutItem[]) => {
   for (const item of items) {
     const merchantId = item.merchantId.trim();
     if (!merchantId) {
-      throw new Error(`Cart item ${item.productId} is missing merchantId/storeId`);
+      throw new Error(`Cart item ${item.productId} is missing merchantId/storeId. Each cart item merchantId must match your Sedifex store ID.`);
     }
     const next = grouped.get(merchantId) ?? [];
     next.push(item);
@@ -111,6 +113,8 @@ export const previewMerchantCheckout = async (merchantId: string, items: Checkou
   const payload: SedifexCheckoutPreviewRequest = {
     store_id: merchantId,
     merchant_id: merchantId,
+    storeId: merchantId,
+    merchantId: merchantId,
     fulfillment_type: 'PICKUP',
     delivery_address_id: null,
     items: items.map((item) => ({ type: item.type ?? 'PRODUCT', item_id: item.productId, qty: item.quantity })),
