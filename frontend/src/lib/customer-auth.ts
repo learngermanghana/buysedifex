@@ -6,7 +6,7 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth';
-import { addDoc, collection, getDocs, orderBy, query, serverTimestamp, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db, firebaseConfigError, getFirebaseAuth } from '@/lib/firebase';
 
 export type PurchaseHistoryItem = {
@@ -24,6 +24,12 @@ export type PurchaseHistoryItem = {
   orderCompletedAt?: string;
 };
 
+export type CustomerProfile = {
+  fullName: string;
+  email: string;
+  phone: string;
+};
+
 const assertFirebaseReady = () => {
   if (firebaseConfigError || !getFirebaseAuth() || !db) {
     throw new Error(firebaseConfigError ?? 'Firebase is not configured.');
@@ -32,12 +38,24 @@ const assertFirebaseReady = () => {
 
 const getAuthErrorMessage = (fallback: string) => fallback;
 
-export const registerCustomer = async (input: { fullName: string; email: string; password: string }) => {
+export const registerCustomer = async (input: { fullName: string; email: string; phone: string; password: string }) => {
   assertFirebaseReady();
   const credential = await createUserWithEmailAndPassword(getFirebaseAuth()!, input.email.trim(), input.password);
-  if (input.fullName.trim()) {
-    await updateProfile(credential.user, { displayName: input.fullName.trim() });
+  const fullName = input.fullName.trim();
+  const email = input.email.trim();
+  const phone = input.phone.trim();
+
+  if (fullName) {
+    await updateProfile(credential.user, { displayName: fullName });
   }
+
+  await setDoc(doc(db!, 'customerProfiles', credential.user.uid), {
+    fullName,
+    email,
+    phone,
+    updatedAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
+  });
 };
 
 export const signInCustomer = async (emailInput: string, password: string): Promise<boolean> => {
@@ -57,6 +75,25 @@ export const signOutCustomer = async () => {
 
 export const getSignedInEmail = (): string | null => getFirebaseAuth()?.currentUser?.email ?? null;
 export const getSignedInUserId = (): string | null => getFirebaseAuth()?.currentUser?.uid ?? null;
+
+export const getSignedInCustomerProfile = async (): Promise<CustomerProfile | null> => {
+  assertFirebaseReady();
+  const user = getFirebaseAuth()?.currentUser;
+  if (!user) {
+    return null;
+  }
+
+  const profileSnapshot = await getDoc(doc(db!, 'customerProfiles', user.uid));
+  const profileData = profileSnapshot.exists()
+    ? (profileSnapshot.data() as Partial<CustomerProfile>)
+    : {};
+
+  return {
+    fullName: (profileData.fullName ?? user.displayName ?? '').trim(),
+    email: (profileData.email ?? user.email ?? '').trim(),
+    phone: (profileData.phone ?? '').trim(),
+  };
+};
 
 export const subscribeToAuth = (callback: (user: User | null) => void) => {
   assertFirebaseReady();

@@ -79,7 +79,7 @@ export default function AccountPage() {
       }
 
       try {
-        await registerCustomer({ fullName: fullName.trim(), email: email.trim(), password });
+        await registerCustomer({ fullName: fullName.trim(), email: email.trim(), phone: phone.trim(), password });
       } catch (signupError) {
         setError(signupError instanceof Error ? signupError.message : 'Unable to create account.');
       }
