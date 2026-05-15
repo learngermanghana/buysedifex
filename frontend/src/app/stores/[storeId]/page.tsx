@@ -14,13 +14,13 @@ type StorePageProps = {
 
 const buildStoreTitle = (storeName: string, city?: string) => {
   const normalizedCity = city?.trim();
-  return normalizedCity ? `${storeName} in ${normalizedCity} | Buy on Sedifex` : `${storeName} | Buy on Sedifex`;
+  return normalizedCity ? `${storeName} in ${normalizedCity} | Sedifex Market` : `${storeName} | Sedifex Market`;
 };
 
 const buildStoreDescription = (storeName: string, city?: string, country?: string) => {
   const location = [city, country].filter((part) => typeof part === 'string' && part.trim().length > 0).join(', ');
   const locationText = location ? ` in ${location}` : '';
-  return `Shop products from ${storeName}${locationText}. Browse available items and order via WhatsApp on Sedifex.`;
+  return `Shop products from verified store ${storeName}${locationText}. Browse available items and order securely on Sedifex Market.`;
 };
 
 export async function generateStaticParams() {
@@ -39,8 +39,8 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
 
   if (!profile) {
     return {
-      title: 'Store not found | Buy on Sedifex',
-      description: 'The requested store could not be found on Sedifex.',
+      title: 'Store not found | Sedifex Market',
+      description: 'The requested store could not be found on Sedifex Market.',
       robots: { index: false, follow: false },
     };
   }
@@ -64,7 +64,7 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
       url: canonicalUrl,
       title,
       description,
-      siteName: 'Sedifex',
+      siteName: 'Sedifex Market',
       images: [{ url: socialImage ?? defaultSocialImageUrl() }],
     },
     twitter: {
@@ -99,26 +99,40 @@ export default async function StorePage({ params }: StorePageProps) {
   const mailtoHref = profile.storeEmail ? `mailto:${profile.storeEmail}` : '';
   const hasCoordinates = Number.isFinite(profile.latitude) && Number.isFinite(profile.longitude);
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': hasLocation ? 'LocalBusiness' : 'OnlineStore',
-    name: profile.storeName,
-    url: canonicalUrl,
-    ...(profile.storeLogoUrl ? { logo: profile.storeLogoUrl } : {}),
-    ...(profile.storeBannerUrl ? { image: profile.storeBannerUrl } : {}),
-    ...(profile.storePhone ? { telephone: profile.storePhone } : {}),
-    ...(hasLocation
-      ? {
-          address: {
-            '@type': 'PostalAddress',
-            ...(profile.addressLine1 ? { streetAddress: profile.addressLine1 } : {}),
-            ...(profile.city ? { addressLocality: profile.city } : {}),
-            ...(profile.country ? { addressCountry: profile.country } : {}),
-          },
-        }
-      : {}),
-    ...(profile.sameAs.length > 0 ? { sameAs: profile.sameAs } : {}),
-  };
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': hasLocation ? 'LocalBusiness' : 'OnlineStore',
+      '@id': `${canonicalUrl}#store`,
+      name: profile.storeName,
+      url: canonicalUrl,
+      ...(profile.storeLogoUrl ? { logo: profile.storeLogoUrl } : {}),
+      ...(profile.storeBannerUrl ? { image: profile.storeBannerUrl } : {}),
+      ...(profile.storePhone ? { telephone: profile.storePhone } : {}),
+      ...(profile.storeEmail ? { email: profile.storeEmail } : {}),
+      ...(hasLocation
+        ? {
+            address: {
+              '@type': 'PostalAddress',
+              ...(profile.addressLine1 ? { streetAddress: profile.addressLine1 } : {}),
+              ...(profile.city ? { addressLocality: profile.city } : {}),
+              ...(profile.country ? { addressCountry: profile.country } : {}),
+            },
+          }
+        : {}),
+      ...(hasCoordinates ? { geo: { '@type': 'GeoCoordinates', latitude: profile.latitude, longitude: profile.longitude } } : {}),
+      ...(profile.sameAs.length > 0 ? { sameAs: profile.sameAs } : {}),
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: canonicalUrlForPath('/') },
+        { '@type': 'ListItem', position: 2, name: 'Stores', item: canonicalUrlForPath('/stores') },
+        { '@type': 'ListItem', position: 3, name: profile.storeName, item: canonicalUrl },
+      ],
+    },
+  ];
 
   return (
     <main className="storePage">
@@ -172,12 +186,10 @@ export default async function StorePage({ params }: StorePageProps) {
 
       {categoryKeys.length > 0 ? (
         <section className="storeInfoCard" aria-label="Store categories">
-          <h2>Categories</h2>
+          <h2>Store tags</h2>
           <ul>
-            {categoryKeys.map((category) => (
-              <li key={category}>
-                <Link href={`/category/${encodeURIComponent(category)}`}>{category}</Link>
-              </li>
+            {categoryKeys.slice(0, 6).map((category) => (
+              <li key={category}>{category}</li>
             ))}
           </ul>
         </section>
