@@ -51,6 +51,34 @@ const getRequiredEnv = (key: string) => {
 
 const getContractVersion = () => process.env.SEDIFEX_INTEGRATION_API_VERSION ?? '2026-04-13';
 
+
+const getMerchantTokensMap = () => {
+  const raw = process.env.SEDIFEX_MERCHANT_TOKENS_JSON?.trim();
+  if (!raw) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('SEDIFEX_MERCHANT_TOKENS_JSON must be valid JSON object mapping merchantId to token.');
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('SEDIFEX_MERCHANT_TOKENS_JSON must be a JSON object mapping merchantId to token.');
+  }
+
+  return parsed as Record<string, unknown>;
+};
+
+const getMerchantToken = (merchantId: string) => {
+  const map = getMerchantTokensMap();
+  const tokenFromMap = map?.[merchantId];
+  if (typeof tokenFromMap === 'string' && tokenFromMap.trim()) {
+    return tokenFromMap.trim();
+  }
+
+  return getRequiredEnv(`SEDIFEX_MERCHANT_TOKEN_${merchantId}`);
+};
 const getIntegrationApiBaseUrl = () => {
   const rawBaseUrl = getRequiredEnv('SEDIFEX_INTEGRATION_API_BASE_URL').trim();
 
@@ -108,13 +136,22 @@ export const groupCartByMerchant = (items: CheckoutItem[]) => {
 export const createCheckoutReference = (merchantId: string) =>
   `${merchantId}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
+const normalizeMerchantId = (merchantId: string) => {
+  const normalized = merchantId.trim();
+  if (!normalized) {
+    throw new Error('Checkout merchantId/store_id is missing. Ensure the product merchantId matches a Sedifex store ID.');
+  }
+  return normalized;
+};
+
 export const previewMerchantCheckout = async (merchantId: string, items: CheckoutItem[]) => {
-  const merchantToken = getRequiredEnv(`SEDIFEX_MERCHANT_TOKEN_${merchantId}`);
+  const normalizedMerchantId = normalizeMerchantId(merchantId);
+  const merchantToken = getMerchantToken(normalizedMerchantId);
   const payload: SedifexCheckoutPreviewRequest = {
-    store_id: merchantId,
-    merchant_id: merchantId,
-    storeId: merchantId,
-    merchantId: merchantId,
+    store_id: normalizedMerchantId,
+    merchant_id: normalizedMerchantId,
+    storeId: normalizedMerchantId,
+    merchantId: normalizedMerchantId,
     fulfillment_type: 'PICKUP',
     delivery_address_id: null,
     items: items.map((item) => ({ type: item.type ?? 'PRODUCT', item_id: item.productId, qty: item.quantity })),
@@ -135,7 +172,8 @@ export const createMerchantCheckout = async (
   reference: string,
   pricingSnapshot?: SedifexCheckoutPreviewResponse,
 ) => {
-  const merchantToken = getRequiredEnv(`SEDIFEX_MERCHANT_TOKEN_${merchantId}`);
+  const normalizedMerchantId = normalizeMerchantId(merchantId);
+  const merchantToken = getMerchantToken(normalizedMerchantId);
   return integrationFetch<unknown>('/integration/checkout/create', {
     method: 'POST',
     headers: {
@@ -143,10 +181,10 @@ export const createMerchantCheckout = async (
       'x-api-key': merchantToken,
     },
     body: JSON.stringify({
-      store_id: merchantId,
-      merchant_id: merchantId,
-      storeId: merchantId,
-      merchantId: merchantId,
+      store_id: normalizedMerchantId,
+      merchant_id: normalizedMerchantId,
+      storeId: normalizedMerchantId,
+      merchantId: normalizedMerchantId,
       payment_reference: reference,
       client_order_id: reference,
       items: items.map((item) => ({ type: item.type ?? 'PRODUCT', item_id: item.productId, qty: item.quantity })),

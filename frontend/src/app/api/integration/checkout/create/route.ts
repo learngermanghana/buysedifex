@@ -28,12 +28,16 @@ export async function POST(request: NextRequest) {
     }
 
     const grouped = groupCartByMerchant(cart);
+    console.info('checkout.create.grouped', { merchantIds: Array.from(grouped.keys()) });
 
     const merchantResults = await Promise.all(
       Array.from(grouped.entries()).map(async ([merchantId, merchantCart]) => {
+      console.info('checkout.create.merchant.started', { merchantId, cartItems: merchantCart.length });
       const preview = await previewMerchantCheckout(merchantId, merchantCart);
+      console.info('checkout.create.merchant.preview_succeeded', { merchantId });
       const reference = createCheckoutReference(merchantId);
       const checkout = await createMerchantCheckout(merchantId, merchantCart, reference, preview);
+      console.info('checkout.create.merchant.checkout_succeeded', { merchantId, reference });
 
       const checkoutRecord = {
         merchantId,
@@ -87,7 +91,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, merchantCheckouts: merchantResults });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown checkout error';
-    console.error('checkout.create.failed', { message });
+    const missingStoreId = message.includes('missing-store-id');
+    console.error('checkout.create.failed', { message, cause: missingStoreId ? 'upstream_missing_store_id' : 'unknown' });
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

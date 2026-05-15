@@ -76,6 +76,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [checkoutCards, setCheckoutCards] = useState<Array<{ merchantId: string; reference: string; checkoutUrl?: string }>>([]);
   const [submitMode, setSubmitMode] = useState<SubmitMode>(null);
+  const [submitErrorMessage, setSubmitErrorMessage] = useState('');
   const supportPhone = (whatsappPhone ?? '').trim();
 
   useEffect(() => {
@@ -115,6 +116,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitState('submitting');
+    setSubmitErrorMessage('');
 
     try {
       const quantity = Number(formState.quantity);
@@ -181,7 +183,12 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
       setFormState(initialFormState);
     } catch (error) {
       console.error(error);
-      void trackEvent('checkout_create_failed', { productId, productName });
+      const rawMessage = error instanceof Error ? error.message : 'Unable to create checkout at the moment.';
+      const userMessage = rawMessage.includes('missing-store-id')
+        ? 'This merchant checkout is unavailable right now due to a store setup issue. Please contact support or try another merchant.'
+        : 'Unable to create checkout. Check your location/contact details and try again.';
+      setSubmitErrorMessage(userMessage);
+      void trackEvent('checkout_create_failed', { productId, productName, reason: rawMessage });
       setSubmitState('error');
     }
   };
@@ -287,7 +294,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
         </button>
 
         {submitState === 'success' ? <p className="requestFeedback success">Success! Your order has been received and is being processed. {submitMode === 'online' ? 'Please complete your payment using the Paystack checkout below.' : 'You selected pay on delivery and your request has been saved.'} A Sedifex team member will reach out shortly{supportPhone ? `, or call ${supportPhone} to speak directly with Sedifex.` : '.'}</p> : null}
-        {submitState === 'error' ? <p className="requestFeedback error">Unable to create checkout. Check your location/contact or merchant availability.</p> : null}
+        {submitState === 'error' ? <p className="requestFeedback error">{submitErrorMessage || 'Unable to create checkout. Check your location/contact details and try again.'}</p> : null}
       </form>
       {checkoutCards.map((card) => (
         <div key={card.reference} className="storeShowcaseCard">
