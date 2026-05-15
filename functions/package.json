@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "lint": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test test/**/*.test.cjs",
-    "test:integration": "node test/emulator.integration.test.cjs"
+    "test:integration": "node test/emulator.integration.cjs"
   },
   "dependencies": {
     "firebase-admin": "^12.7.0",
