@@ -260,7 +260,7 @@ const prioritizeBalancedFirstScreen = (items: PublicProduct[]) => {
   return [...firstScreen, ...remaining];
 };
 
-const getVerifiedStoreIds = async () => {
+const getProductApprovedStoreIds = async () => {
   if (!db) return new Set<string>();
 
   const snapshot = await getDocs(query(collection(db, 'stores'), where('verified', '==', true), limit(VERIFIED_STORE_SCAN_LIMIT)));
@@ -271,8 +271,9 @@ const getVerifiedStoreIds = async () => {
     const status = typeof data.status === 'string' ? data.status.trim().toLowerCase() : '';
     const eligibleForBuy = normalizeBoolean(data.eligibleForBuy);
     const isInactive = ['inactive', 'suspended', 'deleted', 'disabled'].includes(status);
+    const verifiedProduct = normalizeBoolean(data.verified_product ?? data.verifiedProduct);
 
-    if (isInactive || eligibleForBuy === false) return;
+    if (isInactive || eligibleForBuy === false || verifiedProduct === false) return;
 
     ids.add(storeDoc.id);
     for (const key of ['storeId', 'id', 'ownerUid', 'workspaceSlug']) {
@@ -304,8 +305,8 @@ export function HomeProductGrid() {
       try {
         setIsLoading(true);
         setError(null);
-        const [verifiedStoreIds, snapshot] = await Promise.all([
-          getVerifiedStoreIds(),
+        const [productApprovedStoreIds, snapshot] = await Promise.all([
+          getProductApprovedStoreIds(),
           getDocs(query(collection(db, 'publicProducts'), orderBy(documentId(), 'asc'), limit(HOME_SCAN_LIMIT))),
         ]);
         if (!active) return;
@@ -315,7 +316,7 @@ export function HomeProductGrid() {
             const storeId = item.storeId?.trim();
             return Boolean(
               storeId &&
-                verifiedStoreIds.has(storeId) &&
+                productApprovedStoreIds.has(storeId) &&
                 isProductItem(item) &&
                 isPublicListing(item) &&
                 getDisplayImages(item).length > 0,
