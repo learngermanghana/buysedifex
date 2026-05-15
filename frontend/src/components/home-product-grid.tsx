@@ -57,6 +57,7 @@ type SortOption = 'newest' | 'price' | 'featured';
 const INITIAL_VISIBLE_COUNT = 24;
 const LOAD_MORE_COUNT = 24;
 const HOME_SCAN_LIMIT = 300;
+const FIRST_SCREEN_PER_STORE_LIMIT = 4;
 
 const normalizeBoolean = (value: unknown): boolean | null => {
   if (typeof value === 'boolean') return value;
@@ -71,7 +72,6 @@ const normalizeBoolean = (value: unknown): boolean | null => {
 
 const isExplicitlyFalse = (value: unknown) => normalizeBoolean(value) === false;
 const isExplicitlyTrue = (value: unknown) => normalizeBoolean(value) === true;
-
 const getProductName = (item: PublicProduct) => (item.productName ?? item.name)?.trim() || 'Untitled item';
 
 const getCategory = (item: PublicProduct) =>
@@ -97,9 +97,7 @@ const formatPrice = (price?: number, currency?: string) => {
 };
 
 const decodeImageValues = (value: unknown): string[] => {
-  if (Array.isArray(value)) {
-    return value.flatMap((entry) => decodeImageValues(entry));
-  }
+  if (Array.isArray(value)) return value.flatMap((entry) => decodeImageValues(entry));
   if (typeof value !== 'string') return [];
   const trimmed = value.trim();
   if (!trimmed) return [];
@@ -120,7 +118,6 @@ const normalizeImageUrl = (value: string): string => {
     .replace(/^['"]+|['"]+$/g, '')
     .replace(/\\u002F/gi, '/')
     .replace(/\\\//g, '/');
-
   if (!trimmed.toLowerCase().startsWith('gs://')) return trimmed;
   const withoutPrefix = trimmed.slice(5);
   const slashIndex = withoutPrefix.indexOf('/');
@@ -151,7 +148,6 @@ const getDisplayImages = (item: PublicProduct): string[] => {
     item.photoUrl,
     item.images,
   ].flatMap((value) => decodeImageValues(value));
-
   return Array.from(new Set(candidates.map(normalizeImageUrl).filter(isValidImageUrl)));
 };
 
@@ -159,9 +155,6 @@ const isPublicListing = (item: PublicProduct) => {
   if (isExplicitlyTrue(item.deleted) || isExplicitlyTrue(item.isDeleted)) return false;
   if (isExplicitlyTrue(item.hidden) || isExplicitlyTrue(item.isHidden)) return false;
   if (isExplicitlyFalse(item.visible) || isExplicitlyFalse(item.isVisible)) return false;
-
-  // publicProducts is already the public read model. Do not hide older synced docs only
-  // because they are missing isPublished or were copied with isPublished=false.
   return true;
 };
 
@@ -206,7 +199,6 @@ const sortProducts = (items: PublicProduct[], selectedSort: SortOption) => {
       const rightPrice = typeof right.price === 'number' ? right.price : Number.POSITIVE_INFINITY;
       if (leftPrice !== rightPrice) return leftPrice - rightPrice;
     }
-
     if (selectedSort === 'featured') {
       const leftScore = typeof left.rankingScore === 'number' ? left.rankingScore : Number.NEGATIVE_INFINITY;
       const rightScore = typeof right.rankingScore === 'number' ? right.rankingScore : Number.NEGATIVE_INFINITY;
@@ -215,7 +207,6 @@ const sortProducts = (items: PublicProduct[], selectedSort: SortOption) => {
       const rightRank = typeof right.featuredRank === 'number' ? right.featuredRank : Number.NEGATIVE_INFINITY;
       if (leftRank !== rightRank) return rightRank - leftRank;
     }
-
     const leftTime = getTimestampScore(left.publishedAt) || getTimestampScore(left.updatedAt);
     const rightTime = getTimestampScore(right.publishedAt) || getTimestampScore(right.updatedAt);
     if (leftTime !== rightTime) return rightTime - leftTime;
@@ -224,10 +215,12 @@ const sortProducts = (items: PublicProduct[], selectedSort: SortOption) => {
   return sorted;
 };
 
+const getStoreKey = (item: PublicProduct) => item.storeId?.trim() || item.storeName?.trim() || `unknown-store-${item.id}`;
+
 const mixProductsAcrossStores = (items: PublicProduct[]) => {
   const buckets = new Map<string, PublicProduct[]>();
   for (const item of items) {
-    const storeKey = item.storeId?.trim() || item.storeName?.trim() || `unknown-store-${item.id}`;
+    const storeKey = getStoreKey(item);
     const bucket = buckets.get(storeKey) ?? [];
     bucket.push(item);
     buckets.set(storeKey, bucket);
@@ -244,6 +237,25 @@ const mixProductsAcrossStores = (items: PublicProduct[]) => {
   return mixed;
 };
 
+const prioritizeBalancedFirstScreen = (items: PublicProduct[]) => {
+  const firstScreenCounts = new Map<string, number>();
+  const firstScreen: PublicProduct[] = [];
+  const remaining: PublicProduct[] = [];
+
+  for (const item of items) {
+    const storeKey = getStoreKey(item);
+    const count = firstScreenCounts.get(storeKey) ?? 0;
+    if (count < FIRST_SCREEN_PER_STORE_LIMIT) {
+      firstScreenCounts.set(storeKey, count + 1);
+      firstScreen.push(item);
+    } else {
+      remaining.push(item);
+    }
+  }
+
+  return [...firstScreen, ...remaining];
+};
+
 export function HomeProductGrid() {
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [selectedCity, setSelectedCity] = useState('all');
@@ -255,14 +267,12 @@ export function HomeProductGrid() {
 
   useEffect(() => {
     let active = true;
-
     const loadProducts = async () => {
       if (!db) {
         setError(firebaseConfigError ?? 'Firebase is not configured.');
         setIsLoading(false);
         return;
       }
-
       try {
         setIsLoading(true);
         setError(null);
@@ -280,7 +290,6 @@ export function HomeProductGrid() {
         if (active) setIsLoading(false);
       }
     };
-
     void loadProducts();
     return () => {
       active = false;
@@ -299,21 +308,13 @@ export function HomeProductGrid() {
       const cityMatches = selectedCity === 'all' || getStoreCity(product).toLowerCase() === selectedCity.toLowerCase();
       if (!cityMatches) return false;
       if (!text) return true;
-      const haystack = [
-        getProductName(product),
-        product.description,
-        product.storeName,
-        getCategory(product),
-        product.sku,
-        product.batchNumber,
-      ]
+      const haystack = [getProductName(product), product.description, product.storeName, getCategory(product), product.sku, product.batchNumber]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
       return haystack.includes(text);
     });
-
-    return mixProductsAcrossStores(sortProducts(filtered, selectedSort));
+    return prioritizeBalancedFirstScreen(mixProductsAcrossStores(sortProducts(filtered, selectedSort)));
   }, [products, searchText, selectedCity, selectedSort]);
 
   const visibleProducts = filteredProducts.slice(0, visibleLimit);
@@ -334,7 +335,6 @@ export function HomeProductGrid() {
             placeholder="Search products, services, stores, or categories"
           />
         </div>
-
         <div className="sortWrap">
           <label htmlFor="sort">Sort by</label>
           <select
@@ -364,9 +364,7 @@ export function HomeProductGrid() {
             }}
           >
             {cities.map((city) => (
-              <option key={city} value={city}>
-                {city === 'all' ? 'All cities' : city}
-              </option>
+              <option key={city} value={city}>{city === 'all' ? 'All cities' : city}</option>
             ))}
           </select>
         </div>
@@ -389,12 +387,7 @@ export function HomeProductGrid() {
               const storeHref = getStoreHref(item.storeId, item.storeName);
               const whatsAppHref = getWhatsAppHref(item);
               const imageUrl = getDisplayImages(item)[0] ?? 'https://placehold.co/640x640';
-              const shortDescription =
-                (item.description ?? '')
-                  .split(/\n+/)
-                  .map((line) => line.trim())
-                  .filter(Boolean)[0] ?? '';
-
+              const shortDescription = (item.description ?? '').split(/\n+/).map((line) => line.trim()).filter(Boolean)[0] ?? '';
               return (
                 <article key={item.id} className="card">
                   <div className="imageWrap">
@@ -414,48 +407,24 @@ export function HomeProductGrid() {
                   <div className="meta">
                     <span className="storeIdentity">
                       {storeHref ? <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link> : item.storeName ?? 'Unknown store'}
-                      {isVerifiedStore(item.verified) ? (
-                        <span className="verifiedBadge" aria-label="Verified by Sedifex">
-                          <span className="verifiedPulse" aria-hidden="true" />
-                          Verified by Sedifex
-                        </span>
-                      ) : null}
+                      {isVerifiedStore(item.verified) ? <span className="verifiedBadge" aria-label="Verified by Sedifex"><span className="verifiedPulse" aria-hidden="true" />Verified by Sedifex</span> : null}
                     </span>
                     <strong>{formatPrice(item.price, item.currency)}</strong>
                   </div>
                   {isVerifiedStore(item.verified) ? <p className="trustScoreCard">🛡 Sedifex Trust+ 98%</p> : null}
                   <div className="cardActions">
-                    <Link href={getProductHref(item.id, item.productName)} className="buyNowButton" aria-label={`Buy ${getProductName(item)} now`}>
-                      Buy now
-                    </Link>
-                    {whatsAppHref ? (
-                      <a className="contactStoreButton" href={whatsAppHref} target="_blank" rel="noopener noreferrer">
-                        Contact store
-                      </a>
-                    ) : (
-                      <span className="contactStoreButton" aria-disabled="true">
-                        Contact store unavailable
-                      </span>
-                    )}
+                    <Link href={getProductHref(item.id, item.productName)} className="buyNowButton" aria-label={`Buy ${getProductName(item)} now`}>Buy now</Link>
+                    {whatsAppHref ? <a className="contactStoreButton" href={whatsAppHref} target="_blank" rel="noopener noreferrer">Contact store</a> : <span className="contactStoreButton" aria-disabled="true">Contact store unavailable</span>}
                   </div>
                 </article>
               );
             })}
       </div>
 
-      {!isLoading && visibleProducts.length === 0 && !error ? (
-        <div className="emptyState">
-          <h3>No items found</h3>
-          <p>Try a different search term, category, or sort option.</p>
-        </div>
-      ) : null}
+      {!isLoading && visibleProducts.length === 0 && !error ? <div className="emptyState"><h3>No items found</h3><p>Try a different search term, category, or sort option.</p></div> : null}
 
       <div className="actions">
-        <button
-          type="button"
-          disabled={isLoading || visibleLimit >= filteredProducts.length}
-          onClick={() => setVisibleLimit((current) => current + LOAD_MORE_COUNT)}
-        >
+        <button type="button" disabled={isLoading || visibleLimit >= filteredProducts.length} onClick={() => setVisibleLimit((current) => current + LOAD_MORE_COUNT)}>
           {visibleLimit >= filteredProducts.length ? 'All products loaded' : 'Load more products'}
         </button>
       </div>
