@@ -38,8 +38,6 @@ const assertFirebaseReady = () => {
   }
 };
 
-const getAuthErrorMessage = (fallback: string) => fallback;
-
 const normalizeEmail = (value?: string | null) => value?.trim().toLowerCase() ?? '';
 
 const timestampToIso = (value: unknown) => {
