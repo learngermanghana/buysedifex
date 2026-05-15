@@ -16,8 +16,8 @@ type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
 
 type CheckoutFormState = {
   customerName: string;
-  contact: string;
-  companyName: string;
+  email: string;
+  phone: string;
   quantity: string;
   paymentMethod: string;
   deliveryLocation: string;
@@ -26,8 +26,8 @@ type CheckoutFormState = {
 
 const initialFormState: CheckoutFormState = {
   customerName: '',
-  contact: '',
-  companyName: '',
+  email: '',
+  phone: '',
   quantity: '1',
   paymentMethod: 'pay-on-delivery',
   deliveryLocation: '',
@@ -101,8 +101,8 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
         body: JSON.stringify({
           cart: [{ productId, merchantId, quantity }],
           customer: {
-            email: formState.contact.includes('@') ? formState.contact.trim() : undefined,
-            phone: formState.contact.includes('@') ? undefined : formState.contact.trim(),
+            email: formState.email.trim(),
+            phone: formState.phone.trim(),
           },
         }),
       });
@@ -162,24 +162,27 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
           onChange={(event) => setFormState((current) => ({ ...current, customerName: event.target.value }))}
         />
 
-        <label htmlFor="checkout-contact">Phone or email</label>
+        <label htmlFor="checkout-email">Email address</label>
         <input
-          id="checkout-contact"
-          name="contact"
-          type="text"
-          pattern="(^[^\s@]+@[^\s@]+\.[^\s@]+$)|(^[+0-9\s()-]{7,}$)"
+          id="checkout-email"
+          name="email"
+          type="email"
           required
-          value={formState.contact}
-          onChange={(event) => setFormState((current) => ({ ...current, contact: event.target.value }))}
+          value={formState.email}
+          onChange={(event) => setFormState((current) => ({ ...current, email: event.target.value }))}
+          placeholder="name@example.com"
         />
 
-        <label htmlFor="checkout-company">Company name (optional)</label>
+        <label htmlFor="checkout-phone">Phone number</label>
         <input
-          id="checkout-company"
-          name="companyName"
-          type="text"
-          value={formState.companyName}
-          onChange={(event) => setFormState((current) => ({ ...current, companyName: event.target.value }))}
+          id="checkout-phone"
+          name="phone"
+          type="tel"
+          pattern="[+0-9\s()-]{7,}"
+          required
+          value={formState.phone}
+          onChange={(event) => setFormState((current) => ({ ...current, phone: event.target.value }))}
+          placeholder="+233 20 000 0000"
         />
 
         <label htmlFor="checkout-payment">Payment method</label>
@@ -231,7 +234,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
           placeholder="Color, preferred call time, gate number, etc."
         />
 
-        <button className="requestButton" type="submit" disabled={submitState === 'submitting' || !formState.customerName.trim() || !formState.contact.trim() || !formState.deliveryLocation.trim()}>
+        <button className="requestButton" type="submit" disabled={submitState === 'submitting' || !formState.customerName.trim() || !formState.email.trim() || !formState.phone.trim() || !formState.deliveryLocation.trim()}>
           {submitState === 'submitting' ? 'Creating secure checkout...' : 'Continue to secure checkout'}
         </button>
 
