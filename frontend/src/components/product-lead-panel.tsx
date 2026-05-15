@@ -10,6 +10,7 @@ type ProductLeadPanelProps = {
   city?: string;
   storeName: string;
   whatsappPhone?: string;
+  itemType?: string;
 };
 
 type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
@@ -58,6 +59,18 @@ const normalizeWhatsAppPhone = (value?: string) => {
   return `https://wa.me/${normalized}`;
 };
 
+const normalizeCheckoutQuantity = (value: string) => {
+  const quantity = Math.floor(Number(value));
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    throw new Error('Quantity must be at least 1.');
+  }
+  return quantity;
+};
+
+const normalizeCheckoutItemType = (value?: string): 'PRODUCT' | 'SERVICE' => {
+  return value?.trim().toLowerCase() === 'service' ? 'SERVICE' : 'PRODUCT';
+};
+
 const trackEvent = async (eventName: string, payload: Record<string, unknown>) => {
   try {
     await fetch('/api/track', {
@@ -71,7 +84,7 @@ const trackEvent = async (eventName: string, payload: Record<string, unknown>) =
   }
 };
 
-export function ProductLeadPanel({ productId, merchantId, productName, city, storeName, whatsappPhone }: ProductLeadPanelProps) {
+export function ProductLeadPanel({ productId, merchantId, productName, city, storeName, whatsappPhone, itemType }: ProductLeadPanelProps) {
   const [formState, setFormState] = useState<CheckoutFormState>(initialFormState);
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [checkoutCards, setCheckoutCards] = useState<Array<{ merchantId: string; reference: string; checkoutUrl?: string }>>([]);
@@ -119,7 +132,8 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
     setSubmitErrorMessage('');
 
     try {
-      const quantity = Number(formState.quantity);
+      const quantity = normalizeCheckoutQuantity(formState.quantity);
+      const checkoutType = normalizeCheckoutItemType(itemType);
       const isOnlinePayment = formState.paymentMethod === 'online';
 
       let payload: { merchantCheckouts?: Array<{ merchantId: string; reference: string; checkoutUrl?: string }> } = {};
@@ -128,7 +142,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            cart: [{ productId, merchantId, quantity }],
+            cart: [{ productId, merchantId, quantity, type: checkoutType }],
             customer: {
               email: formState.email.trim(),
               phone: formState.phone.trim(),
@@ -186,7 +200,9 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
       const rawMessage = error instanceof Error ? error.message : 'Unable to create checkout at the moment.';
       const userMessage = rawMessage.includes('missing-store-id')
         ? 'This merchant checkout is unavailable right now due to a store setup issue. Please contact support or try another merchant.'
-        : rawMessage;
+        : rawMessage.includes('valid checkout total could not be computed')
+          ? 'This item is missing a valid Sedifex product ID or price. Please contact support or try another item.'
+          : rawMessage;
       setSubmitErrorMessage(userMessage);
       void trackEvent('checkout_create_failed', { productId, productName, reason: rawMessage });
       setSubmitState('error');
