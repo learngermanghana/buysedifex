@@ -24,6 +24,7 @@ export type PurchaseHistoryItem = {
   orderStatus?: 'pending' | 'processing' | 'completed' | string;
   paymentConfirmedAt?: string;
   orderCompletedAt?: string;
+  recordType?: 'product_order' | 'service_booking' | string;
 };
 
 export type CustomerProfile = {
@@ -97,14 +98,10 @@ export const getSignedInUserId = (): string | null => getFirebaseAuth()?.current
 export const getSignedInCustomerProfile = async (): Promise<CustomerProfile | null> => {
   assertFirebaseReady();
   const user = getFirebaseAuth()?.currentUser;
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   const profileSnapshot = await getDoc(doc(db!, 'customerProfiles', user.uid));
-  const profileData = profileSnapshot.exists()
-    ? (profileSnapshot.data() as Partial<CustomerProfile>)
-    : {};
+  const profileData = profileSnapshot.exists() ? (profileSnapshot.data() as Partial<CustomerProfile>) : {};
 
   return {
     fullName: (profileData.fullName ?? user.displayName ?? '').trim(),
@@ -118,10 +115,7 @@ export const subscribeToAuth = (callback: (user: User | null) => void) => {
   return onAuthStateChanged(getFirebaseAuth()!, callback);
 };
 
-export const addPurchaseHistoryItem = async (
-  userId: string,
-  item: Omit<PurchaseHistoryItem, 'id' | 'createdAt'>,
-) => {
+export const addPurchaseHistoryItem = async (userId: string, item: Omit<PurchaseHistoryItem, 'id' | 'createdAt'>) => {
   assertFirebaseReady();
   await addDoc(collection(db!, 'customerPurchaseHistory'), {
     userId,
@@ -146,11 +140,13 @@ const mapCustomerPurchaseHistoryDoc = (documentId: string, data: Record<string, 
   orderStatus: pickString(data.orderStatus) || undefined,
   paymentConfirmedAt: data.paymentConfirmedAt ? timestampToIso(data.paymentConfirmedAt) : undefined,
   orderCompletedAt: data.orderCompletedAt ? timestampToIso(data.orderCompletedAt) : undefined,
+  recordType: pickString(data.recordType) || undefined,
 });
 
 const mapCheckoutRequestDoc = (documentId: string, data: Record<string, unknown>): PurchaseHistoryItem => {
   const contact = pickString(data.contact);
   const [phoneCandidate, emailCandidate] = contact.split('|').map((part) => part.trim());
+  const itemType = pickString(data.itemType).toLowerCase();
   return {
     id: `checkoutRequest_${documentId}`,
     productId: pickString(data.productId, 'unknown-product'),
@@ -164,6 +160,57 @@ const mapCheckoutRequestDoc = (documentId: string, data: Record<string, unknown>
     customerPhone: pickString(data.customerPhone) || phoneCandidate || undefined,
     paymentStatus: pickString(data.paymentStatus, 'pending'),
     orderStatus: pickString(data.orderStatus, 'pending'),
+    recordType: itemType === 'service' ? 'service_booking' : 'product_order',
+  };
+};
+
+const mapIntegrationOrderDoc = (documentId: string, data: Record<string, unknown>): PurchaseHistoryItem => {
+  const customer = data.customer && typeof data.customer === 'object' ? (data.customer as Record<string, unknown>) : {};
+  const items = Array.isArray(data.items) ? data.items : Array.isArray(data.cart) ? data.cart : [];
+  const firstItem = items[0] && typeof items[0] === 'object' ? (items[0] as Record<string, unknown>) : {};
+  return {
+    id: `integrationOrder_${documentId}`,
+    productId: pickString(firstItem.productId ?? firstItem.item_id, 'unknown-product'),
+    productName: pickString(firstItem.name ?? firstItem.productName ?? data.productName, 'Product order'),
+    quantity: pickNumber(firstItem.quantity ?? firstItem.qty),
+    paymentMethod: pickString(data.paymentCollectionMode, 'online'),
+    deliveryLocation: pickString(data.deliveryLocation, 'Not provided'),
+    createdAt: timestampToIso(data.createdAtServer ?? data.createdAt),
+    reference: pickString(data.reference) || undefined,
+    customerEmail: normalizeEmail(pickString(customer.email)) || undefined,
+    customerPhone: pickString(customer.phone) || undefined,
+    paymentStatus: pickString(data.paymentStatus ?? data.payment_status, 'pending'),
+    orderStatus: pickString(data.orderStatus ?? data.order_status, 'pending'),
+    paymentConfirmedAt: data.paymentConfirmedAt ? timestampToIso(data.paymentConfirmedAt) : undefined,
+    orderCompletedAt: data.orderCompletedAt ? timestampToIso(data.orderCompletedAt) : undefined,
+    recordType: pickString(data.recordType, 'product_order'),
+  };
+};
+
+const mapIntegrationBookingDoc = (documentId: string, data: Record<string, unknown>): PurchaseHistoryItem => {
+  const customer = data.customer && typeof data.customer === 'object' ? (data.customer as Record<string, unknown>) : {};
+  const items = Array.isArray(data.items) ? data.items : Array.isArray(data.cart) ? data.cart : [];
+  const firstItem = items[0] && typeof items[0] === 'object' ? (items[0] as Record<string, unknown>) : {};
+  const booking = data.booking && typeof data.booking === 'object' ? (data.booking as Record<string, unknown>) : {};
+  const preferredDate = pickString(data.bookingDate ?? booking.preferredDate);
+  const preferredTime = pickString(data.bookingTime ?? booking.preferredTime);
+  const preferredBranch = pickString(data.preferredBranch ?? booking.preferredBranch);
+  return {
+    id: `integrationBooking_${documentId}`,
+    productId: pickString(data.serviceId ?? firstItem.productId ?? firstItem.item_id, 'unknown-service'),
+    productName: pickString(data.serviceName ?? firstItem.name ?? firstItem.productName, 'Service booking'),
+    quantity: 1,
+    paymentMethod: pickString(data.paymentCollectionMode, 'booking'),
+    deliveryLocation: [preferredDate, preferredTime, preferredBranch].filter(Boolean).join(' · ') || 'Preferred time not provided',
+    createdAt: timestampToIso(data.createdAtServer ?? data.createdAt),
+    reference: pickString(data.reference) || undefined,
+    customerEmail: normalizeEmail(pickString(customer.email)) || undefined,
+    customerPhone: pickString(customer.phone) || undefined,
+    paymentStatus: pickString(data.paymentStatus ?? data.payment_status, 'pending'),
+    orderStatus: pickString(data.bookingStatus ?? data.orderStatus ?? data.order_status, 'pending_store_confirmation'),
+    paymentConfirmedAt: data.paymentConfirmedAt ? timestampToIso(data.paymentConfirmedAt) : undefined,
+    orderCompletedAt: data.orderCompletedAt ? timestampToIso(data.orderCompletedAt) : undefined,
+    recordType: 'service_booking',
   };
 };
 
@@ -187,25 +234,31 @@ export const getPurchaseHistory = async (userId: string, email?: string | null):
   const historyItems: PurchaseHistoryItem[] = [];
 
   const byUserSnapshot = await getDocs(query(collection(db!, 'customerPurchaseHistory'), where('userId', '==', userId)));
-  historyItems.push(
-    ...byUserSnapshot.docs.map((historyDoc) =>
-      mapCustomerPurchaseHistoryDoc(historyDoc.id, historyDoc.data() as Record<string, unknown>),
-    ),
-  );
+  historyItems.push(...byUserSnapshot.docs.map((historyDoc) => mapCustomerPurchaseHistoryDoc(historyDoc.id, historyDoc.data() as Record<string, unknown>)));
 
   if (normalizedEmail) {
     try {
-      const byEmailSnapshot = await getDocs(
-        query(collection(db!, 'customerPurchaseHistory'), where('customerEmail', '==', normalizedEmail)),
-      );
+      const byEmailSnapshot = await getDocs(query(collection(db!, 'customerPurchaseHistory'), where('customerEmail', '==', normalizedEmail)));
+      historyItems.push(...byEmailSnapshot.docs.map((historyDoc) => mapCustomerPurchaseHistoryDoc(historyDoc.id, historyDoc.data() as Record<string, unknown>)));
+    } catch {}
+
+    try {
+      const ordersSnapshot = await getDocs(query(collection(db!, 'integrationOrders'), limit(300)));
       historyItems.push(
-        ...byEmailSnapshot.docs.map((historyDoc) =>
-          mapCustomerPurchaseHistoryDoc(historyDoc.id, historyDoc.data() as Record<string, unknown>),
-        ),
+        ...ordersSnapshot.docs
+          .map((orderDoc) => mapIntegrationOrderDoc(orderDoc.id, orderDoc.data() as Record<string, unknown>))
+          .filter((item) => item.customerEmail === normalizedEmail),
       );
-    } catch {
-      // Older deployments may not have customerEmail indexed or readable yet. Keep userId history working.
-    }
+    } catch {}
+
+    try {
+      const bookingsSnapshot = await getDocs(query(collection(db!, 'integrationBookings'), limit(300)));
+      historyItems.push(
+        ...bookingsSnapshot.docs
+          .map((bookingDoc) => mapIntegrationBookingDoc(bookingDoc.id, bookingDoc.data() as Record<string, unknown>))
+          .filter((item) => item.customerEmail === normalizedEmail),
+      );
+    } catch {}
 
     try {
       const checkoutRequestsSnapshot = await getDocs(query(collection(db!, 'checkoutRequests'), limit(300)));
@@ -213,9 +266,7 @@ export const getPurchaseHistory = async (userId: string, email?: string | null):
         .map((requestDoc) => mapCheckoutRequestDoc(requestDoc.id, requestDoc.data() as Record<string, unknown>))
         .filter((item) => item.customerEmail === normalizedEmail || normalizeEmail(item.customerEmail).includes(normalizedEmail));
       historyItems.push(...matchingCheckoutRequests);
-    } catch {
-      // Checkout requests are a legacy fallback. If rules block it, newer customerPurchaseHistory still works.
-    }
+    } catch {}
   }
 
   return dedupeHistory(historyItems);
