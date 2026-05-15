@@ -125,7 +125,7 @@ export default function AccountPage() {
                   <label htmlFor="full-name">Full name</label>
                   <input id="full-name" value={fullName} onChange={(event) => setFullName(event.target.value)} required minLength={3} placeholder="First and last name" />
                   <label htmlFor="phone">Phone number</label>
-                  <input id="phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required pattern="[+0-9\s()-]{7,}" placeholder="+233 20 000 0000" />
+                  <input id="phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required pattern="[+0-9\s()\-]{7,}" placeholder="+233 20 000 0000" />
                 </>
               ) : null}
               <label htmlFor="email">Email</label>

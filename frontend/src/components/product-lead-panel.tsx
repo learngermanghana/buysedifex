@@ -204,7 +204,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
           id="checkout-phone"
           name="phone"
           type="tel"
-          pattern="[+0-9\s()-]{7,}"
+          pattern="[+0-9\s()\-]{7,}"
           required
           value={formState.phone}
           onChange={(event) => setFormState((current) => ({ ...current, phone: event.target.value }))}
