@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   getPurchaseHistory,
@@ -48,6 +49,15 @@ export default function AccountPage() {
       .catch((historyError) => setError(historyError instanceof Error ? historyError.message : 'Unable to load history.'))
       .finally(() => setLoadingHistory(false));
   }, [sessionEmail, sessionUserId]);
+
+  const orderHistory = useMemo(
+    () => history.filter((item) => item.recordType !== 'service_booking'),
+    [history],
+  );
+  const bookingCount = useMemo(
+    () => history.filter((item) => item.recordType === 'service_booking').length,
+    [history],
+  );
 
   const passwordStrengthHint = useMemo(() => {
     if (!password) return '';
@@ -104,11 +114,15 @@ export default function AccountPage() {
       <section className="accountCard">
         <p className="eyebrow">Customer account</p>
         <h1>Sign up or sign in</h1>
-        <p>Create a richer account profile so checkout and support are faster, and track your purchase history with Firebase.</p>
+        <p>Create a richer account profile so checkout and support are faster, and track your orders and service bookings.</p>
 
         {sessionEmail ? (
           <div>
             <p className="requestFeedback success">Signed in as {sessionEmail}</p>
+            <div className="productStoreActions">
+              <Link href="/account">Orders</Link>
+              <Link href="/account/bookings">Bookings{bookingCount ? ` (${bookingCount})` : ''}</Link>
+            </div>
             <button className="secondaryButton" onClick={() => void signOutCustomer().catch(() => setError('Unable to sign out.'))}>
               Sign out
             </button>
@@ -147,14 +161,14 @@ export default function AccountPage() {
       </section>
 
       <section className="accountCard">
-        <h2>Purchase history</h2>
+        <h2>Orders</h2>
         {loadingAccount ? <p>Loading your account...</p> : null}
-        {loadingHistory ? <p>Loading purchase history...</p> : null}
-        {!sessionEmail ? <p>Sign in to view your purchase history.</p> : null}
-        {sessionEmail && !loadingHistory && history.length === 0 ? <p>No purchases yet. Place an order request to start tracking.</p> : null}
-        {sessionEmail && history.length > 0 ? (
+        {loadingHistory ? <p>Loading orders...</p> : null}
+        {!sessionEmail ? <p>Sign in to view your orders and bookings.</p> : null}
+        {sessionEmail && !loadingHistory && orderHistory.length === 0 ? <p>No product orders yet. Place an order to start tracking.</p> : null}
+        {sessionEmail && orderHistory.length > 0 ? (
           <ul className="historyList">
-            {history.map((item) => (
+            {orderHistory.map((item) => (
               <li key={item.id}>
                 <strong>{item.productName}</strong> × {item.quantity} · {item.paymentMethod} · {item.deliveryLocation}
                 <br />
@@ -164,6 +178,7 @@ export default function AccountPage() {
                 </small>
                 <br />
                 <small>{new Date(item.createdAt).toLocaleString()}</small>
+                {item.reference ? <><br /><Link href={`/account/orders/${encodeURIComponent(item.reference)}`}>View order details</Link></> : null}
                 {item.paymentConfirmedAt ? <><br /><small>Payment confirmed: {new Date(item.paymentConfirmedAt).toLocaleString()}</small></> : null}
                 {item.orderCompletedAt ? <><br /><small>Order completed: {new Date(item.orderCompletedAt).toLocaleString()}</small></> : null}
               </li>
