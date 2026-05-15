@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { collection, documentId, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { collection, documentId, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db, firebaseConfigError } from '@/lib/firebase';
 import { getProductHref } from '@/lib/product-route';
 import { getStoreHref } from '@/lib/store-route';
@@ -38,6 +38,7 @@ type PublicProduct = {
   city?: string;
   storeCity?: string;
   itemType?: string;
+  type?: string;
   isVisible?: boolean | string | number;
   visible?: boolean | string | number;
   isPublished?: boolean | string | number;
@@ -56,7 +57,8 @@ type SortOption = 'newest' | 'price' | 'featured';
 
 const INITIAL_VISIBLE_COUNT = 24;
 const LOAD_MORE_COUNT = 24;
-const HOME_SCAN_LIMIT = 300;
+const HOME_SCAN_LIMIT = 1000;
+const VERIFIED_STORE_SCAN_LIMIT = 500;
 const FIRST_SCREEN_PER_STORE_LIMIT = 4;
 
 const normalizeBoolean = (value: unknown): boolean | null => {
@@ -151,6 +153,11 @@ const getDisplayImages = (item: PublicProduct): string[] => {
   return Array.from(new Set(candidates.map(normalizeImageUrl).filter(isValidImageUrl)));
 };
 
+const isProductItem = (item: PublicProduct) => {
+  const normalizedType = (item.itemType ?? item.type ?? 'product').trim().toLowerCase();
+  return normalizedType !== 'service';
+};
+
 const isPublicListing = (item: PublicProduct) => {
   if (isExplicitlyTrue(item.deleted) || isExplicitlyTrue(item.isDeleted)) return false;
   if (isExplicitlyTrue(item.hidden) || isExplicitlyTrue(item.isHidden)) return false;
@@ -158,10 +165,7 @@ const isPublicListing = (item: PublicProduct) => {
   return true;
 };
 
-const isVerifiedStore = (value: PublicProduct['verified']) => {
-  const normalized = normalizeBoolean(value);
-  return normalized === null ? true : normalized;
-};
+const isVerifiedStore = () => true;
 
 const getContactPhone = (item: PublicProduct) => {
   const source = item as Record<string, unknown>;
@@ -256,6 +260,30 @@ const prioritizeBalancedFirstScreen = (items: PublicProduct[]) => {
   return [...firstScreen, ...remaining];
 };
 
+const getVerifiedStoreIds = async () => {
+  if (!db) return new Set<string>();
+
+  const snapshot = await getDocs(query(collection(db, 'stores'), where('verified', '==', true), limit(VERIFIED_STORE_SCAN_LIMIT)));
+  const ids = new Set<string>();
+
+  snapshot.docs.forEach((storeDoc) => {
+    const data = storeDoc.data() as Record<string, unknown>;
+    const status = typeof data.status === 'string' ? data.status.trim().toLowerCase() : '';
+    const eligibleForBuy = normalizeBoolean(data.eligibleForBuy);
+    const isInactive = ['inactive', 'suspended', 'deleted', 'disabled'].includes(status);
+
+    if (isInactive || eligibleForBuy === false) return;
+
+    ids.add(storeDoc.id);
+    for (const key of ['storeId', 'id', 'ownerUid', 'workspaceSlug']) {
+      const value = data[key];
+      if (typeof value === 'string' && value.trim()) ids.add(value.trim());
+    }
+  });
+
+  return ids;
+};
+
 export function HomeProductGrid() {
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [selectedCity, setSelectedCity] = useState('all');
@@ -276,11 +304,24 @@ export function HomeProductGrid() {
       try {
         setIsLoading(true);
         setError(null);
-        const snapshot = await getDocs(query(collection(db, 'publicProducts'), orderBy(documentId(), 'asc'), limit(HOME_SCAN_LIMIT)));
+        const [verifiedStoreIds, snapshot] = await Promise.all([
+          getVerifiedStoreIds(),
+          getDocs(query(collection(db, 'publicProducts'), orderBy(documentId(), 'asc'), limit(HOME_SCAN_LIMIT))),
+        ]);
         if (!active) return;
         const loaded = snapshot.docs
           .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as PublicProduct)
-          .filter((item) => isPublicListing(item) && getDisplayImages(item).length > 0);
+          .filter((item) => {
+            const storeId = item.storeId?.trim();
+            return Boolean(
+              storeId &&
+                verifiedStoreIds.has(storeId) &&
+                isProductItem(item) &&
+                isPublicListing(item) &&
+                getDisplayImages(item).length > 0,
+            );
+          })
+          .map((item) => ({ ...item, verified: true }));
         setProducts(loaded);
       } catch (err) {
         console.error('Failed to load homepage products', err);
@@ -332,7 +373,7 @@ export function HomeProductGrid() {
               setSearchText(event.target.value);
               setVisibleLimit(INITIAL_VISIBLE_COUNT);
             }}
-            placeholder="Search products, services, stores, or categories"
+            placeholder="Search products, stores, or categories"
           />
         </div>
         <div className="sortWrap">
@@ -407,11 +448,11 @@ export function HomeProductGrid() {
                   <div className="meta">
                     <span className="storeIdentity">
                       {storeHref ? <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link> : item.storeName ?? 'Unknown store'}
-                      {isVerifiedStore(item.verified) ? <span className="verifiedBadge" aria-label="Verified by Sedifex"><span className="verifiedPulse" aria-hidden="true" />Verified by Sedifex</span> : null}
+                      {isVerifiedStore() ? <span className="verifiedBadge" aria-label="Verified by Sedifex"><span className="verifiedPulse" aria-hidden="true" />Verified by Sedifex</span> : null}
                     </span>
                     <strong>{formatPrice(item.price, item.currency)}</strong>
                   </div>
-                  {isVerifiedStore(item.verified) ? <p className="trustScoreCard">🛡 Sedifex Trust+ 98%</p> : null}
+                  {isVerifiedStore() ? <p className="trustScoreCard">🛡 Sedifex Trust+ 98%</p> : null}
                   <div className="cardActions">
                     <Link href={getProductHref(item.id, item.productName)} className="buyNowButton" aria-label={`Buy ${getProductName(item)} now`}>Buy now</Link>
                     {whatsAppHref ? <a className="contactStoreButton" href={whatsAppHref} target="_blank" rel="noopener noreferrer">Contact store</a> : <span className="contactStoreButton" aria-disabled="true">Contact store unavailable</span>}
@@ -421,7 +462,7 @@ export function HomeProductGrid() {
             })}
       </div>
 
-      {!isLoading && visibleProducts.length === 0 && !error ? <div className="emptyState"><h3>No items found</h3><p>Try a different search term, category, or sort option.</p></div> : null}
+      {!isLoading && visibleProducts.length === 0 && !error ? <div className="emptyState"><h3>No products found</h3><p>Try a different search term, category, or city.</p></div> : null}
 
       <div className="actions">
         <button type="button" disabled={isLoading || visibleLimit >= filteredProducts.length} onClick={() => setVisibleLimit((current) => current + LOAD_MORE_COUNT)}>
