@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { addPurchaseHistoryItem, getSignedInUserId } from '@/lib/customer-auth';
+import { addPurchaseHistoryItem, getSignedInCustomerProfile, getSignedInUserId, subscribeToAuth } from '@/lib/customer-auth';
 
 type ProductLeadPanelProps = {
   productId: string;
@@ -81,6 +81,28 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
   useEffect(() => {
     void trackEvent('product_view', { productId, productName });
   }, [productId, productName]);
+
+  useEffect(() => {
+    const applySignedInProfile = async () => {
+      const profile = await getSignedInCustomerProfile();
+      if (!profile) return;
+
+      setFormState((current) => ({
+        ...current,
+        customerName: current.customerName.trim() ? current.customerName : profile.fullName,
+        email: current.email.trim() ? current.email : profile.email,
+        phone: current.phone.trim() ? current.phone : profile.phone,
+      }));
+    };
+
+    const unsubscribe = subscribeToAuth(() => {
+      void applySignedInProfile();
+    });
+
+    void applySignedInProfile();
+
+    return unsubscribe;
+  }, []);
 
   const whatsappMessage = useMemo(() => {
     const message = `Hi ${storeName}, I want to buy ${productName} on Sedifex.\nMy location: ${city?.trim() || 'Please share your location'}.`;
