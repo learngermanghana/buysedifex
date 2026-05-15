@@ -5,24 +5,10 @@ import { usePathname } from 'next/navigation';
 
 const navItems = [
   { href: '/', label: 'Home', match: (pathname: string) => pathname === '/' },
-  {
-    href: '/stores',
-    label: 'Verified Stores',
-    match: (pathname: string) => pathname.startsWith('/stores'),
-  },
-  {
-    href: '/search',
-    label: 'Search',
-    match: (pathname: string) => pathname.startsWith('/search') || pathname.startsWith('/category'),
-  },
-  {
-    href: '/products',
-    label: 'Products',
-    match: (pathname: string) => pathname.startsWith('/products'),
-  },
-  { href: '/sell', label: 'How to Sell', match: (pathname: string) => pathname.startsWith('/sell') },
-  { href: '/contact', label: 'Contact', match: (pathname: string) => pathname.startsWith('/contact') },
+  { href: '/stores', label: 'Stores', match: (pathname: string) => pathname.startsWith('/stores') },
+  { href: '/search', label: 'Search', match: (pathname: string) => pathname.startsWith('/search') },
   { href: '/account', label: 'Account', match: (pathname: string) => pathname.startsWith('/account') },
+  { href: '/sell', label: 'Sell on Sedifex', match: (pathname: string) => pathname.startsWith('/sell') },
 ];
 
 export function MainNav() {
