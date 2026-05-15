@@ -120,6 +120,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const hasWebsite = Boolean(storeProfile?.websiteUrl);
   const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
   const whatsappPhone = product.waLink ?? storeProfile?.storeWhatsapp ?? storeProfile?.storePhone ?? '';
+  const checkoutProductId = product.sourceProductId?.trim() || product.id;
 
   const productUrl = canonicalUrlForPath(getProductHref(product.id, product.productName));
   const jsonLd = {
@@ -253,12 +254,13 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         </div>
 
         <ProductLeadPanel
-          productId={product.id}
+          productId={checkoutProductId}
           merchantId={product.storeId ?? ''}
           productName={product.productName}
           city={resolvedLocation}
           storeName={resolvedStoreName}
           whatsappPhone={whatsappPhone}
+          itemType={product.itemType}
         />
       </div>
     </main>
