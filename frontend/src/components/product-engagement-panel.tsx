@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { getFirebaseAuth } from '@/lib/firebase';
 import {
   getEngagementSummary,
@@ -31,7 +31,7 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
 
   const identity = useMemo(() => ({ publicProductId, storeId, sourceProductId }), [publicProductId, sourceProductId, storeId]);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       setLoading(true);
       const token = await getFirebaseAuth()?.currentUser?.getIdToken();
@@ -48,13 +48,13 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
     } finally {
       setLoading(false);
     }
-  };
+  }, [identity]);
 
   useEffect(() => {
     void refresh();
     const timer = setInterval(() => void refresh(), 15000);
     return () => clearInterval(timer);
-  }, [publicProductId, sourceProductId, storeId]);
+  }, [refresh]);
 
   const onSubmitComment = async (event: FormEvent) => {
     event.preventDefault();
