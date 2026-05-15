@@ -51,7 +51,7 @@ const buildMetadataDescription = (input: {
   const currencyLabel = displayCurrency === 'GHS' ? 'Cedis (GH₵)' : displayCurrency;
   const priceText = input.price == null ? 'Price unavailable' : `${currencyLabel} ${input.price}`;
 
-  return `Buy ${input.productName} from ${input.storeName}${location}. Price: ${priceText}. Order via WhatsApp on Sedifex.`;
+  return `Buy ${input.productName} from verified store ${input.storeName}${location}. Price: ${priceText}. Secure checkout on Sedifex Market.`;
 };
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
@@ -60,15 +60,15 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
   if (!product) {
     return {
-      title: 'Product not found | Sedifex',
-      description: 'The requested product could not be found on Sedifex.',
+      title: 'Product not found | Sedifex Market',
+      description: 'The requested product could not be found on Sedifex Market.',
       robots: { index: false, follow: false },
     };
   }
 
   const canonicalPath = getProductHref(product.id, product.productName);
   const canonicalUrl = canonicalUrlForPath(canonicalPath);
-  const title = `${product.productName}${buildLocation(product.city)} | ${product.storeName} | Sedifex`;
+  const title = `${product.productName}${buildLocation(product.city)} | ${product.storeName} | Sedifex Market`;
   const description = buildMetadataDescription(product);
   const socialImages =
     product.imageUrls.length > 0 ? product.imageUrls.map((url) => ({ url })) : [{ url: defaultSocialImageUrl() }];
@@ -87,7 +87,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       url: canonicalUrl,
       title,
       description,
-      siteName: 'Sedifex',
+      siteName: 'Sedifex Market',
       images: socialImages,
     },
     twitter: {
@@ -122,34 +122,55 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const whatsappPhone = product.waLink ?? storeProfile?.storeWhatsapp ?? storeProfile?.storePhone ?? '';
   const checkoutProductId = product.sourceProductId?.trim() || product.id;
 
-  const productUrl = canonicalUrlForPath(getProductHref(product.id, product.productName));
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: product.productName,
-    description: product.description,
-    ...(product.imageUrls.length > 0 ? { image: product.imageUrls } : {}),
-    ...(product.sku ? { sku: product.sku } : {}),
-    brand: {
-      '@type': 'Brand',
-      name: resolvedStoreName,
+  const productPath = getProductHref(product.id, product.productName);
+  const productUrl = canonicalUrlForPath(productPath);
+  const storeUrl = storeHref ? canonicalUrlForPath(storeHref) : undefined;
+  const availability =
+    typeof product.stockCount === 'number' && product.stockCount <= 0
+      ? 'https://schema.org/OutOfStock'
+      : 'https://schema.org/InStock';
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      '@id': `${productUrl}#product`,
+      name: product.productName,
+      description: product.description,
+      ...(product.imageUrls.length > 0 ? { image: product.imageUrls } : {}),
+      ...(product.sku ? { sku: product.sku } : {}),
+      brand: {
+        '@type': 'Brand',
+        name: resolvedStoreName,
+      },
+      seller: {
+        '@type': 'Organization',
+        name: resolvedStoreName,
+        ...(storeUrl ? { url: storeUrl } : {}),
+      },
+      ...(product.categoryKey ? { category: product.categoryKey } : {}),
+      offers: {
+        '@type': 'Offer',
+        url: productUrl,
+        priceCurrency: normalizeDisplayCurrency(product.currency),
+        ...(product.price != null ? { price: product.price.toFixed(2) } : {}),
+        availability,
+        itemCondition: 'https://schema.org/NewCondition',
+        seller: {
+          '@type': 'Organization',
+          name: resolvedStoreName,
+        },
+      },
     },
-    ...(product.categoryKey ? { category: product.categoryKey } : {}),
-    offers: {
-      '@type': 'Offer',
-      ...(product.price != null ? { price: product.price } : {}),
-      ...(product.currency ? { priceCurrency: normalizeDisplayCurrency(product.currency) } : { priceCurrency: 'GHS' }),
-      ...(typeof product.stockCount === 'number'
-        ? {
-            availability:
-              product.stockCount > 0
-                ? 'https://schema.org/InStock'
-                : 'https://schema.org/OutOfStock',
-          }
-        : {}),
-      url: productUrl,
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: canonicalUrlForPath('/') },
+        ...(storeUrl ? [{ '@type': 'ListItem', position: 2, name: resolvedStoreName, item: storeUrl }] : []),
+        { '@type': 'ListItem', position: storeUrl ? 3 : 2, name: product.productName, item: productUrl },
+      ],
     },
-  };
+  ];
 
   const displayCurrency = normalizeDisplayCurrency(product.currency);
   const currencyLabel = displayCurrency === 'GHS' ? 'Cedis (GH₵)' : displayCurrency;
