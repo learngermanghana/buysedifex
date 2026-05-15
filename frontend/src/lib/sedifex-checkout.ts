@@ -173,6 +173,7 @@ export const createMerchantCheckout = async (
   items: CheckoutItem[],
   reference: string,
   pricingSnapshot?: SedifexCheckoutPreviewResponse,
+  customer?: { email?: string; phone?: string },
 ) => {
   const normalizedMerchantId = normalizeMerchantId(merchantId);
   const merchantToken = getMerchantToken(normalizedMerchantId);
@@ -191,6 +192,12 @@ export const createMerchantCheckout = async (
       client_order_id: reference,
       items: items.map((item) => ({ type: item.type ?? 'PRODUCT', item_id: item.productId, qty: item.quantity })),
       pricing_snapshot: pricingSnapshot,
+      customer: customer
+        ? {
+            email: customer.email,
+            phone: customer.phone,
+          }
+        : undefined,
       payment_status: 'pending',
       order_status: 'pending',
       returnUrl: process.env.SEDIFEX_CHECKOUT_RETURN_URL,

@@ -21,10 +21,17 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as CheckoutCreateBody;
     const cart = Array.isArray(body.cart) ? body.cart : [];
+    const customerEmail = body.customer?.email?.trim();
+    const customerPhone = body.customer?.phone?.trim();
 
     if (cart.length === 0) {
       console.warn('checkout.create.failed', { reason: 'empty_cart' });
       return NextResponse.json({ error: 'Cart is required' }, { status: 400 });
+    }
+
+    if (!customerEmail) {
+      console.warn('checkout.create.failed', { reason: 'missing_customer_email' });
+      return NextResponse.json({ error: 'customer.email is required' }, { status: 400 });
     }
 
     const grouped = groupCartByMerchant(cart);
@@ -36,13 +43,19 @@ export async function POST(request: NextRequest) {
       const preview = await previewMerchantCheckout(merchantId, merchantCart);
       console.info('checkout.create.merchant.preview_succeeded', { merchantId });
       const reference = createCheckoutReference(merchantId);
-      const checkout = await createMerchantCheckout(merchantId, merchantCart, reference, preview);
+      const checkout = await createMerchantCheckout(merchantId, merchantCart, reference, preview, {
+        email: customerEmail,
+        phone: customerPhone,
+      });
       console.info('checkout.create.merchant.checkout_succeeded', { merchantId, reference });
 
       const checkoutRecord = {
         merchantId,
         reference,
-        customer: body.customer ?? null,
+        customer: {
+          email: customerEmail,
+          phone: customerPhone,
+        },
         cart: merchantCart,
         pricingSnapshot: preview,
         pricing_snapshot: preview,
