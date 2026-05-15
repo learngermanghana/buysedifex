@@ -347,6 +347,22 @@ const mixProductsAcrossStores = (items: PublicProduct[]) => {
   return mixed;
 };
 
+const capProductsPerStore = (items: PublicProduct[], limitPerStore: number) => {
+  if (limitPerStore <= 0) return items;
+  const counts = new Map<string, number>();
+  const filtered: PublicProduct[] = [];
+
+  items.forEach((item) => {
+    const storeKey = item.storeId?.trim() || item.storeName?.trim() || `unknown-store-${item.id}`;
+    const currentCount = counts.get(storeKey) ?? 0;
+    if (currentCount >= limitPerStore) return;
+    counts.set(storeKey, currentCount + 1);
+    filtered.push(item);
+  });
+
+  return filtered;
+};
+
 const mixProductsByCategoryThenStore = (items: PublicProduct[]) => {
   const categoryBuckets = new Map<string, PublicProduct[]>();
 
@@ -721,9 +737,10 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         throw new Error('Unable to fetch products with the available indexes.');
       }
 
-      const nextItems = snapshot.docs
+      const nextItemsRaw = snapshot.docs
         .map((doc) => doc.data() as PublicProduct)
         .filter((item) => isPublicListing(item) && hasDisplayImage(item));
+      const nextItems = capProductsPerStore(mixProductsAcrossStores(nextItemsRaw), 2);
 
       setProducts((current) => (cursor ? [...current, ...nextItems] : nextItems));
       setCities((current) => {

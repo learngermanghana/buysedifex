@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { auth } from '@/lib/firebase';
+import { getFirebaseAuth } from '@/lib/firebase';
 import {
   getEngagementSummary,
   listEngagementComments,
@@ -34,7 +34,7 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
   const refresh = async () => {
     try {
       setLoading(true);
-      const token = await auth?.currentUser?.getIdToken();
+      const token = await getFirebaseAuth()?.currentUser?.getIdToken();
       const [loadedComments, loadedSummary] = await Promise.all([
         listEngagementComments(identity),
         getEngagementSummary({ ...identity, token: token ?? undefined }),
@@ -60,7 +60,7 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
     event.preventDefault();
     const trimmedText = text.trim();
     if (!trimmedText) return;
-    const token = await auth?.currentUser?.getIdToken();
+    const token = await getFirebaseAuth()?.currentUser?.getIdToken();
     if (!token) {
       setError('Sign in to comment.');
       return;
@@ -72,7 +72,7 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
   };
 
   const onToggleFavorite = async () => {
-    const token = await auth?.currentUser?.getIdToken();
+    const token = await getFirebaseAuth()?.currentUser?.getIdToken();
     if (!token) {
       setError('Sign in to favorite.');
       return;
