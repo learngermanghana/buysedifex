@@ -34,8 +34,8 @@ export default function SellPage() {
       <p className="eyebrow">For Businesses</p>
       <h1>Sell on Sedifex</h1>
       <p>
-        Sedifex helps stores promote products to more customers while keeping WhatsApp as the main sales conversation
-        channel.
+        Sedifex helps stores promote products to more customers with structured online checkout, Paystack payment collection,
+        and WhatsApp for support conversations.
       </p>
 
       <section>
@@ -74,12 +74,9 @@ export default function SellPage() {
         <h2>How Sedifex Market works</h2>
         <ul>
           <li>Sedifex acts as a marketplace mediator to recommend stores to customers.</li>
-          <li>We do not accept payments on behalf of any shop.</li>
-          <li>Each verified shop must have a location.</li>
-          <li>
-            If a store does not provide a location, customers should pay only after receiving their products through
-            delivery.
-          </li>
+          <li>Sedifex now supports secure online checkout and payment via Paystack.</li>
+          <li>Verified shops must fulfill orders according to Sedifex platform fulfillment and support standards.</li>
+          <li>Each verified shop must have an accurate location and reachable support contact.</li>
           <li>If you notice suspicious behavior, please report it immediately as a potential fraud alert.</li>
         </ul>
       </section>

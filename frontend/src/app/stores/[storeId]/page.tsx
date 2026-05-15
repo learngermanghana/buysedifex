@@ -207,7 +207,7 @@ export default async function StorePage({ params }: StorePageProps) {
       {productListings.length > 0 || serviceListings.length > 0 ? (
         <section className="storeInfoCard" aria-label="Store products and services">
           <h2>Products &amp; Services from {profile.storeName}</h2>
-          <p>🚚 Delivery: Discuss with seller · 💳 Payment methods: MoMo, cash, and seller-approved options.</p>
+          <p>🚚 Delivery: Discuss with seller · 💳 Payment method: Online payment via Paystack checkout.</p>
 
           <h3>Products ({productListings.length})</h3>
           {productListings.length > 0 ? (
