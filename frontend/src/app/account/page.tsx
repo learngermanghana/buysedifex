@@ -43,11 +43,11 @@ export default function AccountPage() {
     }
 
     setLoadingHistory(true);
-    void getPurchaseHistory(sessionUserId)
+    void getPurchaseHistory(sessionUserId, sessionEmail)
       .then(setHistory)
       .catch((historyError) => setError(historyError instanceof Error ? historyError.message : 'Unable to load history.'))
       .finally(() => setLoadingHistory(false));
-  }, [sessionUserId]);
+  }, [sessionEmail, sessionUserId]);
 
   const passwordStrengthHint = useMemo(() => {
     if (!password) return '';
@@ -94,8 +94,8 @@ export default function AccountPage() {
 
   const statusClass = (status?: string) => {
     const normalized = (status ?? 'pending').toLowerCase();
-    if (normalized === 'confirmed' || normalized === 'completed') return 'success';
-    if (normalized === 'failed' || normalized === 'rejected') return 'error';
+    if (['confirmed', 'completed', 'success', 'paid', 'captured'].includes(normalized)) return 'success';
+    if (['failed', 'rejected', 'cancelled', 'canceled', 'abandoned'].includes(normalized)) return 'error';
     return 'pending';
   };
 
@@ -151,7 +151,7 @@ export default function AccountPage() {
         {loadingAccount ? <p>Loading your account...</p> : null}
         {loadingHistory ? <p>Loading purchase history...</p> : null}
         {!sessionEmail ? <p>Sign in to view your purchase history.</p> : null}
-        {sessionEmail && history.length === 0 ? <p>No purchases yet. Place an order request to start tracking.</p> : null}
+        {sessionEmail && !loadingHistory && history.length === 0 ? <p>No purchases yet. Place an order request to start tracking.</p> : null}
         {sessionEmail && history.length > 0 ? (
           <ul className="historyList">
             {history.map((item) => (
