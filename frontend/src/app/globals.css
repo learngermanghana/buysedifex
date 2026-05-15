@@ -1704,6 +1704,23 @@ select:focus {
   border-color: #818cf8;
 }
 
+
+.authForm {
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  padding: 0.9rem;
+}
+
+.authForm input {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.authForm input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px #e0e7ff;
+  outline: none;
+}
 .historyList {
   margin: 0;
   padding-left: 1rem;
