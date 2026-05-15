@@ -14,6 +14,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: canonicalUrlForPath('/'), changeFrequency: 'daily', priority: 1 },
     { url: canonicalUrlForPath('/stores'), changeFrequency: 'daily', priority: 0.9 },
+    { url: canonicalUrlForPath('/services'), changeFrequency: 'daily', priority: 0.9 },
     { url: canonicalUrlForPath('/search'), changeFrequency: 'daily', priority: 0.85 },
     { url: canonicalUrlForPath('/sell'), changeFrequency: 'weekly', priority: 0.7 },
     { url: canonicalUrlForPath('/about'), changeFrequency: 'weekly', priority: 0.6 },
