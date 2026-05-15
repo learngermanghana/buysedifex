@@ -55,7 +55,6 @@ const normalizeBoolean = (value: unknown): boolean | null => {
 
 const isExplicitlyTrue = (value: unknown) => normalizeBoolean(value) === true;
 const isExplicitlyFalse = (value: unknown) => normalizeBoolean(value) === false;
-
 const getServiceName = (item: PublicService) => (item.productName ?? item.name)?.trim() || 'Untitled service';
 const getStoreCity = (item: PublicService) => (item.city ?? item.storeCity)?.trim() || 'City unavailable';
 
@@ -133,7 +132,7 @@ const getTimestampScore = (value: PublicService['updatedAt'] | PublicService['pu
   return typeof value.seconds === 'number' ? value.seconds : 0;
 };
 
-const getVerifiedStoreIds = async () => {
+const getServiceApprovedStoreIds = async () => {
   if (!db) return new Set<string>();
   const snapshot = await getDocs(query(collection(db, 'stores'), where('verified', '==', true), limit(VERIFIED_STORE_SCAN_LIMIT)));
   const ids = new Set<string>();
@@ -142,7 +141,8 @@ const getVerifiedStoreIds = async () => {
     const data = storeDoc.data() as Record<string, unknown>;
     const status = typeof data.status === 'string' ? data.status.trim().toLowerCase() : '';
     const eligibleForBuy = normalizeBoolean(data.eligibleForBuy);
-    if (['inactive', 'suspended', 'deleted', 'disabled'].includes(status) || eligibleForBuy === false) return;
+    const verifiedService = normalizeBoolean(data.verified_service ?? data.verifiedService);
+    if (['inactive', 'suspended', 'deleted', 'disabled'].includes(status) || eligibleForBuy === false || verifiedService === false) return;
 
     ids.add(storeDoc.id);
     for (const key of ['storeId', 'id', 'ownerUid', 'workspaceSlug']) {
@@ -174,8 +174,8 @@ export function ServiceMarketGrid() {
       try {
         setIsLoading(true);
         setError(null);
-        const [verifiedStoreIds, snapshot] = await Promise.all([
-          getVerifiedStoreIds(),
+        const [serviceApprovedStoreIds, snapshot] = await Promise.all([
+          getServiceApprovedStoreIds(),
           getDocs(query(collection(db, 'publicProducts'), orderBy(documentId(), 'asc'), limit(SERVICE_SCAN_LIMIT))),
         ]);
         if (!active) return;
@@ -184,7 +184,7 @@ export function ServiceMarketGrid() {
           .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as PublicService)
           .filter((item) => {
             const storeId = item.storeId?.trim();
-            return Boolean(storeId && verifiedStoreIds.has(storeId) && isServiceItem(item) && isPublicListing(item) && getDisplayImages(item).length > 0);
+            return Boolean(storeId && serviceApprovedStoreIds.has(storeId) && isServiceItem(item) && isPublicListing(item) && getDisplayImages(item).length > 0);
           })
           .sort((left, right) => {
             const leftTime = getTimestampScore(left.publishedAt) || getTimestampScore(left.updatedAt);
@@ -233,20 +233,12 @@ export function ServiceMarketGrid() {
       <div className="toolbar">
         <div className="searchWrap">
           <label htmlFor="service-search">Search services</label>
-          <input
-            id="service-search"
-            type="search"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Search spa, beauty, school, repair, consultation..."
-          />
+          <input id="service-search" type="search" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Search services..." />
         </div>
         <div className="sortWrap">
           <label htmlFor="service-city-filter">City</label>
           <select id="service-city-filter" value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>
-            {cities.map((city) => (
-              <option key={city} value={city}>{city === 'all' ? 'All cities' : city}</option>
-            ))}
+            {cities.map((city) => <option key={city} value={city}>{city === 'all' ? 'All cities' : city}</option>)}
           </select>
         </div>
       </div>
@@ -270,16 +262,7 @@ export function ServiceMarketGrid() {
               return (
                 <article key={service.id} className="card">
                   <div className="imageWrap">
-                    <Image
-                      src={imageUrl}
-                      alt={service.imageAlt?.trim() || getServiceName(service)}
-                      loading="lazy"
-                      unoptimized
-                      width={360}
-                      height={360}
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                      style={{ width: '100%', height: 'auto' }}
-                    />
+                    <Image src={imageUrl} alt={service.imageAlt?.trim() || getServiceName(service)} loading="lazy" unoptimized width={360} height={360} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw" style={{ width: '100%', height: 'auto' }} />
                   </div>
                   <h3>{getServiceName(service)}</h3>
                   <p className="productShortDescription">{description}</p>
@@ -292,9 +275,7 @@ export function ServiceMarketGrid() {
                   </div>
                   <p className="trustScoreCard">📅 Book through Sedifex · Pay online or request support</p>
                   <div className="cardActions">
-                    <Link href={getProductHref(service.id, service.productName ?? service.name)} className="buyNowButton" aria-label={`Book ${getServiceName(service)}`}>
-                      Book service
-                    </Link>
+                    <Link href={getProductHref(service.id, service.productName ?? service.name)} className="buyNowButton" aria-label={`Book ${getServiceName(service)}`}>Book service</Link>
                     {storeHref ? <Link className="contactStoreButton" href={storeHref}>View store</Link> : null}
                   </div>
                 </article>
@@ -302,9 +283,7 @@ export function ServiceMarketGrid() {
             })}
       </div>
 
-      {!isLoading && filteredServices.length === 0 && !error ? (
-        <div className="emptyState"><h3>No services found</h3><p>Try a different search term or city.</p></div>
-      ) : null}
+      {!isLoading && filteredServices.length === 0 && !error ? <div className="emptyState"><h3>No services found</h3><p>Try a different search term or city.</p></div> : null}
     </section>
   );
 }
