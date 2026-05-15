@@ -20,6 +20,13 @@ export type MerchantCheckoutInit = {
   pricingSnapshot: SedifexCheckoutPreviewResponse;
 };
 
+type SedifexCheckoutItem = {
+  type: 'PRODUCT' | 'SERVICE';
+  item_type: 'product' | 'service';
+  item_id: string;
+  qty: number;
+};
+
 export type SedifexCheckoutPreviewRequest = {
   store_id: string;
   merchant_id?: string;
@@ -28,11 +35,12 @@ export type SedifexCheckoutPreviewRequest = {
   currency?: string;
   fulfillment_type?: 'PICKUP' | 'DELIVERY';
   delivery_address_id?: string | null;
-  items: Array<{ type: 'PRODUCT' | 'SERVICE'; item_id: string; qty: number }>;
+  items: SedifexCheckoutItem[];
 };
 
 export type SedifexCheckoutPreviewResponse = {
   pricing_version?: string;
+  currency?: string;
   subtotal?: number;
   tax_total?: number;
   delivery_fee?: number;
@@ -139,6 +147,37 @@ const normalizeMerchantId = (merchantId: string) => {
   return normalized;
 };
 
+const normalizeCheckoutQuantity = (quantity: number) => {
+  const normalizedQuantity = Math.floor(Number(quantity));
+  if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) {
+    throw new Error('Checkout quantity must be a positive whole number.');
+  }
+  return normalizedQuantity;
+};
+
+const normalizeCheckoutItemType = (type?: CheckoutItem['type']) => {
+  const normalizedType = type === 'SERVICE' ? 'SERVICE' : 'PRODUCT';
+  return {
+    contractType: normalizedType,
+    backendItemType: normalizedType === 'SERVICE' ? 'service' : 'product',
+  } as const;
+};
+
+const toSedifexCheckoutItem = (item: CheckoutItem): SedifexCheckoutItem => {
+  const itemId = item.productId.trim();
+  if (!itemId) {
+    throw new Error('Checkout item_id is missing. Ensure marketplace products keep their original Sedifex sourceProductId.');
+  }
+
+  const itemType = normalizeCheckoutItemType(item.type);
+  return {
+    type: itemType.contractType,
+    item_type: itemType.backendItemType,
+    item_id: itemId,
+    qty: normalizeCheckoutQuantity(item.quantity),
+  };
+};
+
 export const getMerchantToken = (merchantId: string) => {
   const normalizedMerchantId = normalizeMerchantId(merchantId);
   const tokenFromJson = getMerchantTokensJsonMap()[normalizedMerchantId];
@@ -154,9 +193,10 @@ export const previewMerchantCheckout = async (merchantId: string, items: Checkou
     merchant_id: normalizedMerchantId,
     storeId: normalizedMerchantId,
     merchantId: normalizedMerchantId,
+    currency: 'GHS',
     fulfillment_type: 'PICKUP',
     delivery_address_id: null,
-    items: items.map((item) => ({ type: item.type ?? 'PRODUCT', item_id: item.productId, qty: item.quantity })),
+    items: items.map(toSedifexCheckoutItem),
   };
   return integrationFetch<SedifexCheckoutPreviewResponse>('/integration/checkout/preview', {
     method: 'POST',
@@ -177,6 +217,9 @@ export const createMerchantCheckout = async (
 ) => {
   const normalizedMerchantId = normalizeMerchantId(merchantId);
   const merchantToken = getMerchantToken(normalizedMerchantId);
+  const finalTotalMinor = typeof pricingSnapshot?.final_total === 'number' ? pricingSnapshot.final_total : null;
+  const fallbackAmountMajor = finalTotalMinor && finalTotalMinor > 0 ? finalTotalMinor / 100 : undefined;
+
   return integrationFetch<unknown>('/integration/checkout/create', {
     method: 'POST',
     headers: {
@@ -188,9 +231,12 @@ export const createMerchantCheckout = async (
       merchant_id: normalizedMerchantId,
       storeId: normalizedMerchantId,
       merchantId: normalizedMerchantId,
+      currency: pricingSnapshot?.currency ?? 'GHS',
       payment_reference: reference,
       client_order_id: reference,
-      items: items.map((item) => ({ type: item.type ?? 'PRODUCT', item_id: item.productId, qty: item.quantity })),
+      clientOrderId: reference,
+      amount: fallbackAmountMajor,
+      items: items.map(toSedifexCheckoutItem),
       pricing_snapshot: pricingSnapshot,
       customer: customer
         ? {
