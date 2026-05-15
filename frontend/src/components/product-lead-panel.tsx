@@ -13,6 +13,7 @@ type ProductLeadPanelProps = {
 };
 
 type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
+type SubmitMode = 'online' | 'delivery' | null;
 
 type CheckoutFormState = {
   customerName: string;
@@ -29,16 +30,14 @@ const initialFormState: CheckoutFormState = {
   email: '',
   phone: '',
   quantity: '1',
-  paymentMethod: 'pay-on-delivery',
+  paymentMethod: 'online',
   deliveryLocation: '',
   notes: '',
 };
 
 const PAYMENT_METHODS = [
+  { id: 'online', label: 'Online Payment (Paystack)' },
   { id: 'pay-on-delivery', label: 'Pay on Delivery' },
-  { id: 'mobile-money', label: 'Mobile Money' },
-  { id: 'bank-transfer', label: 'Bank Transfer' },
-  { id: 'cash', label: 'Cash' },
 ];
 
 const normalizeWhatsAppPhone = (value?: string) => {
@@ -76,6 +75,8 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
   const [formState, setFormState] = useState<CheckoutFormState>(initialFormState);
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [checkoutCards, setCheckoutCards] = useState<Array<{ merchantId: string; reference: string; checkoutUrl?: string }>>([]);
+  const [submitMode, setSubmitMode] = useState<SubmitMode>(null);
+  const supportPhone = (whatsappPhone ?? '').trim();
 
   useEffect(() => {
     void trackEvent('product_view', { productId, productName });
@@ -95,25 +96,50 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
 
     try {
       const quantity = Number(formState.quantity);
-      const response = await fetch('/api/integration/checkout/create', {
+      const isOnlinePayment = formState.paymentMethod === 'online';
+
+      let payload: { merchantCheckouts?: Array<{ merchantId: string; reference: string; checkoutUrl?: string }> } = {};
+      if (isOnlinePayment) {
+        const response = await fetch('/api/integration/checkout/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cart: [{ productId, merchantId, quantity }],
+            customer: {
+              email: formState.email.trim(),
+              phone: formState.phone.trim(),
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          const errorPayload = (await response.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(errorPayload?.error ?? 'Failed to submit checkout request');
+        }
+
+        payload = (await response.json()) as { merchantCheckouts?: Array<{ merchantId: string; reference: string; checkoutUrl?: string }> };
+        setCheckoutCards(payload.merchantCheckouts ?? []);
+      } else {
+        setCheckoutCards([]);
+      }
+
+      await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cart: [{ productId, merchantId, quantity }],
-          customer: {
-            email: formState.email.trim(),
-            phone: formState.phone.trim(),
-          },
+          productId,
+          productName,
+          storeName,
+          customerName: formState.customerName.trim(),
+          contact: `${formState.phone.trim()} | ${formState.email.trim()}`,
+          companyName: storeName,
+          quantity,
+          paymentMethod: formState.paymentMethod,
+          deliveryLocation: formState.deliveryLocation.trim(),
+          notes: formState.notes.trim(),
         }),
       });
-
-      if (!response.ok) {
-        const errorPayload = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(errorPayload?.error ?? 'Failed to submit checkout request');
-      }
-
-      const payload = (await response.json()) as { merchantCheckouts?: Array<{ merchantId: string; reference: string; checkoutUrl?: string }> };
-      setCheckoutCards(payload.merchantCheckouts ?? []);
+      setSubmitMode(isOnlinePayment ? 'online' : 'delivery');
       await trackEvent('checkout_create_succeeded', { productId, productName, quantity, paymentMethod: formState.paymentMethod });
       const signedInUserId = getSignedInUserId();
       if (signedInUserId) {
@@ -141,7 +167,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
   return (
     <aside className="stickyProductActions" aria-label="Buy and checkout options">
       <h3>Buy this product</h3>
-      <p className="checkoutHint">Complete checkout here without leaving Sedifex. WhatsApp is for pre-purchase questions.</p>
+      <p className="checkoutHint">Complete checkout here without leaving Sedifex. All orders are paid online with Paystack.</p>
 
       <div className="paymentMethodList" aria-label="Available payment methods">
         {PAYMENT_METHODS.map((method) => (
@@ -235,10 +261,10 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
         />
 
         <button className="requestButton" type="submit" disabled={submitState === 'submitting' || !formState.customerName.trim() || !formState.email.trim() || !formState.phone.trim() || !formState.deliveryLocation.trim()}>
-          {submitState === 'submitting' ? 'Creating secure checkout...' : 'Continue to secure checkout'}
+          {submitState === 'submitting' ? (formState.paymentMethod === 'online' ? 'Creating Paystack checkout...' : 'Submitting delivery order...') : (formState.paymentMethod === 'online' ? 'Pay online with Paystack' : 'Place pay-on-delivery order')}
         </button>
 
-        {submitState === 'success' ? <p className="requestFeedback success">Checkout created. Use the merchant checkout card below to pay.</p> : null}
+        {submitState === 'success' ? <p className="requestFeedback success">Success! Your order has been received and is being processed. {submitMode === 'online' ? 'Please complete your payment using the Paystack checkout below.' : 'You selected pay on delivery and your request has been saved.'} A Sedifex team member will reach out shortly{supportPhone ? `, or call ${supportPhone} to speak directly with Sedifex.` : '.'}</p> : null}
         {submitState === 'error' ? <p className="requestFeedback error">Unable to create checkout. Check your location/contact or merchant availability.</p> : null}
       </form>
       {checkoutCards.map((card) => (
@@ -250,7 +276,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
         </div>
       ))}
       <p className="checkoutHint">Payment confirmed only after Sedifex webhook verification.</p>
-      <p className="checkoutHint">Need help? <a href="/contact">WhatsApp/email support</a> · <a href="/return-policy">Returns/refunds policy</a></p>
+      <p className="checkoutHint">Need help? <a href="/contact">WhatsApp/email support</a> · <a href="/return-policy">Returns/refunds policy</a>{supportPhone ? ` · Store phone: ${supportPhone}` : ''}</p>
       <p className="checkoutHint">Need clarification before ordering?</p>
       {whatsappLinkWithMessage ? (
         <a
