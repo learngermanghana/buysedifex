@@ -6,7 +6,7 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth';
-import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db, firebaseConfigError, getFirebaseAuth } from '@/lib/firebase';
 
 export type PurchaseHistoryItem = {
@@ -18,6 +18,8 @@ export type PurchaseHistoryItem = {
   deliveryLocation: string;
   createdAt: string;
   reference?: string;
+  customerEmail?: string;
+  customerPhone?: string;
   paymentStatus?: 'pending' | 'confirmed' | 'failed' | string;
   orderStatus?: 'pending' | 'processing' | 'completed' | string;
   paymentConfirmedAt?: string;
@@ -38,11 +40,29 @@ const assertFirebaseReady = () => {
 
 const getAuthErrorMessage = (fallback: string) => fallback;
 
+const normalizeEmail = (value?: string | null) => value?.trim().toLowerCase() ?? '';
+
+const timestampToIso = (value: unknown) => {
+  if (!value) return new Date().toISOString();
+  if (typeof value === 'string') return value;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'object' && value !== null && 'toDate' in value && typeof value.toDate === 'function') {
+    return value.toDate().toISOString();
+  }
+  return new Date().toISOString();
+};
+
+const pickString = (value: unknown, fallback = '') => (typeof value === 'string' && value.trim() ? value.trim() : fallback);
+const pickNumber = (value: unknown, fallback = 1) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+};
+
 export const registerCustomer = async (input: { fullName: string; email: string; phone: string; password: string }) => {
   assertFirebaseReady();
   const credential = await createUserWithEmailAndPassword(getFirebaseAuth()!, input.email.trim(), input.password);
   const fullName = input.fullName.trim();
-  const email = input.email.trim();
+  const email = normalizeEmail(input.email);
   const phone = input.phone.trim();
 
   if (fullName) {
@@ -61,7 +81,7 @@ export const registerCustomer = async (input: { fullName: string; email: string;
 export const signInCustomer = async (emailInput: string, password: string): Promise<boolean> => {
   assertFirebaseReady();
   try {
-    await signInWithEmailAndPassword(getFirebaseAuth()!, emailInput.trim(), password);
+    await signInWithEmailAndPassword(getFirebaseAuth()!, normalizeEmail(emailInput), password);
     return true;
   } catch {
     return false;
@@ -90,7 +110,7 @@ export const getSignedInCustomerProfile = async (): Promise<CustomerProfile | nu
 
   return {
     fullName: (profileData.fullName ?? user.displayName ?? '').trim(),
-    email: (profileData.email ?? user.email ?? '').trim(),
+    email: normalizeEmail(profileData.email ?? user.email ?? ''),
     phone: (profileData.phone ?? '').trim(),
   };
 };
@@ -108,28 +128,97 @@ export const addPurchaseHistoryItem = async (
   await addDoc(collection(db!, 'customerPurchaseHistory'), {
     userId,
     ...item,
+    customerEmail: normalizeEmail(item.customerEmail),
     createdAt: serverTimestamp(),
   });
 };
 
-export const getPurchaseHistory = async (userId: string): Promise<PurchaseHistoryItem[]> => {
+const mapCustomerPurchaseHistoryDoc = (documentId: string, data: Record<string, unknown>): PurchaseHistoryItem => ({
+  id: documentId,
+  productId: pickString(data.productId, 'unknown-product'),
+  productName: pickString(data.productName, 'Untitled item'),
+  quantity: pickNumber(data.quantity),
+  paymentMethod: pickString(data.paymentMethod, 'online'),
+  deliveryLocation: pickString(data.deliveryLocation, 'Not provided'),
+  createdAt: timestampToIso(data.createdAt),
+  reference: pickString(data.reference) || undefined,
+  customerEmail: normalizeEmail(data.customerEmail as string | undefined) || undefined,
+  customerPhone: pickString(data.customerPhone) || undefined,
+  paymentStatus: pickString(data.paymentStatus) || undefined,
+  orderStatus: pickString(data.orderStatus) || undefined,
+  paymentConfirmedAt: data.paymentConfirmedAt ? timestampToIso(data.paymentConfirmedAt) : undefined,
+  orderCompletedAt: data.orderCompletedAt ? timestampToIso(data.orderCompletedAt) : undefined,
+});
+
+const mapCheckoutRequestDoc = (documentId: string, data: Record<string, unknown>): PurchaseHistoryItem => {
+  const contact = pickString(data.contact);
+  const [phoneCandidate, emailCandidate] = contact.split('|').map((part) => part.trim());
+  return {
+    id: `checkoutRequest_${documentId}`,
+    productId: pickString(data.productId, 'unknown-product'),
+    productName: pickString(data.productName, 'Untitled item'),
+    quantity: pickNumber(data.quantity),
+    paymentMethod: pickString(data.paymentMethod, 'online'),
+    deliveryLocation: pickString(data.deliveryLocation, 'Not provided'),
+    createdAt: timestampToIso(data.createdAtServer ?? data.createdAt),
+    reference: pickString(data.reference) || undefined,
+    customerEmail: normalizeEmail(pickString(data.customerEmail) || emailCandidate) || undefined,
+    customerPhone: pickString(data.customerPhone) || phoneCandidate || undefined,
+    paymentStatus: pickString(data.paymentStatus, 'pending'),
+    orderStatus: pickString(data.orderStatus, 'pending'),
+  };
+};
+
+const dedupeHistory = (items: PurchaseHistoryItem[]) => {
+  const seen = new Set<string>();
+  const deduped: PurchaseHistoryItem[] = [];
+
+  for (const item of items) {
+    const key = item.reference || `${item.productId}_${item.createdAt}_${item.customerEmail ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(item);
+  }
+
+  return deduped.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+};
+
+export const getPurchaseHistory = async (userId: string, email?: string | null): Promise<PurchaseHistoryItem[]> => {
   assertFirebaseReady();
-  const snapshot = await getDocs(
-    query(collection(db!, 'customerPurchaseHistory'), where('userId', '==', userId), orderBy('createdAt', 'desc')),
+  const normalizedEmail = normalizeEmail(email);
+  const historyItems: PurchaseHistoryItem[] = [];
+
+  const byUserSnapshot = await getDocs(query(collection(db!, 'customerPurchaseHistory'), where('userId', '==', userId)));
+  historyItems.push(
+    ...byUserSnapshot.docs.map((historyDoc) =>
+      mapCustomerPurchaseHistoryDoc(historyDoc.id, historyDoc.data() as Record<string, unknown>),
+    ),
   );
 
-  return snapshot.docs
-    .map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as Omit<PurchaseHistoryItem, 'id'> & { userId: string; createdAt?: { toDate?: () => Date } }),
-    }))
-    .map((item) => ({
-      id: item.id,
-      productId: item.productId,
-      productName: item.productName,
-      quantity: item.quantity,
-      paymentMethod: item.paymentMethod,
-      deliveryLocation: item.deliveryLocation,
-      createdAt: item.createdAt?.toDate ? item.createdAt.toDate().toISOString() : getAuthErrorMessage(new Date().toISOString()),
-    }));
+  if (normalizedEmail) {
+    try {
+      const byEmailSnapshot = await getDocs(
+        query(collection(db!, 'customerPurchaseHistory'), where('customerEmail', '==', normalizedEmail)),
+      );
+      historyItems.push(
+        ...byEmailSnapshot.docs.map((historyDoc) =>
+          mapCustomerPurchaseHistoryDoc(historyDoc.id, historyDoc.data() as Record<string, unknown>),
+        ),
+      );
+    } catch {
+      // Older deployments may not have customerEmail indexed or readable yet. Keep userId history working.
+    }
+
+    try {
+      const checkoutRequestsSnapshot = await getDocs(query(collection(db!, 'checkoutRequests'), limit(300)));
+      const matchingCheckoutRequests = checkoutRequestsSnapshot.docs
+        .map((requestDoc) => mapCheckoutRequestDoc(requestDoc.id, requestDoc.data() as Record<string, unknown>))
+        .filter((item) => item.customerEmail === normalizedEmail || normalizeEmail(item.customerEmail).includes(normalizedEmail));
+      historyItems.push(...matchingCheckoutRequests);
+    } catch {
+      // Checkout requests are a legacy fallback. If rules block it, newer customerPurchaseHistory still works.
+    }
+  }
+
+  return dedupeHistory(historyItems);
 };
