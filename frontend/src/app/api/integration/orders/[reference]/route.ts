@@ -48,9 +48,13 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
     const merchantToken = getMerchantToken(merchantId);
     const baseUrl = getIntegrationApiBaseUrl();
-    const endpoint = `${baseUrl}/integration/orders/${encodeURIComponent(reference)}`;
+    const upstreamUrl = new URL(`${baseUrl}/integration/orders/${encodeURIComponent(reference)}`);
+    upstreamUrl.searchParams.set('store_id', merchantId);
+    upstreamUrl.searchParams.set('merchant_id', merchantId);
+    upstreamUrl.searchParams.set('storeId', merchantId);
+    upstreamUrl.searchParams.set('merchantId', merchantId);
 
-    const response = await fetch(endpoint, {
+    const response = await fetch(upstreamUrl.toString(), {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -58,6 +62,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
         'X-Sedifex-Contract-Version': getContractVersion(),
         Authorization: `Bearer ${merchantToken}`,
         'x-api-key': merchantToken,
+        'x-sedifex-store-id': merchantId,
       },
       cache: 'no-store',
     });
