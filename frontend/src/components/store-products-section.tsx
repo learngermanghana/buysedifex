@@ -1,0 +1,236 @@
+'use client';
+
+import Image from 'next/image';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { db, firebaseConfigError } from '@/lib/firebase';
+import { getProductHref } from '@/lib/product-route';
+import { resolveClosestCategoryKey } from '@/lib/category-taxonomy';
+
+type StoreProduct = {
+  id: string;
+  storeId?: string;
+  productName?: string;
+  name?: string;
+  description?: string;
+  imageUrls?: string[] | string;
+  imageUrl?: string;
+  image?: string;
+  serviceImageUrls?: string[] | string;
+  serviceImageUrl?: string;
+  serviceImage?: string;
+  imageAlt?: string;
+  price?: number;
+  currency?: string;
+  categoryKey?: string;
+  category?: string;
+  itemType?: string;
+  isVisible?: boolean | string | number;
+  visible?: boolean | string | number;
+  isPublished?: boolean | string | number;
+  hidden?: boolean | string | number;
+  isHidden?: boolean | string | number;
+  deleted?: boolean | string | number;
+  isDeleted?: boolean | string | number;
+};
+
+type StoreProductsSectionProps = {
+  storeId: string;
+  storeName: string;
+};
+
+const normalizeBoolean = (value: unknown): boolean | null => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes'].includes(normalized)) return true;
+    if (['false', '0', 'no'].includes(normalized)) return false;
+  }
+  return null;
+};
+
+const isExplicitlyTrue = (value: unknown) => normalizeBoolean(value) === true;
+const isExplicitlyFalse = (value: unknown) => normalizeBoolean(value) === false;
+
+const isPublicListing = (item: StoreProduct) => {
+  if (isExplicitlyTrue(item.deleted) || isExplicitlyTrue(item.isDeleted)) return false;
+  if (isExplicitlyTrue(item.hidden) || isExplicitlyTrue(item.isHidden)) return false;
+  if (isExplicitlyFalse(item.visible) || isExplicitlyFalse(item.isVisible)) return false;
+  return true;
+};
+
+const getProductName = (item: StoreProduct) => (item.productName ?? item.name)?.trim() || 'Untitled item';
+
+const normalizeDisplayCurrency = (currency?: string) => {
+  const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
+  return normalizedCurrency === 'USD' ? 'GHS' : normalizedCurrency;
+};
+
+const formatPrice = (price?: number, currency?: string) => {
+  if (price == null) return 'Price unavailable';
+  const displayCurrency = normalizeDisplayCurrency(currency);
+  const currencyLabel = displayCurrency === 'GHS' ? 'Cedis (GH₵)' : displayCurrency;
+  return `${currencyLabel} ${price.toFixed(2)}`;
+};
+
+const decodeImageValues = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value.flatMap((entry) => decodeImageValues(entry));
+  if (typeof value !== 'string') return [];
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.flatMap((entry) => decodeImageValues(entry));
+    } catch {
+      return [trimmed];
+    }
+  }
+  return [trimmed];
+};
+
+const normalizeImageUrl = (value: string) => {
+  const trimmed = value
+    .trim()
+    .replace(/^['"]+|['"]+$/g, '')
+    .replace(/\\u002F/gi, '/')
+    .replace(/\\\//g, '/');
+  if (!trimmed.toLowerCase().startsWith('gs://')) return trimmed;
+  const withoutPrefix = trimmed.slice(5);
+  const slashIndex = withoutPrefix.indexOf('/');
+  if (slashIndex === -1) return '';
+  const bucket = withoutPrefix.slice(0, slashIndex);
+  const objectPath = withoutPrefix.slice(slashIndex + 1);
+  return bucket && objectPath ? `https://storage.googleapis.com/${bucket}/${objectPath}` : '';
+};
+
+const isValidImageUrl = (value: string) => {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+const getDisplayImages = (item: StoreProduct) => {
+  const candidates = [
+    item.imageUrls,
+    item.imageUrl,
+    item.image,
+    item.serviceImageUrls,
+    item.serviceImageUrl,
+    item.serviceImage,
+  ].flatMap((value) => decodeImageValues(value));
+  return Array.from(new Set(candidates.map(normalizeImageUrl).filter(isValidImageUrl)));
+};
+
+const getCategory = (item: StoreProduct) =>
+  resolveClosestCategoryKey({
+    category: item.categoryKey?.trim() || item.category?.trim(),
+    productName: getProductName(item),
+    description: item.description,
+    itemType: item.itemType,
+  });
+
+export function StoreProductsSection({ storeId, storeName }: StoreProductsSectionProps) {
+  const [items, setItems] = useState<StoreProduct[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadStoreProducts = async () => {
+      if (!db) {
+        setError(firebaseConfigError ?? 'Firebase is not configured.');
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        const snapshot = await getDocs(query(collection(db, 'publicProducts'), where('storeId', '==', storeId), limit(120)));
+        if (!active) return;
+        const loaded = snapshot.docs
+          .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as StoreProduct)
+          .filter((item) => isPublicListing(item) && getDisplayImages(item).length > 0);
+        setItems(loaded);
+      } catch (loadError) {
+        console.error('Failed to load store products', loadError);
+        if (!active) return;
+        setError('Could not load this store’s products. Please try again.');
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+
+    void loadStoreProducts();
+    return () => {
+      active = false;
+    };
+  }, [storeId]);
+
+  const productListings = useMemo(
+    () => items.filter((item) => item.itemType?.trim().toLowerCase() !== 'service'),
+    [items],
+  );
+  const serviceListings = useMemo(
+    () => items.filter((item) => item.itemType?.trim().toLowerCase() === 'service'),
+    [items],
+  );
+
+  return (
+    <section className="storeInfoCard" aria-label="Store products and services">
+      <h2>Products &amp; Services from {storeName}</h2>
+      <p>🚚 Delivery: Discuss with seller · 💳 Payment method: Online payment via Paystack checkout.</p>
+      {isLoading ? <p>Loading store products…</p> : null}
+      {error ? <p className="error">{error}</p> : null}
+      {!isLoading && !error && items.length === 0 ? <p>No products listed yet.</p> : null}
+
+      {productListings.length > 0 ? <h3>Products ({productListings.length})</h3> : null}
+      <div className="grid">
+        {productListings.map((product) => {
+          const imageUrl = getDisplayImages(product)[0] ?? 'https://placehold.co/640x640';
+          const category = getCategory(product);
+          return (
+            <article key={product.id} className="card">
+              <div className="imageWrap">
+                <Image
+                  src={imageUrl}
+                  alt={product.imageAlt?.trim() || getProductName(product)}
+                  width={360}
+                  height={360}
+                  unoptimized
+                  style={{ width: '100%', height: 'auto' }}
+                />
+              </div>
+              <h3>{getProductName(product)}</h3>
+              <p>{formatPrice(product.price, product.currency)}</p>
+              {category ? <p className="trustScoreCard">{category}</p> : null}
+              <div className="cardActions">
+                <Link href={getProductHref(product.id, product.productName ?? product.name)} className="buyNowButton">
+                  Buy now
+                </Link>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      {serviceListings.length > 0 ? <h3>Services ({serviceListings.length})</h3> : null}
+      {serviceListings.length > 0 ? (
+        <ul>
+          {serviceListings.map((service) => (
+            <li key={service.id}>
+              <Link href={getProductHref(service.id, service.productName ?? service.name)}>{getProductName(service)}</Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
