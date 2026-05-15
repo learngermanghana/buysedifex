@@ -229,8 +229,7 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
   };
 };
 
-const productIsPubliclyVisible = (product: StoreEnrichedProduct): boolean =>
-  product.isVisible === true || product.isPublished === true;
+const productIsEligibleForSedifexMarket = (product: StoreEnrichedProduct): boolean => product.verified === true;
 
 const toPublicProductDetail = (product: StoreEnrichedProduct): PublicProductDetail => ({
   id: product.id,
@@ -511,7 +510,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
     matchedProducts = normalizeStoreNamesByStoreId(
       rows
         .flatMap((row) => (row.document ? [productFromDocument(row.document)] : []))
-        .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && productIsPubliclyVisible(item)),
+        .filter((item) => item.id && item.productName && item.imageUrls.length > 0 && productIsEligibleForSedifexMarket(item)),
     );
 
     if (matchedProducts.length > 0) {
@@ -641,40 +640,17 @@ export const getProductsByCategory = async (
         { fieldPath: 'storeCountry' },
         { fieldPath: 'waLink' },
         { fieldPath: 'publishedAt' },
-        { fieldPath: 'verified' },
         { fieldPath: 'itemType' },
         { fieldPath: 'type' },
-        { fieldPath: 'isVisible' },
-        { fieldPath: 'isPublished' },
+        { fieldPath: 'verified' },
       ],
     },
     from: [{ collectionId: 'publicProducts' }],
     where: {
-      compositeFilter: {
-        op: 'AND',
-        filters: [
-          {
-            compositeFilter: {
-              op: 'OR',
-              filters: [
-                {
-                  fieldFilter: {
-                    field: { fieldPath: 'isVisible' },
-                    op: 'EQUAL',
-                    value: { booleanValue: true },
-                  },
-                },
-                {
-                  fieldFilter: {
-                    field: { fieldPath: 'isPublished' },
-                    op: 'EQUAL',
-                    value: { booleanValue: true },
-                  },
-                },
-              ],
-            },
-          },
-        ],
+      fieldFilter: {
+        field: { fieldPath: 'verified' },
+        op: 'EQUAL',
+        value: { booleanValue: true },
       },
     },
     orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'DESCENDING' }],
