@@ -3,9 +3,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ShareButton } from '@/components/share-button';
+import { StoreProductsSection } from '@/components/store-products-section';
 import { getStoreProfileById, listPublicStoreIds } from '@/lib/public-stores';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
-import { getProductHref } from '@/lib/product-route';
 import { extractStoreIdFromRouteParam } from '@/lib/store-route';
 
 type StorePageProps = {
@@ -50,7 +50,6 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
   const title = buildStoreTitle(profile.storeName, profile.city);
   const description = buildStoreDescription(profile.storeName, profile.city, profile.country);
   const socialImage = profile.storeBannerUrl ?? profile.storeLogoUrl;
-  const socialImages = [{ url: socialImage ?? defaultSocialImageUrl() }];
 
   return {
     title,
@@ -66,13 +65,13 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
       title,
       description,
       siteName: 'Sedifex',
-      images: socialImages,
+      images: [{ url: socialImage ?? defaultSocialImageUrl() }],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: socialImages.map((image) => image.url),
+      images: [socialImage ?? defaultSocialImageUrl()],
     },
   };
 }
@@ -88,32 +87,7 @@ export default async function StorePage({ params }: StorePageProps) {
   const canonicalUrl = canonicalUrlForPath(`/stores/${params.storeId}`);
   const storePath = `/stores/${params.storeId}`;
   const hasLocation = Boolean(profile.addressLine1 || profile.city || profile.country);
-
-  const organizationType = hasLocation ? 'LocalBusiness' : 'OnlineStore';
-  const address = hasLocation
-    ? {
-        '@type': 'PostalAddress',
-        ...(profile.addressLine1 ? { streetAddress: profile.addressLine1 } : {}),
-        ...(profile.city ? { addressLocality: profile.city } : {}),
-        ...(profile.country ? { addressCountry: profile.country } : {}),
-      }
-    : undefined;
-
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': organizationType,
-    name: profile.storeName,
-    url: canonicalUrl,
-    ...(profile.storeLogoUrl ? { logo: profile.storeLogoUrl } : {}),
-    ...(profile.storeBannerUrl ? { image: profile.storeBannerUrl } : {}),
-    ...(profile.storePhone ? { telephone: profile.storePhone } : {}),
-    ...(address ? { address } : {}),
-    ...(profile.sameAs.length > 0 ? { sameAs: profile.sameAs } : {}),
-  };
-
   const categoryKeys = Array.from(new Set(profile.products.map((product) => product.categoryKey).filter(Boolean))) as string[];
-  const serviceListings = profile.products.filter((product) => product.itemType?.trim().toLowerCase() === 'service');
-  const productListings = profile.products.filter((product) => product.itemType?.trim().toLowerCase() !== 'service');
   const normalizedPhone = (profile.storePhone ?? '').replace(/[^\d+]/g, '');
   const normalizedWhatsapp = (profile.storeWhatsapp ?? '').trim();
   const whatsappLink =
@@ -124,6 +98,27 @@ export default async function StorePage({ params }: StorePageProps) {
         : '';
   const mailtoHref = profile.storeEmail ? `mailto:${profile.storeEmail}` : '';
   const hasCoordinates = Number.isFinite(profile.latitude) && Number.isFinite(profile.longitude);
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': hasLocation ? 'LocalBusiness' : 'OnlineStore',
+    name: profile.storeName,
+    url: canonicalUrl,
+    ...(profile.storeLogoUrl ? { logo: profile.storeLogoUrl } : {}),
+    ...(profile.storeBannerUrl ? { image: profile.storeBannerUrl } : {}),
+    ...(profile.storePhone ? { telephone: profile.storePhone } : {}),
+    ...(hasLocation
+      ? {
+          address: {
+            '@type': 'PostalAddress',
+            ...(profile.addressLine1 ? { streetAddress: profile.addressLine1 } : {}),
+            ...(profile.city ? { addressLocality: profile.city } : {}),
+            ...(profile.country ? { addressCountry: profile.country } : {}),
+          },
+        }
+      : {}),
+    ...(profile.sameAs.length > 0 ? { sameAs: profile.sameAs } : {}),
+  };
 
   return (
     <main className="storePage">
@@ -147,28 +142,12 @@ export default async function StorePage({ params }: StorePageProps) {
           {profile.addressLine1 ? ` · ${profile.addressLine1}` : ''}
           {profile.area ? ` · Area: ${profile.area}` : ''}
         </p>
-        <p>
-          <strong>Opening hours:</strong> {profile.openingHours ?? 'Contact store for opening hours'}
-        </p>
-        {hasCoordinates ? (
-          <p>
-            <strong>GPS:</strong> {profile.latitude}, {profile.longitude}
-          </p>
-        ) : null}
+        <p><strong>Opening hours:</strong> {profile.openingHours ?? 'Contact store for opening hours'}</p>
+        {hasCoordinates ? <p><strong>GPS:</strong> {profile.latitude}, {profile.longitude}</p> : null}
         <div className="productStoreActions">
-          {profile.storePhone ? (
-            <a href={`tel:${normalizedPhone || profile.storePhone}`}>Call {profile.storePhone}</a>
-          ) : (
-            <span aria-disabled="true">Phone unavailable</span>
-          )}
+          {profile.storePhone ? <a href={`tel:${normalizedPhone || profile.storePhone}`}>Call {profile.storePhone}</a> : <span aria-disabled="true">Phone unavailable</span>}
           {mailtoHref ? <a href={mailtoHref}>Email store</a> : <span aria-disabled="true">Email unavailable</span>}
-          {whatsappLink ? (
-            <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
-              WhatsApp
-            </a>
-          ) : (
-            <span aria-disabled="true">WhatsApp unavailable</span>
-          )}
+          {whatsappLink ? <a href={whatsappLink} target="_blank" rel="noopener noreferrer">WhatsApp</a> : <span aria-disabled="true">WhatsApp unavailable</span>}
           <ShareButton
             className="secondaryButton"
             url={storePath}
@@ -204,50 +183,7 @@ export default async function StorePage({ params }: StorePageProps) {
         </section>
       ) : null}
 
-      {productListings.length > 0 || serviceListings.length > 0 ? (
-        <section className="storeInfoCard" aria-label="Store products and services">
-          <h2>Products &amp; Services from {profile.storeName}</h2>
-          <p>🚚 Delivery: Discuss with seller · 💳 Payment method: Online payment via Paystack checkout.</p>
-
-          <h3>Products ({productListings.length})</h3>
-          {productListings.length > 0 ? (
-            <ul>
-              {productListings.map((product) => (
-                <li key={product.id}>
-                  <Link href={getProductHref(product.id, product.productName)}>{product.productName}</Link>
-                  {product.categoryKey ? (
-                    <>
-                      {' '}
-                      in <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
-                    </>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No products listed yet.</p>
-          )}
-
-          <h3>Services ({serviceListings.length})</h3>
-          {serviceListings.length > 0 ? (
-            <ul>
-              {serviceListings.map((service) => (
-                <li key={service.id}>
-                  <Link href={getProductHref(service.id, service.productName)}>{service.productName}</Link>
-                  {service.categoryKey ? (
-                    <>
-                      {' '}
-                      in <Link href={`/category/${encodeURIComponent(service.categoryKey)}`}>{service.categoryKey}</Link>
-                    </>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No services listed yet.</p>
-          )}
-        </section>
-      ) : null}
+      <StoreProductsSection storeId={normalizedStoreId} storeName={profile.storeName} />
     </main>
   );
 }
