@@ -2,42 +2,105 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 
-type PollState = { paymentStatus?: string; orderStatus?: string; reference?: string; error?: string };
+type PollState = {
+  ok?: boolean;
+  paymentStatus?: string;
+  orderStatus?: string;
+  reference?: string;
+  error?: string;
+  status?: number;
+  details?: unknown;
+};
+
+const SUCCESS_PAYMENT_STATUSES = new Set(['confirmed', 'success', 'paid', 'captured']);
+const SUCCESS_ORDER_STATUSES = new Set(['confirmed', 'success', 'paid', 'completed']);
+const FAILED_PAYMENT_STATUSES = new Set(['failed', 'cancelled', 'canceled', 'abandoned', 'verification_failed']);
+
+const normalizeStatus = (value?: string) => value?.trim().toLowerCase() ?? '';
 
 function CheckoutProcessingContent() {
   const params = useSearchParams();
   const reference = params.get('reference') ?? '';
   const [state, setState] = useState<PollState>({ reference });
+  const [lastCheckedAt, setLastCheckedAt] = useState<string>('');
+
+  const paymentStatus = normalizeStatus(state.paymentStatus);
+  const orderStatus = normalizeStatus(state.orderStatus);
+  const isPaid = SUCCESS_PAYMENT_STATUSES.has(paymentStatus) || SUCCESS_ORDER_STATUSES.has(orderStatus);
+  const hasFailed = FAILED_PAYMENT_STATUSES.has(paymentStatus) || FAILED_PAYMENT_STATUSES.has(orderStatus);
+
+  const headline = useMemo(() => {
+    if (isPaid) return 'Payment confirmed';
+    if (hasFailed) return 'Payment could not be confirmed';
+    return 'Payment processing';
+  }, [hasFailed, isPaid]);
 
   useEffect(() => {
     if (!reference) return;
     let active = true;
-    const timer = setInterval(async () => {
-      const response = await fetch(`/api/integration/orders/${encodeURIComponent(reference)}`, { cache: 'no-store' });
-      const payload = (await response.json().catch(() => ({}))) as PollState;
-      if (!active) return;
-      setState((current) => ({ ...current, ...payload }));
-      if ((payload.paymentStatus ?? '').toLowerCase() === 'confirmed') {
-        clearInterval(timer);
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const pollStatus = async () => {
+      try {
+        const response = await fetch(`/api/integration/orders/${encodeURIComponent(reference)}`, { cache: 'no-store' });
+        const payload = (await response.json().catch(() => ({}))) as PollState;
+        if (!active) return;
+        setLastCheckedAt(new Date().toLocaleTimeString());
+        setState((current) => ({
+          ...current,
+          ...payload,
+          error: response.ok ? payload.error : payload.error ?? `Order status request failed with ${response.status}`,
+          status: response.status,
+        }));
+
+        const nextPaymentStatus = normalizeStatus(payload.paymentStatus);
+        const nextOrderStatus = normalizeStatus(payload.orderStatus);
+        if (
+          SUCCESS_PAYMENT_STATUSES.has(nextPaymentStatus) ||
+          SUCCESS_ORDER_STATUSES.has(nextOrderStatus) ||
+          FAILED_PAYMENT_STATUSES.has(nextPaymentStatus) ||
+          FAILED_PAYMENT_STATUSES.has(nextOrderStatus)
+        ) {
+          if (timer) clearInterval(timer);
+        }
+      } catch (error) {
+        if (!active) return;
+        setLastCheckedAt(new Date().toLocaleTimeString());
+        setState((current) => ({
+          ...current,
+          ok: false,
+          error: error instanceof Error ? error.message : 'Unable to check order status',
+        }));
       }
-    }, 4000);
+    };
+
+    void pollStatus();
+    timer = setInterval(pollStatus, 4000);
 
     return () => {
       active = false;
-      clearInterval(timer);
+      if (timer) clearInterval(timer);
     };
   }, [reference]);
 
   return (
     <main className="container accountPage">
       <section className="accountCard">
-        <h1>Payment processing</h1>
-        <p>Don’t close this page yet; we’re confirming payment with Sedifex.</p>
+        <h1>{headline}</h1>
+        {isPaid ? (
+          <p>Your payment has been confirmed by Sedifex. Thank you for your order.</p>
+        ) : hasFailed ? (
+          <p>Sedifex could not confirm this payment. Please contact support with the reference below.</p>
+        ) : (
+          <p>Don’t close this page yet; we’re confirming payment with Sedifex.</p>
+        )}
         <p>Reference: {reference || 'Missing reference'}</p>
         <p>Payment status: {state.paymentStatus ?? 'pending'}</p>
         <p>Order status: {state.orderStatus ?? 'processing'}</p>
+        {lastCheckedAt ? <p>Last checked: {lastCheckedAt}</p> : null}
+        {state.error ? <p className="requestFeedback error">Status check error: {state.error}</p> : null}
         <p>If this takes longer than expected, contact support:</p>
         <p><Link href="/contact">WhatsApp / Email support</Link></p>
       </section>
