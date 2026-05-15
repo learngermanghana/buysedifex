@@ -1,18 +1,67 @@
 {
-  "functions": [
+  "functions": {
+    "source": "functions",
+    "codebase": "default",
+    "predeploy": [
+      "npm --prefix functions run build"
+    ]
+  },
+  "hosting": {
+    "public": "web/dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/google-ads/oauth-start",
+        "function": "googleAdsOAuthStart"
+      },
+      {
+        "source": "/api/google-ads/oauth-callback",
+        "function": "googleAdsOAuthCallback"
+      },
+      {
+        "source": "/api/google-ads/campaign",
+        "function": "googleAdsCampaign"
+      },
+      {
+        "source": "/api/google-ads/metrics-sync",
+        "function": "googleAdsMetricsSync"
+      },
+      {
+        "source": "/api/google-business/locations",
+        "function": "googleBusinessLocations"
+      },
+      {
+        "source": "/api/google-business/upload-location-media",
+        "function": "googleBusinessUploadLocationMedia"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "firestore": [
     {
-      "source": "functions",
-      "codebase": "sedifexmarket",
-      "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run build"
-      ],
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "*.local"
-      ]
+      "database": "(default)",
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.json"
+    },
+    {
+      "database": "roster",
+      "rules": "firestore.roster.rules",
+      "indexes": "firestore.roster.indexes.json"
     }
-  ]
+  ],
+  "emulators": {
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    }
+  }
 }
