@@ -2,7 +2,7 @@
   "functions": [
     {
       "source": "functions",
-      "codebase": "default",
+      "codebase": "sedifexmarket",
       "predeploy": [
         "npm --prefix \"$RESOURCE_DIR\" run build"
       ],
@@ -14,9 +14,5 @@
         "*.local"
       ]
     }
-  ],
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  }
+  ]
 }
