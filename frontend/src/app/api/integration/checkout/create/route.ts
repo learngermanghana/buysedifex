@@ -12,11 +12,14 @@ import {
 
 type CheckoutCreateBody = {
   cart?: CheckoutItem[];
-  customer?: { email?: string; phone?: string };
+  customer?: { name?: string; email?: string; phone?: string };
+  booking?: { preferredDate?: string; preferredTime?: string; preferredBranch?: string; notes?: string };
 };
 
 const isServiceCart = (cart: CheckoutItem[]) =>
   cart.some((item) => String((item as { type?: unknown }).type ?? '').trim().toUpperCase() === 'SERVICE');
+
+const cleanText = (value: unknown, max = 300) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 
 export async function POST(request: NextRequest) {
   console.info('checkout.create.requested');
@@ -24,8 +27,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as CheckoutCreateBody;
     const cart = Array.isArray(body.cart) ? body.cart : [];
+    const customerName = cleanText(body.customer?.name, 160);
     const customerEmail = body.customer?.email?.trim();
     const customerPhone = body.customer?.phone?.trim();
+    const preferredDate = cleanText(body.booking?.preferredDate, 40);
+    const preferredTime = cleanText(body.booking?.preferredTime, 40);
+    const preferredBranch = cleanText(body.booking?.preferredBranch, 180);
+    const bookingNotes = cleanText(body.booking?.notes, 1200);
 
     if (cart.length === 0) {
       console.warn('checkout.create.failed', { reason: 'empty_cart' });
@@ -62,9 +70,24 @@ export async function POST(request: NextRequest) {
           storeId: merchantId,
           reference,
           customer: {
+            name: customerName || null,
             email: customerEmail,
             phone: customerPhone,
           },
+          ...(cartIsServiceBooking
+            ? {
+                booking: {
+                  preferredDate: preferredDate || null,
+                  preferredTime: preferredTime || null,
+                  preferredBranch: preferredBranch || null,
+                  notes: bookingNotes || null,
+                },
+                bookingDate: preferredDate || null,
+                bookingTime: preferredTime || null,
+                preferredBranch: preferredBranch || null,
+                notes: bookingNotes || null,
+              }
+            : {}),
           cart: merchantCart,
           items: merchantCart,
           pricingSnapshot: preview,
