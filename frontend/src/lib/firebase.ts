@@ -30,11 +30,20 @@ export const firebaseConfigError =
 
 let db: Firestore | null = null;
 let auth: Auth | null = null;
+let firebaseAppInitialized = false;
 
 if (!firebaseConfigError) {
   const app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
   db = getFirestore(app);
-  auth = getAuth(app);
+  firebaseAppInitialized = true;
 }
+
+export const getFirebaseAuth = (): Auth | null => {
+  if (!firebaseAppInitialized) return null;
+  if (auth) return auth;
+  const app = getApps()[0];
+  auth = getAuth(app);
+  return auth;
+};
 
 export { db, auth };
