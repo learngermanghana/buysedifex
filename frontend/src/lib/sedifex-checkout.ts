@@ -49,6 +49,29 @@ const getRequiredEnv = (key: string) => {
   return value;
 };
 
+const getMerchantTokensJsonMap = (): Record<string, string> => {
+  const raw = process.env.SEDIFEX_MERCHANT_TOKENS_JSON?.trim();
+  if (!raw) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('SEDIFEX_MERCHANT_TOKENS_JSON must be valid JSON.');
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('SEDIFEX_MERCHANT_TOKENS_JSON must be a JSON object mapping merchantId to token.');
+  }
+
+  const map: Record<string, string> = {};
+  for (const [merchantId, token] of Object.entries(parsed)) {
+    if (typeof token === 'string' && token.trim()) {
+      map[merchantId] = token.trim();
+    }
+  }
+  return map;
+};
+
 const getContractVersion = () => process.env.SEDIFEX_INTEGRATION_API_VERSION ?? '2026-04-13';
 
 const getIntegrationApiBaseUrl = () => {
@@ -116,9 +139,38 @@ const normalizeMerchantId = (merchantId: string) => {
   return normalized;
 };
 
+const normalizeMerchantIdForEnvSuffix = (merchantId: string) =>
+  merchantId
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_]/g, '_');
+
+const getOptionalEnv = (key: string) => {
+  const value = process.env[key];
+  return value?.trim() ? value.trim() : undefined;
+};
+
+export const getMerchantToken = (merchantId: string) => {
+  const normalizedMerchantId = normalizeMerchantId(merchantId);
+  const tokenFromJson = getMerchantTokensJsonMap()[normalizedMerchantId];
+  if (tokenFromJson) return tokenFromJson;
+
+  const directLegacyKey = `SEDIFEX_MERCHANT_TOKEN_${normalizedMerchantId}`;
+  const directLegacyToken = getOptionalEnv(directLegacyKey);
+  if (directLegacyToken) return directLegacyToken;
+
+  const normalizedLegacyKey = `SEDIFEX_MERCHANT_TOKEN_${normalizeMerchantIdForEnvSuffix(normalizedMerchantId)}`;
+  const normalizedLegacyToken = getOptionalEnv(normalizedLegacyKey);
+  if (normalizedLegacyToken) return normalizedLegacyToken;
+
+  throw new Error(
+    `${directLegacyKey} is not configured. Configure SEDIFEX_MERCHANT_TOKENS_JSON or ${normalizedLegacyKey}.`,
+  );
+};
+
 export const previewMerchantCheckout = async (merchantId: string, items: CheckoutItem[]) => {
   const normalizedMerchantId = normalizeMerchantId(merchantId);
-  const merchantToken = getRequiredEnv(`SEDIFEX_MERCHANT_TOKEN_${normalizedMerchantId}`);
+  const merchantToken = getMerchantToken(normalizedMerchantId);
   const payload: SedifexCheckoutPreviewRequest = {
     store_id: normalizedMerchantId,
     merchant_id: normalizedMerchantId,
@@ -145,7 +197,7 @@ export const createMerchantCheckout = async (
   pricingSnapshot?: SedifexCheckoutPreviewResponse,
 ) => {
   const normalizedMerchantId = normalizeMerchantId(merchantId);
-  const merchantToken = getRequiredEnv(`SEDIFEX_MERCHANT_TOKEN_${normalizedMerchantId}`);
+  const merchantToken = getMerchantToken(normalizedMerchantId);
   return integrationFetch<unknown>('/integration/checkout/create', {
     method: 'POST',
     headers: {
