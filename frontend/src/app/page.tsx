@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ProductGrid } from '@/components/product-grid';
+import { HomeProductGrid } from '@/components/home-product-grid';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
 const title = 'Discover trusted local stores near you';
@@ -56,24 +56,12 @@ export default function HomePage() {
             <div><strong>24/7</strong><span>buyer touchpoints</span></div>
           </div>
           <div className="heroActions">
-            <Link href="/stores" className="btn btnPrimary">
-              Shop by store
-            </Link>
-            <Link href="/categories" className="btn btnSecondary">
-              Explore categories
-            </Link>
-            <Link href="/search" className="btn btnGhost">
-              Search products
-            </Link>
-            <Link href="/about" className="btn btnGhost">
-              About Sedifex
-            </Link>
-            <Link href="/contact" className="btn btnGhost">
-              Contact us
-            </Link>
-            <Link href="/sell" className="btn btnGhost">
-              Become a seller
-            </Link>
+            <Link href="/stores" className="btn btnPrimary">Shop by store</Link>
+            <Link href="/categories" className="btn btnSecondary">Explore categories</Link>
+            <Link href="/search" className="btn btnGhost">Search products</Link>
+            <Link href="/about" className="btn btnGhost">About Sedifex</Link>
+            <Link href="/contact" className="btn btnGhost">Contact us</Link>
+            <Link href="/sell" className="btn btnGhost">Become a seller</Link>
           </div>
         </div>
         <div className="commerceHeroVisual" role="img" aria-label="Sedifex ecosystem connecting storefront, inventory, website, WhatsApp, delivery, marketplace, and payments">
@@ -90,9 +78,7 @@ export default function HomePage() {
 
       <section className="quickLinksStrip" aria-label="Trending categories">
         {trendingCategories.map((category) => (
-          <Link key={category} href="/categories" className="quickLinkChip">
-            {category}
-          </Link>
+          <Link key={category} href="/categories" className="quickLinkChip">{category}</Link>
         ))}
       </section>
 
@@ -102,46 +88,27 @@ export default function HomePage() {
             <p className="promoLabel">Mega Sale</p>
             <h2>Up to 50% off top products this week</h2>
             <p>Discover limited-time offers from verified stores across beauty, electronics, and home essentials.</p>
-            <Link href="/products" className="promoLink">
-              View flash deals →
-            </Link>
+            <Link href="/products" className="promoLink">View flash deals →</Link>
           </div>
         </article>
         <article className="promoCard promoCardBeauty">
           <p className="promoLabel">Beauty Spotlight</p>
           <h2>New arrivals in skincare & cosmetics</h2>
-          <Link href="/category/beauty" className="promoLink">
-            Shop beauty →
-          </Link>
+          <Link href="/category/beauty" className="promoLink">Shop beauty →</Link>
         </article>
         <article className="promoCard promoCardElectro">
           <p className="promoLabel">Tech Picks</p>
           <h2>Mobile accessories and smart gadgets</h2>
-          <Link href="/category/electronics" className="promoLink">
-            Shop electronics →
-          </Link>
+          <Link href="/category/electronics" className="promoLink">Shop electronics →</Link>
         </article>
       </section>
 
       <section className="featureRow" aria-label="Shopping benefits">
-        <article className="featureCard">
-          <h2>Verified storefronts</h2>
-          <p>Every listing starts with a transparent seller profile so you can shop with confidence.</p>
-        </article>
-        <article className="featureCard">
-          <h2>Store-first search</h2>
-          <p>Find relevant products faster by browsing inside the stores you trust most.</p>
-        </article>
-        <article className="featureCard">
-          <h2>Instant WhatsApp support</h2>
-          <p>Chat directly with sellers to confirm stock, delivery windows, and latest pricing.</p>
-        </article>
-        <article className="featureCard">
-          <h2>Professional deal discovery</h2>
-          <p>Browse curated promos, trending categories, and featured products in one clean homepage.</p>
-        </article>
+        <article className="featureCard"><h2>Verified storefronts</h2><p>Every listing starts with a transparent seller profile so you can shop with confidence.</p></article>
+        <article className="featureCard"><h2>Store-first search</h2><p>Find relevant products faster by browsing inside the stores you trust most.</p></article>
+        <article className="featureCard"><h2>Instant WhatsApp support</h2><p>Chat directly with sellers to confirm stock, delivery windows, and latest pricing.</p></article>
+        <article className="featureCard"><h2>Professional deal discovery</h2><p>Browse curated promos, trending categories, and featured products in one clean homepage.</p></article>
       </section>
-
 
       <section className="activityStrip" aria-label="Marketplace activity feed">
         <article><strong>1,240+</strong><span>verified products</span></article>
@@ -163,11 +130,7 @@ export default function HomePage() {
         </ul>
       </section>
 
-      <div className="homeColumns">
-        <div className="productsColumn">
-          <ProductGrid />
-        </div>
-      </div>
+      <div className="homeColumns"><div className="productsColumn"><HomeProductGrid /></div></div>
     </main>
   );
 }
