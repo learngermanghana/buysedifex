@@ -163,12 +163,23 @@ const normalizeCheckoutItemType = (type?: CheckoutItem['type']) => {
   } as const;
 };
 
-const toSedifexCheckoutItem = (item: CheckoutItem): SedifexCheckoutItem => {
-  const itemId = item.productId.trim();
-  if (!itemId) {
+const normalizeCheckoutItemId = (item: CheckoutItem) => {
+  const rawItemId = item.productId.trim();
+  const merchantId = item.merchantId.trim();
+  if (!rawItemId) {
     throw new Error('Checkout item_id is missing. Ensure marketplace products keep their original Sedifex sourceProductId.');
   }
 
+  const merchantPrefix = `${merchantId}_`;
+  if (merchantId && rawItemId.startsWith(merchantPrefix)) {
+    return rawItemId.slice(merchantPrefix.length);
+  }
+
+  return rawItemId;
+};
+
+const toSedifexCheckoutItem = (item: CheckoutItem): SedifexCheckoutItem => {
+  const itemId = normalizeCheckoutItemId(item);
   const itemType = normalizeCheckoutItemType(item.type);
   return {
     type: itemType.contractType,
