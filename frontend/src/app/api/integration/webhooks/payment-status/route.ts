@@ -3,6 +3,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, firebaseConfigError } from '@/lib/firebase';
 import { verifyWebhookSignature } from '@/lib/sedifex-checkout';
 
+type PaymentWebhookPayload = {
+  reference?: string;
+  paymentStatus?: string;
+  orderStatus?: string;
+  sedifexOrderId?: string;
+  clientOrderId?: string;
+};
+
+const findRecordByReference = async (reference: string) => {
+  if (!db) return null;
+
+  for (const collectionName of ['integrationOrders', 'integrationBookings']) {
+    const snapshot = await getDocs(query(collection(db, collectionName), where('reference', '==', reference), limit(1)));
+    const hit = snapshot.docs[0];
+    if (hit) return { collectionName, id: hit.id };
+  }
+
+  return null;
+};
+
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const signature = request.headers.get('x-sedifex-signature');
@@ -14,13 +34,7 @@ export async function POST(request: NextRequest) {
   }
 
   const eventName = request.headers.get('x-sedifex-event') ?? 'unknown';
-  const payload = JSON.parse(rawBody) as {
-    reference?: string;
-    paymentStatus?: string;
-    orderStatus?: string;
-    sedifexOrderId?: string;
-    clientOrderId?: string;
-  };
+  const payload = JSON.parse(rawBody) as PaymentWebhookPayload;
 
   if (!db || firebaseConfigError) {
     return NextResponse.json({ ok: true, warning: 'Firestore not configured' });
@@ -38,21 +52,32 @@ export async function POST(request: NextRequest) {
   }
 
   const ref = payload.reference?.trim();
+  let updatedCollection: string | null = null;
+  let updatedRecordId: string | null = null;
+
   if (ref) {
-    const docs = await getDocs(query(collection(db, 'integrationBookings'), where('reference', '==', ref), limit(1)));
-    const hit = docs.docs[0];
+    const hit = await findRecordByReference(ref);
 
     if (hit) {
-      await updateDoc(doc(db, 'integrationBookings', hit.id), {
-        paymentStatus: payload.paymentStatus ?? (eventName === 'payment.succeeded' ? 'confirmed' : 'pending'),
-        orderStatus: payload.orderStatus ?? (eventName === 'order.confirmed' ? 'confirmed' : 'processing'),
-        paymentConfirmedAt: payload.paymentStatus === 'confirmed' ? new Date().toISOString() : null,
+      const paymentStatus = payload.paymentStatus ?? (eventName === 'payment.succeeded' ? 'confirmed' : 'pending');
+      const orderStatus = payload.orderStatus ?? (eventName === 'order.confirmed' ? 'confirmed' : 'processing');
+
+      await updateDoc(doc(db, hit.collectionName, hit.id), {
+        paymentStatus,
+        payment_status: paymentStatus,
+        orderStatus,
+        order_status: orderStatus,
+        ...(hit.collectionName === 'integrationBookings' ? { bookingStatus: orderStatus } : {}),
+        paymentConfirmedAt: ['confirmed', 'success', 'paid', 'captured'].includes(paymentStatus) ? new Date().toISOString() : null,
         sedifexOrderId: payload.sedifexOrderId ?? null,
         clientOrderId: payload.clientOrderId ?? null,
         syncStatus: 'synced',
         updatedAt: new Date().toISOString(),
         updatedAtServer: serverTimestamp(),
       });
+
+      updatedCollection = hit.collectionName;
+      updatedRecordId = hit.id;
     }
   }
 
@@ -60,11 +85,20 @@ export async function POST(request: NextRequest) {
     eventName,
     deliveryId: deliveryId ?? null,
     payload,
+    reference: ref ?? null,
+    updatedCollection,
+    updatedRecordId,
     receivedAt: new Date().toISOString(),
     receivedAtServer: serverTimestamp(),
   });
 
-  console.info('webhook.accepted', { eventName, deliveryId: deliveryId ?? null, reference: payload.reference ?? null });
+  console.info('webhook.accepted', {
+    eventName,
+    deliveryId: deliveryId ?? null,
+    reference: payload.reference ?? null,
+    updatedCollection,
+    updatedRecordId,
+  });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, updatedCollection, updatedRecordId });
 }
