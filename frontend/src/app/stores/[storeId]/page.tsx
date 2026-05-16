@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ShareButton } from '@/components/share-button';
 import { StoreProductsSection } from '@/components/store-products-section';
@@ -45,11 +44,10 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
     };
   }
 
-  const canonicalPath = `/stores/${params.storeId}`;
-  const canonicalUrl = canonicalUrlForPath(canonicalPath);
+  const canonicalUrl = canonicalUrlForPath(`/stores/${params.storeId}`);
   const title = buildStoreTitle(profile.storeName, profile.city);
   const description = buildStoreDescription(profile.storeName, profile.city, profile.country);
-  const socialImage = profile.storeBannerUrl ?? profile.storeLogoUrl;
+  const socialImage = profile.storeBannerUrl ?? profile.storeLogoUrl ?? defaultSocialImageUrl();
 
   return {
     title,
@@ -65,13 +63,13 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
       title,
       description,
       siteName: 'Sedifex Market',
-      images: [{ url: socialImage ?? defaultSocialImageUrl() }],
+      images: [{ url: socialImage }],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: [socialImage ?? defaultSocialImageUrl()],
+      images: [socialImage],
     },
   };
 }
@@ -84,9 +82,7 @@ export default async function StorePage({ params }: StorePageProps) {
     notFound();
   }
 
-  const canonicalUrl = canonicalUrlForPath(`/stores/${params.storeId}`);
   const storePath = `/stores/${params.storeId}`;
-  const hasLocation = Boolean(profile.addressLine1 || profile.city || profile.country);
   const categoryKeys = Array.from(new Set(profile.products.map((product) => product.categoryKey).filter(Boolean))) as string[];
   const normalizedPhone = (profile.storePhone ?? '').replace(/[^\d+]/g, '');
   const normalizedWhatsapp = (profile.storeWhatsapp ?? '').trim();
@@ -99,44 +95,8 @@ export default async function StorePage({ params }: StorePageProps) {
   const mailtoHref = profile.storeEmail ? `mailto:${profile.storeEmail}` : '';
   const hasCoordinates = Number.isFinite(profile.latitude) && Number.isFinite(profile.longitude);
 
-  const jsonLd = [
-    {
-      '@context': 'https://schema.org',
-      '@type': hasLocation ? 'LocalBusiness' : 'OnlineStore',
-      '@id': `${canonicalUrl}#store`,
-      name: profile.storeName,
-      url: canonicalUrl,
-      ...(profile.storeLogoUrl ? { logo: profile.storeLogoUrl } : {}),
-      ...(profile.storeBannerUrl ? { image: profile.storeBannerUrl } : {}),
-      ...(profile.storePhone ? { telephone: profile.storePhone } : {}),
-      ...(profile.storeEmail ? { email: profile.storeEmail } : {}),
-      ...(hasLocation
-        ? {
-            address: {
-              '@type': 'PostalAddress',
-              ...(profile.addressLine1 ? { streetAddress: profile.addressLine1 } : {}),
-              ...(profile.city ? { addressLocality: profile.city } : {}),
-              ...(profile.country ? { addressCountry: profile.country } : {}),
-            },
-          }
-        : {}),
-      ...(hasCoordinates ? { geo: { '@type': 'GeoCoordinates', latitude: profile.latitude, longitude: profile.longitude } } : {}),
-      ...(profile.sameAs.length > 0 ? { sameAs: profile.sameAs } : {}),
-    },
-    {
-      '@context': 'https://schema.org',
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Home', item: canonicalUrlForPath('/') },
-        { '@type': 'ListItem', position: 2, name: 'Stores', item: canonicalUrlForPath('/stores') },
-        { '@type': 'ListItem', position: 3, name: profile.storeName, item: canonicalUrl },
-      ],
-    },
-  ];
-
   return (
     <main className="storePage">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <section className="storeHero">
         <p className="eyebrow">Store</p>
         <h1>
