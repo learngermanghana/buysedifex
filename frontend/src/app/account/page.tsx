@@ -12,6 +12,33 @@ import {
 } from '@/lib/customer-auth';
 import { firebaseConfigError } from '@/lib/firebase';
 
+const CUSTOMER_STATUS_LABELS: Record<string, string> = {
+  pending_cash_collection: 'Pay on delivery',
+  pending_delivery: 'Waiting for store delivery',
+  pending_store_confirmation: 'Waiting for store confirmation',
+  pending_manual: 'Manual payment pending',
+  pending_manual_review: 'Manual payment pending',
+  pending_payment: 'Waiting for payment',
+  pending: 'Processing',
+  processing: 'Processing',
+  confirmed_by_store: 'Confirmed by store',
+  delivered: 'Delivered',
+  cash_collected: 'Payment collected on delivery',
+  completed: 'Completed',
+  success: 'Paid',
+  paid: 'Paid',
+  confirmed: 'Confirmed',
+  cancelled_by_store: 'Cancelled by store',
+  cancelled: 'Cancelled',
+  canceled: 'Cancelled',
+  failed: 'Failed',
+};
+
+const getCustomerStatusLabel = (status?: string) => {
+  const normalized = (status ?? 'pending').trim().toLowerCase();
+  return CUSTOMER_STATUS_LABELS[normalized] ?? normalized.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 export default function AccountPage() {
   const [mode, setMode] = useState<'signup' | 'signin'>('signup');
   const [fullName, setFullName] = useState('');
@@ -104,8 +131,8 @@ export default function AccountPage() {
 
   const statusClass = (status?: string) => {
     const normalized = (status ?? 'pending').toLowerCase();
-    if (['confirmed', 'completed', 'success', 'paid', 'captured'].includes(normalized)) return 'success';
-    if (['failed', 'rejected', 'cancelled', 'canceled', 'abandoned'].includes(normalized)) return 'error';
+    if (['confirmed', 'completed', 'success', 'paid', 'captured', 'cash_collected', 'delivered', 'confirmed_by_store'].includes(normalized)) return 'success';
+    if (['failed', 'rejected', 'cancelled', 'canceled', 'abandoned', 'cancelled_by_store'].includes(normalized)) return 'error';
     return 'pending';
   };
 
@@ -173,8 +200,8 @@ export default function AccountPage() {
                 <strong>{item.productName}</strong> × {item.quantity} · {item.paymentMethod} · {item.deliveryLocation}
                 <br />
                 <small>
-                  Ref: {item.reference ?? 'N/A'} · Payment: <span className={`statusBadge ${statusClass(item.paymentStatus)}`}>{item.paymentStatus ?? 'pending'}</span> · Order:{' '}
-                  <span className={`statusBadge ${statusClass(item.orderStatus)}`}>{item.orderStatus ?? 'pending'}</span>
+                  Ref: {item.reference ?? 'N/A'} · Payment: <span className={`statusBadge ${statusClass(item.paymentStatus)}`}>{getCustomerStatusLabel(item.paymentStatus)}</span> · Order:{' '}
+                  <span className={`statusBadge ${statusClass(item.orderStatus)}`}>{getCustomerStatusLabel(item.orderStatus)}</span>
                 </small>
                 <br />
                 <small>{new Date(item.createdAt).toLocaleString()}</small>
