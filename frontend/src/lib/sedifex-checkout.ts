@@ -7,6 +7,16 @@ export type CheckoutItem = {
   type?: 'PRODUCT' | 'SERVICE';
 };
 
+export type MerchantPaymentRouting = {
+  provider?: string;
+  settlementMode?: string;
+  paystackSubaccountCode?: string | null;
+  subaccountCode?: string | null;
+  percentageCharge?: number | null;
+  commissionControlledBy?: string | null;
+  status?: string | null;
+};
+
 export type MerchantCheckoutPreview = {
   merchantId: string;
   preview: unknown;
@@ -279,6 +289,47 @@ export const applyMarketplaceFeeModel = (
   };
 };
 
+const cleanPaymentRouting = (routing?: MerchantPaymentRouting | null) => {
+  const subaccountCode = routing?.paystackSubaccountCode ?? routing?.subaccountCode ?? null;
+  if (!subaccountCode || typeof subaccountCode !== 'string') return null;
+  const trimmed = subaccountCode.trim();
+  if (!trimmed) return null;
+  return {
+    provider: 'paystack',
+    settlementMode: routing?.settlementMode ?? 'subaccount',
+    paystackSubaccountCode: trimmed,
+    subaccountCode: trimmed,
+    percentageCharge: typeof routing?.percentageCharge === 'number' ? routing.percentageCharge : null,
+    commissionControlledBy: routing?.commissionControlledBy ?? 'sedifex',
+    status: routing?.status ?? 'active',
+  };
+};
+
+const buildPaystackSplitPayload = (routing?: MerchantPaymentRouting | null, preview?: SedifexCheckoutPreviewResponse) => {
+  const cleaned = cleanPaymentRouting(routing);
+  if (!cleaned) return {};
+  const marketplaceFees = preview?.marketplace_fees ?? preview?.marketplaceFees;
+  const sedifexCommissionMinor =
+    marketplaceFees && typeof marketplaceFees === 'object' && 'sedifexCommissionMinor' in marketplaceFees
+      ? (marketplaceFees as MarketplaceFeeBreakdown).sedifexCommissionMinor
+      : null;
+  return {
+    subaccount: cleaned.paystackSubaccountCode,
+    paystackSubaccountCode: cleaned.paystackSubaccountCode,
+    paystack_subaccount_code: cleaned.paystackSubaccountCode,
+    splitPayment: {
+      provider: 'paystack',
+      mode: 'subaccount',
+      subaccount: cleaned.paystackSubaccountCode,
+      percentageCharge: cleaned.percentageCharge,
+      commissionControlledBy: cleaned.commissionControlledBy,
+      transactionChargeMinor: typeof sedifexCommissionMinor === 'number' ? sedifexCommissionMinor : null,
+      bearer: 'subaccount',
+    },
+    paymentRouting: cleaned,
+  };
+};
+
 export const previewMerchantCheckout = async (merchantId: string, items: CheckoutItem[]) => {
   const normalizedMerchantId = normalizeMerchantId(merchantId);
   const merchantToken = getMerchantToken(normalizedMerchantId);
@@ -309,11 +360,13 @@ export const createMerchantCheckout = async (
   reference: string,
   pricingSnapshot?: SedifexCheckoutPreviewResponse,
   customer?: { email?: string; phone?: string },
+  paymentRouting?: MerchantPaymentRouting | null,
 ) => {
   const normalizedMerchantId = normalizeMerchantId(merchantId);
   const merchantToken = getMerchantToken(normalizedMerchantId);
   const finalTotalMinor = typeof pricingSnapshot?.final_total === 'number' ? pricingSnapshot.final_total : null;
   const fallbackAmountMajor = finalTotalMinor && finalTotalMinor > 0 ? finalTotalMinor / 100 : undefined;
+  const splitPayload = buildPaystackSplitPayload(paymentRouting, pricingSnapshot);
 
   return integrationFetch<unknown>('/integration/checkout/create', {
     method: 'POST',
@@ -334,6 +387,7 @@ export const createMerchantCheckout = async (
       items: items.map(toSedifexCheckoutItem),
       pricing_snapshot: pricingSnapshot,
       marketplace_fees: pricingSnapshot?.marketplace_fees ?? pricingSnapshot?.marketplaceFees,
+      ...splitPayload,
       customer: customer
         ? {
             email: customer.email,
