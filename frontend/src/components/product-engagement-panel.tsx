@@ -39,19 +39,22 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
   const identity = useMemo(() => ({ publicProductId, storeId, sourceProductId }), [publicProductId, sourceProductId, storeId]);
 
   const refresh = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const token = await getFirebaseAuth()?.currentUser?.getIdToken();
-      const [loadedComments, loadedSummary] = await Promise.all([
-        listEngagementComments(identity),
-        getEngagementSummary({ ...identity, token: token ?? undefined }),
-      ]);
+      const loadedComments = await listEngagementComments(identity);
       setComments(loadedComments.filter((item) => item.moderationStatus !== 'rejected'));
-      setSummary(loadedSummary);
       setError('');
-    } catch (refreshError) {
-      console.error(refreshError);
-      setError(getErrorMessage(refreshError, 'Unable to load comments right now.'));
+    } catch (commentsError) {
+      console.error(commentsError);
+      setError(getErrorMessage(commentsError, 'Unable to load comments right now.'));
+    }
+
+    try {
+      const token = await getFirebaseAuth()?.currentUser?.getIdToken();
+      const loadedSummary = await getEngagementSummary({ ...identity, token: token ?? undefined });
+      setSummary(loadedSummary);
+    } catch (summaryError) {
+      console.warn('engagement.summary.load.failed', summaryError);
     } finally {
       setLoading(false);
     }
@@ -75,7 +78,7 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
       const token = await getFirebaseAuth()?.currentUser?.getIdToken();
       await postEngagementComment({ ...identity, token: token ?? '', text: trimmedText });
       setText('');
-      setNotice('Comment posted. It is visible after refresh.');
+      setNotice('Comment posted. It is approved and visible now.');
       await refresh();
     } catch (submitError) {
       console.error(submitError);
@@ -103,6 +106,8 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
     }
   };
 
+  const showEmptyState = !error && comments.length === 0;
+
   return (
     <section className="productStoreCard" aria-label="Product comments and favorites">
       <h2>Community engagement</h2>
@@ -126,7 +131,7 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
 
       {notice ? <p className="requestFeedback success">{notice}</p> : null}
       {error ? <p className="requestFeedback error">{error}</p> : null}
-      {comments.length === 0 ? <p>{loading ? 'Loading comments…' : 'No approved comments yet.'}</p> : null}
+      {showEmptyState ? <p>{loading ? 'Loading comments…' : 'No approved comments yet.'}</p> : null}
       <ul>
         {comments.map((comment) => (
           <li key={comment.id}>
