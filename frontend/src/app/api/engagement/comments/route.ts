@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       authorDisplayName: cleanText(body.authorDisplayName ?? body.author_name, 160),
       token,
     });
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json(result);
   } catch (error) {
     console.error('engagement.comments.post.failed', error);
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Unable to post comment.' }, { status: 500 });
