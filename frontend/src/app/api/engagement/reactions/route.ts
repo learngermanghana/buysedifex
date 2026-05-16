@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       reaction: cleanText(body.reaction, 40) || 'favorite',
       token,
     });
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json(result);
   } catch (error) {
     console.error('engagement.reactions.post.failed', error);
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Unable to update favorite.' }, { status: 500 });
