@@ -96,14 +96,18 @@ export async function resolveEngagementIdentity(input: EngagementIdentityInput):
 
 async function ensureThread(identity: ResolvedIdentity) {
   const firestore = requireDb();
-  await setDoc(doc(firestore, 'engagement_threads', identity.canonicalProductKey), {
-    canonicalProductKey: identity.canonicalProductKey,
-    storeId: identity.storeId,
-    sourceProductId: identity.sourceProductId,
-    publicProductId: identity.publicProductId || null,
-    updatedAt: serverTimestamp(),
-    createdAt: serverTimestamp(),
-  }, { merge: true });
+  try {
+    await setDoc(doc(firestore, 'engagement_threads', identity.canonicalProductKey), {
+      canonicalProductKey: identity.canonicalProductKey,
+      storeId: identity.storeId,
+      sourceProductId: identity.sourceProductId,
+      publicProductId: identity.publicProductId || null,
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (error) {
+    console.warn('engagement.thread.ensure.skipped', error);
+  }
 }
 
 export async function listComments(input: EngagementIdentityInput): Promise<EngagementCommentRecord[]> {
@@ -142,7 +146,6 @@ export async function createComment(input: EngagementIdentityInput & { text?: st
   const body = cleanText(input.body ?? input.text, 2000);
   if (!body) throw new Error('Comment text is required.');
 
-  await ensureThread(identity);
   const comment = await addDoc(collection(firestore, 'engagement_comments'), {
     canonicalProductKey: identity.canonicalProductKey,
     storeId: identity.storeId,
@@ -162,8 +165,9 @@ export async function createComment(input: EngagementIdentityInput & { text?: st
     updatedAt: serverTimestamp(),
   });
 
-  await updateThreadCounts(identity);
-  return { id: comment.id, ok: true };
+  await ensureThread(identity);
+  await updateThreadCounts(identity).catch((error) => console.warn('engagement.thread.counts.skipped', error));
+  return { id: comment.id, ok: true, moderationStatus: 'approved' };
 }
 
 export async function updateFavorite(input: EngagementIdentityInput & { token?: string; reaction?: string }) {
@@ -172,7 +176,6 @@ export async function updateFavorite(input: EngagementIdentityInput & { token?: 
   const viewerId = stableViewerId(input.token);
   if (!viewerId) throw new Error('Sign in is required to favorite products.');
 
-  await ensureThread(identity);
   const favoriteRef = doc(firestore, 'engagement_favorites', `${identity.canonicalProductKey}_${viewerId}`);
   const isFavorite = input.reaction !== 'unfavorite';
 
@@ -188,7 +191,8 @@ export async function updateFavorite(input: EngagementIdentityInput & { token?: 
     updatedAt: serverTimestamp(),
   }, { merge: true });
 
-  await updateThreadCounts(identity);
+  await ensureThread(identity);
+  await updateThreadCounts(identity).catch((error) => console.warn('engagement.thread.counts.skipped', error));
   return { ok: true, isFavoritedByViewer: isFavorite };
 }
 
@@ -205,7 +209,7 @@ export async function getSummary(input: EngagementIdentityInput & { token?: stri
   const activeFavorites = favorites.docs.filter((favoriteDoc) => (favoriteDoc.data() as Record<string, unknown>).active !== false);
   const isFavoritedByViewer = viewerId ? activeFavorites.some((favoriteDoc) => favoriteDoc.id.endsWith(`_${viewerId}`)) : false;
 
-  await setDoc(doc(firestore, 'engagement_threads', identity.canonicalProductKey), {
+  setDoc(doc(firestore, 'engagement_threads', identity.canonicalProductKey), {
     canonicalProductKey: identity.canonicalProductKey,
     storeId: identity.storeId,
     sourceProductId: identity.sourceProductId,
@@ -213,7 +217,7 @@ export async function getSummary(input: EngagementIdentityInput & { token?: stri
     commentsCount,
     favoritesCount: activeFavorites.length,
     updatedAt: serverTimestamp(),
-  }, { merge: true });
+  }, { merge: true }).catch((error) => console.warn('engagement.thread.summary.skipped', error));
 
   return { commentsCount, favoritesCount: activeFavorites.length, isFavoritedByViewer };
 }
