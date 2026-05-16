@@ -48,13 +48,37 @@ export type SedifexCheckoutPreviewResponse = {
   processing_fee_to_add?: number;
   final_total?: number;
   breakdown?: Array<{ code: string; amount: number }>;
+  marketplaceFees?: MarketplaceFeeBreakdown;
+  marketplace_fees?: MarketplaceFeeBreakdown;
   [key: string]: unknown;
+};
+
+export type MarketplaceFeeBreakdown = {
+  currency: string;
+  baseTotalMinor: number;
+  customerProcessingFeePercent: number;
+  customerProcessingFeeMinor: number;
+  customerFinalTotalMinor: number;
+  sedifexCommissionPercent: number;
+  sedifexCommissionMinor: number;
+  estimatedMerchantGrossMinor: number;
+  estimatedMerchantNetMinor: number;
+  customerPaysProcessingFee: boolean;
+  merchantPaysCommission: boolean;
+  itemType: 'product' | 'service';
 };
 
 const getRequiredEnv = (key: string) => {
   const value = process.env[key];
   if (!value) throw new Error(`${key} is not configured`);
   return value;
+};
+
+const getOptionalNumberEnv = (key: string, fallback: number) => {
+  const raw = process.env[key]?.trim();
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 };
 
 const getMerchantTokensJsonMap = (): Record<string, string> => {
@@ -163,6 +187,8 @@ const normalizeCheckoutItemType = (type?: CheckoutItem['type']) => {
   } as const;
 };
 
+const cartContainsService = (items: CheckoutItem[]) => items.some((item) => normalizeCheckoutItemType(item.type).backendItemType === 'service');
+
 const normalizeCheckoutItemId = (item: CheckoutItem) => {
   const rawItemId = item.productId.trim();
   const merchantId = item.merchantId.trim();
@@ -196,6 +222,63 @@ export const getMerchantToken = (merchantId: string) => {
   return getRequiredEnv(`SEDIFEX_MERCHANT_TOKEN_${normalizedMerchantId}`);
 };
 
+const getBaseTotalMinor = (preview: SedifexCheckoutPreviewResponse) => {
+  const candidates = [preview.final_total, preview.pre_processing_total, preview.subtotal];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number' && Number.isFinite(candidate) && candidate > 0) {
+      return Math.round(candidate);
+    }
+  }
+  return 0;
+};
+
+export const applyMarketplaceFeeModel = (
+  pricingSnapshot: SedifexCheckoutPreviewResponse,
+  items: CheckoutItem[],
+): SedifexCheckoutPreviewResponse => {
+  const itemType: 'product' | 'service' = cartContainsService(items) ? 'service' : 'product';
+  const baseTotalMinor = getBaseTotalMinor(pricingSnapshot);
+  const customerProcessingFeePercent = getOptionalNumberEnv('SEDIFEX_MARKET_CUSTOMER_PROCESSING_FEE_PERCENT', 1.95);
+  const sedifexCommissionPercent = getOptionalNumberEnv(
+    itemType === 'service' ? 'SEDIFEX_MARKET_SERVICE_COMMISSION_PERCENT' : 'SEDIFEX_MARKET_PRODUCT_COMMISSION_PERCENT',
+    itemType === 'service' ? 5 : 3,
+  );
+  const customerProcessingFeeMinor = Math.round((baseTotalMinor * customerProcessingFeePercent) / 100);
+  const sedifexCommissionMinor = Math.round((baseTotalMinor * sedifexCommissionPercent) / 100);
+  const customerFinalTotalMinor = baseTotalMinor + customerProcessingFeeMinor;
+  const estimatedMerchantGrossMinor = baseTotalMinor;
+  const estimatedMerchantNetMinor = Math.max(0, estimatedMerchantGrossMinor - sedifexCommissionMinor);
+
+  const fees: MarketplaceFeeBreakdown = {
+    currency: pricingSnapshot.currency ?? 'GHS',
+    baseTotalMinor,
+    customerProcessingFeePercent,
+    customerProcessingFeeMinor,
+    customerFinalTotalMinor,
+    sedifexCommissionPercent,
+    sedifexCommissionMinor,
+    estimatedMerchantGrossMinor,
+    estimatedMerchantNetMinor,
+    customerPaysProcessingFee: true,
+    merchantPaysCommission: true,
+    itemType,
+  };
+
+  return {
+    ...pricingSnapshot,
+    pre_processing_total: baseTotalMinor,
+    processing_fee_to_add: customerProcessingFeeMinor,
+    final_total: customerFinalTotalMinor,
+    marketplaceFees: fees,
+    marketplace_fees: fees,
+    breakdown: [
+      ...(Array.isArray(pricingSnapshot.breakdown) ? pricingSnapshot.breakdown : []),
+      { code: 'customer_processing_fee', amount: customerProcessingFeeMinor },
+      { code: 'sedifex_marketplace_commission', amount: sedifexCommissionMinor },
+    ],
+  };
+};
+
 export const previewMerchantCheckout = async (merchantId: string, items: CheckoutItem[]) => {
   const normalizedMerchantId = normalizeMerchantId(merchantId);
   const merchantToken = getMerchantToken(normalizedMerchantId);
@@ -209,7 +292,7 @@ export const previewMerchantCheckout = async (merchantId: string, items: Checkou
     delivery_address_id: null,
     items: items.map(toSedifexCheckoutItem),
   };
-  return integrationFetch<SedifexCheckoutPreviewResponse>('/integration/checkout/preview', {
+  const upstreamPreview = await integrationFetch<SedifexCheckoutPreviewResponse>('/integration/checkout/preview', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${merchantToken}`,
@@ -217,6 +300,7 @@ export const previewMerchantCheckout = async (merchantId: string, items: Checkou
     },
     body: JSON.stringify(payload),
   });
+  return applyMarketplaceFeeModel(upstreamPreview, items);
 };
 
 export const createMerchantCheckout = async (
@@ -249,6 +333,7 @@ export const createMerchantCheckout = async (
       amount: fallbackAmountMajor,
       items: items.map(toSedifexCheckoutItem),
       pricing_snapshot: pricingSnapshot,
+      marketplace_fees: pricingSnapshot?.marketplace_fees ?? pricingSnapshot?.marketplaceFees,
       customer: customer
         ? {
             email: customer.email,
