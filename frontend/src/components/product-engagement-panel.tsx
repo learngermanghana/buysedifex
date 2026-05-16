@@ -20,12 +20,19 @@ type Props = {
 
 const initialSummary: SedifexCommentSummary = { favoritesCount: 0, commentsCount: 0, isFavoritedByViewer: false };
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+};
+
 export function ProductEngagementPanel({ publicProductId, storeId, sourceProductId, isPublished = true }: Props) {
   const [comments, setComments] = useState<SedifexComment[]>([]);
   const [summary, setSummary] = useState<SedifexCommentSummary>(initialSummary);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [posting, setPosting] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   const canWrite = isPublished;
 
@@ -39,12 +46,12 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
         listEngagementComments(identity),
         getEngagementSummary({ ...identity, token: token ?? undefined }),
       ]);
-      setComments(loadedComments.filter((item) => item.moderationStatus === 'approved'));
+      setComments(loadedComments.filter((item) => item.moderationStatus !== 'rejected'));
       setSummary(loadedSummary);
       setError('');
     } catch (refreshError) {
       console.error(refreshError);
-      setError('Unable to load comments right now.');
+      setError(getErrorMessage(refreshError, 'Unable to load comments right now.'));
     } finally {
       setLoading(false);
     }
@@ -60,26 +67,40 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
     event.preventDefault();
     const trimmedText = text.trim();
     if (!trimmedText) return;
-    const token = await getFirebaseAuth()?.currentUser?.getIdToken();
-    if (!token) {
-      setError('Sign in to comment.');
-      return;
-    }
 
-    await postEngagementComment({ ...identity, token, text: trimmedText });
-    setText('');
-    await refresh();
+    try {
+      setPosting(true);
+      setError('');
+      setNotice('');
+      const token = await getFirebaseAuth()?.currentUser?.getIdToken();
+      await postEngagementComment({ ...identity, token: token ?? '', text: trimmedText });
+      setText('');
+      setNotice('Comment posted. It is visible after refresh.');
+      await refresh();
+    } catch (submitError) {
+      console.error(submitError);
+      setError(getErrorMessage(submitError, 'Unable to post comment right now.'));
+    } finally {
+      setPosting(false);
+    }
   };
 
   const onToggleFavorite = async () => {
-    const token = await getFirebaseAuth()?.currentUser?.getIdToken();
-    if (!token) {
-      setError('Sign in to favorite.');
-      return;
-    }
+    try {
+      setError('');
+      setNotice('');
+      const token = await getFirebaseAuth()?.currentUser?.getIdToken();
+      if (!token) {
+        setError('Sign in to favorite products.');
+        return;
+      }
 
-    await postEngagementFavorite({ ...identity, token, reaction: summary.isFavoritedByViewer ? 'unfavorite' : 'favorite' });
-    await refresh();
+      await postEngagementFavorite({ ...identity, token, reaction: summary.isFavoritedByViewer ? 'unfavorite' : 'favorite' });
+      await refresh();
+    } catch (favoriteError) {
+      console.error(favoriteError);
+      setError(getErrorMessage(favoriteError, 'Unable to update favorite right now.'));
+    }
   };
 
   return (
@@ -88,7 +109,7 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
       {!isPublished ? <p>This listing is not currently public. Historical comments are read-only.</p> : null}
       <p>❤️ {summary.favoritesCount} favorites · 💬 {summary.commentsCount} comments</p>
       {canWrite ? (
-        <button className="secondaryButton" type="button" onClick={() => void onToggleFavorite()} disabled={loading}>
+        <button className="secondaryButton" type="button" onClick={() => void onToggleFavorite()} disabled={loading || posting}>
           {summary.isFavoritedByViewer ? 'Remove favorite' : 'Favorite'}
         </button>
       ) : null}
@@ -97,10 +118,13 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
         <form className="requestForm" onSubmit={(event) => void onSubmitComment(event)}>
           <label htmlFor="comment-text">Add comment</label>
           <textarea id="comment-text" rows={3} value={text} onChange={(event) => setText(event.target.value)} />
-          <button className="requestButton" type="submit" disabled={loading || !text.trim()}>Post comment</button>
+          <button className="requestButton" type="submit" disabled={loading || posting || !text.trim()}>
+            {posting ? 'Posting…' : 'Post comment'}
+          </button>
         </form>
       ) : null}
 
+      {notice ? <p className="requestFeedback success">{notice}</p> : null}
       {error ? <p className="requestFeedback error">{error}</p> : null}
       {comments.length === 0 ? <p>{loading ? 'Loading comments…' : 'No approved comments yet.'}</p> : null}
       <ul>
