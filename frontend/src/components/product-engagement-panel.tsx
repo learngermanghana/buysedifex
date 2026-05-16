@@ -1,12 +1,10 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { getFirebaseAuth } from '@/lib/firebase';
 import {
   getEngagementSummary,
   listEngagementComments,
   postEngagementComment,
-  postEngagementFavorite,
   SedifexComment,
   SedifexCommentSummary,
 } from '@/lib/sedifex-engagement';
@@ -43,18 +41,11 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
     try {
       const loadedComments = await listEngagementComments(identity);
       setComments(loadedComments.filter((item) => item.moderationStatus !== 'rejected'));
+      setSummary(await getEngagementSummary(identity));
       setError('');
     } catch (commentsError) {
       console.error(commentsError);
       setError(getErrorMessage(commentsError, 'Unable to load comments right now.'));
-    }
-
-    try {
-      const token = await getFirebaseAuth()?.currentUser?.getIdToken();
-      const loadedSummary = await getEngagementSummary({ ...identity, token: token ?? undefined });
-      setSummary(loadedSummary);
-    } catch (summaryError) {
-      console.warn('engagement.summary.load.failed', summaryError);
     } finally {
       setLoading(false);
     }
@@ -62,8 +53,6 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
 
   useEffect(() => {
     void refresh();
-    const timer = setInterval(() => void refresh(), 15000);
-    return () => clearInterval(timer);
   }, [refresh]);
 
   const onSubmitComment = async (event: FormEvent) => {
@@ -75,10 +64,9 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
       setPosting(true);
       setError('');
       setNotice('');
-      const token = await getFirebaseAuth()?.currentUser?.getIdToken();
-      await postEngagementComment({ ...identity, token: token ?? '', text: trimmedText });
+      await postEngagementComment({ ...identity, text: trimmedText });
       setText('');
-      setNotice('Comment posted. It is approved and visible now.');
+      setNotice('Comment posted. It is visible now.');
       await refresh();
     } catch (submitError) {
       console.error(submitError);
@@ -88,36 +76,13 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
     }
   };
 
-  const onToggleFavorite = async () => {
-    try {
-      setError('');
-      setNotice('');
-      const token = await getFirebaseAuth()?.currentUser?.getIdToken();
-      if (!token) {
-        setError('Sign in to favorite products.');
-        return;
-      }
-
-      await postEngagementFavorite({ ...identity, token, reaction: summary.isFavoritedByViewer ? 'unfavorite' : 'favorite' });
-      await refresh();
-    } catch (favoriteError) {
-      console.error(favoriteError);
-      setError(getErrorMessage(favoriteError, 'Unable to update favorite right now.'));
-    }
-  };
-
   const showEmptyState = !error && comments.length === 0;
 
   return (
-    <section className="productStoreCard" aria-label="Product comments and favorites">
-      <h2>Community engagement</h2>
+    <section className="productStoreCard" aria-label="Product comments">
+      <h2>Customer comments</h2>
       {!isPublished ? <p>This listing is not currently public. Historical comments are read-only.</p> : null}
-      <p>❤️ {summary.favoritesCount} favorites · 💬 {summary.commentsCount} comments</p>
-      {canWrite ? (
-        <button className="secondaryButton" type="button" onClick={() => void onToggleFavorite()} disabled={loading || posting}>
-          {summary.isFavoritedByViewer ? 'Remove favorite' : 'Favorite'}
-        </button>
-      ) : null}
+      <p>💬 {summary.commentsCount || comments.length} comments</p>
 
       {canWrite ? (
         <form className="requestForm" onSubmit={(event) => void onSubmitComment(event)}>
@@ -131,7 +96,7 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
 
       {notice ? <p className="requestFeedback success">{notice}</p> : null}
       {error ? <p className="requestFeedback error">{error}</p> : null}
-      {showEmptyState ? <p>{loading ? 'Loading comments…' : 'No approved comments yet.'}</p> : null}
+      {showEmptyState ? <p>{loading ? 'Loading comments…' : 'No comments yet.'}</p> : null}
       <ul>
         {comments.map((comment) => (
           <li key={comment.id}>
