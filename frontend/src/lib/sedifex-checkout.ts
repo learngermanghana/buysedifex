@@ -116,28 +116,33 @@ const getMerchantTokensJsonMap = (): Record<string, string> => {
 
 const getContractVersion = () => process.env.SEDIFEX_INTEGRATION_API_VERSION ?? '2026-04-13';
 
-const getIntegrationApiBaseUrl = () => {
-  const rawBaseUrl = getRequiredEnv('SEDIFEX_INTEGRATION_API_BASE_URL').trim();
-
+const normalizeAbsoluteUrl = (key: string, rawUrl: string) => {
   let parsed: URL;
   try {
-    parsed = new URL(rawBaseUrl);
+    parsed = new URL(rawUrl.trim());
   } catch {
-    throw new Error(
-      'SEDIFEX_INTEGRATION_API_BASE_URL must be an absolute URL (for example: https://api.example.com).',
-    );
+    throw new Error(`${key} must be an absolute URL.`);
   }
 
   if (!['http:', 'https:'].includes(parsed.protocol)) {
-    throw new Error('SEDIFEX_INTEGRATION_API_BASE_URL must use http or https protocol.');
+    throw new Error(`${key} must use http or https protocol.`);
   }
 
   return parsed.toString().replace(/\/$/, '');
 };
 
+const getIntegrationApiBaseUrl = () => normalizeAbsoluteUrl('SEDIFEX_INTEGRATION_API_BASE_URL', getRequiredEnv('SEDIFEX_INTEGRATION_API_BASE_URL'));
+
+const getCheckoutCreateUrl = () => {
+  const directUrl = process.env.SEDIFEX_INTEGRATION_CHECKOUT_CREATE_URL?.trim();
+  if (directUrl) return normalizeAbsoluteUrl('SEDIFEX_INTEGRATION_CHECKOUT_CREATE_URL', directUrl);
+  return `${getIntegrationApiBaseUrl()}/integration/checkout/create`;
+};
+
 const integrationFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const baseUrl = getIntegrationApiBaseUrl();
-  const response = await fetch(`${baseUrl}${path}`, {
+  const url = `${baseUrl}${path}`;
+  const response = await fetch(url, {
     ...init,
     headers: {
       Accept: 'application/json',
@@ -151,6 +156,27 @@ const integrationFetch = async <T>(path: string, init?: RequestInit): Promise<T>
   if (!response.ok) {
     const body = await response.text().catch(() => '');
     throw new Error(`Sedifex request failed (${response.status}) for ${path}: ${body}`);
+  }
+
+  return (await response.json()) as T;
+};
+
+const checkoutCreateFetch = async <T>(init?: RequestInit): Promise<T> => {
+  const url = getCheckoutCreateUrl();
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-Sedifex-Contract-Version': getContractVersion(),
+      ...(init?.headers ?? {}),
+    },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Sedifex request failed (${response.status}) for checkout create: ${body}`);
   }
 
   return (await response.json()) as T;
@@ -368,7 +394,7 @@ export const createMerchantCheckout = async (
   const fallbackAmountMajor = finalTotalMinor && finalTotalMinor > 0 ? finalTotalMinor / 100 : undefined;
   const splitPayload = buildPaystackSplitPayload(paymentRouting, pricingSnapshot);
 
-  return integrationFetch<unknown>('/integration/checkout/create', {
+  return checkoutCreateFetch<unknown>({
     method: 'POST',
     headers: {
       Authorization: `Bearer ${merchantToken}`,
