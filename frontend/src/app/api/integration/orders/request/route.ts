@@ -10,6 +10,9 @@ type PayOnDeliveryOrderBody = {
   quantity?: number;
   unitPrice?: number | null;
   currency?: string;
+  sourceChannel?: string;
+  sourceLabel?: string;
+  clientOrderId?: string;
   customer?: {
     name?: string;
     email?: string;
@@ -36,6 +39,23 @@ const cleanNumber = (value: unknown) => {
 };
 
 const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+const normalizeSourceChannel = (value: unknown) => {
+  const normalized = cleanText(value, 80).toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+  if (!normalized) return 'sedifex_market';
+  if (normalized.includes('website') || normalized.includes('wordpress') || normalized.includes('client')) return 'client_website';
+  if (normalized.includes('custom_page') || normalized.includes('public_page')) return 'sedifex_custom_page';
+  if (normalized.includes('market')) return 'sedifex_market';
+  return normalized;
+};
+
+const getSourceLabel = (channel: string, provided?: string) => {
+  const customLabel = cleanText(provided, 100);
+  if (customLabel) return customLabel;
+  if (channel === 'client_website') return 'Client Website';
+  if (channel === 'sedifex_custom_page') return 'Sedifex Public Page';
+  return 'Sedifex Market';
+};
 
 const buildFreePayOnDeliveryFeePolicy = (input: { amount: number; currency: string }) => ({
   policyKey: 'sedifex_free_pay_on_delivery_v1',
@@ -94,6 +114,8 @@ export async function POST(request: NextRequest) {
     const deliveryLocation = cleanText(body.delivery?.location, 300);
     const notes = cleanText(body.delivery?.notes, 1200);
     const quantity = Math.max(1, Math.floor(Number(body.quantity) || 1));
+    const sourceChannel = normalizeSourceChannel(body.sourceChannel);
+    const sourceLabel = getSourceLabel(sourceChannel, body.sourceLabel);
 
     if (!merchantId) return NextResponse.json({ error: 'merchantId is required' }, { status: 400 });
     if (!productId) return NextResponse.json({ error: 'productId is required' }, { status: 400 });
@@ -108,6 +130,7 @@ export async function POST(request: NextRequest) {
     const subtotal = unitPrice == null ? 0 : roundMoney(unitPrice * quantity);
 
     const reference = createCheckoutReference(merchantId);
+    const clientOrderId = cleanText(body.clientOrderId, 180) || `MARKET-POD-${reference}`;
     const cartItem: CheckoutItem & { name?: string; unitPrice?: number | null; subtotal?: number; publicProductId?: string; sourceProductId?: string } = {
       merchantId,
       productId,
@@ -123,9 +146,17 @@ export async function POST(request: NextRequest) {
 
     const orderRecord = {
       recordType: 'product_order',
+      orderType: 'product',
       merchantId,
       storeId: merchantId,
       reference,
+      clientOrderId,
+      client_order_id: clientOrderId,
+      sedifexOrderId: reference,
+      sourceChannel,
+      source_channel: sourceChannel,
+      sourceLabel,
+      source_label: sourceLabel,
       productId,
       productName,
       customer: {
@@ -180,7 +211,7 @@ export async function POST(request: NextRequest) {
       order_status: 'pending_delivery',
       paymentCollectionMode: 'pay_on_delivery',
       sedifexCommissionStatus: 'free_launch_period',
-      source: 'sedifex_market',
+      source: sourceChannel,
       syncStatus: 'pending',
       syncRequestedAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
@@ -194,9 +225,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       orderId: created.id,
+      sedifexOrderId: created.id,
+      clientOrderId,
       reference,
       paymentStatus: 'pending_cash_collection',
       orderStatus: 'pending_delivery',
+      sourceChannel,
       subtotal,
       feePolicy,
     });
