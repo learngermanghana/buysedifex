@@ -1,3 +1,16 @@
+import {
+  addDoc,
+  collection,
+  getDocs,
+  limit,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+  doc,
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
 export type SedifexModerationStatus = 'approved' | 'pending' | 'rejected' | string;
 
 export type SedifexComment = {
@@ -20,97 +33,124 @@ type EngagementIdentityInput = {
   sourceProductId?: string;
 };
 
-type EngagementIdentityPayload = {
-  public_product_id: string;
-  store_id?: string;
-  source_product_id?: string;
+const cleanText = (value: unknown, max = 500) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+
+const requireDb = () => {
+  if (!db) throw new Error('Firebase is not configured for Sedifex Market comments.');
+  return db;
 };
 
-const configuredEngagementApiBase =
-  process.env.NEXT_PUBLIC_SEDIFEX_ENGAGEMENT_API_BASE_URL ?? process.env.SEDIFEX_ENGAGEMENT_API_BASE_URL ?? '';
-
-const engagementApiBase = configuredEngagementApiBase || '/api/engagement';
-
-const buildUrl = (path: string) => {
-  if (engagementApiBase.startsWith('/')) return `${engagementApiBase}${path}`;
-  return new URL(path, engagementApiBase).toString();
+const toIso = (value: unknown) => {
+  if (!value) return undefined;
+  if (typeof value === 'string') return value;
+  if (typeof (value as { toDate?: unknown }).toDate === 'function') {
+    const date = (value as { toDate: () => Date }).toDate();
+    return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+  }
+  return undefined;
 };
 
-const buildIdentityPayload = (input: EngagementIdentityInput): EngagementIdentityPayload => ({
-  public_product_id: input.publicProductId,
-  ...(input.storeId ? { store_id: input.storeId } : {}),
-  ...(input.sourceProductId ? { source_product_id: input.sourceProductId } : {}),
-});
+const resolveIdentity = (input: EngagementIdentityInput) => {
+  const publicProductId = cleanText(input.publicProductId, 180);
+  const storeId = cleanText(input.storeId, 180) || 'sedifexmarket';
+  const sourceProductId = cleanText(input.sourceProductId, 220) || publicProductId;
 
-const applyIdentityQueryParams = (endpoint: URLSearchParams, input: EngagementIdentityInput) => {
-  endpoint.set('public_product_id', input.publicProductId);
-  if (input.storeId) endpoint.set('store_id', input.storeId);
-  if (input.sourceProductId) endpoint.set('source_product_id', input.sourceProductId);
-};
+  if (!publicProductId && !sourceProductId) {
+    throw new Error('Product ID is required before comments can load.');
+  }
 
-const buildHeaders = (token?: string): HeadersInit => ({
-  'Content-Type': 'application/json',
-  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-});
-
-export const listEngagementComments = async (input: {
-  publicProductId: string;
-  storeId?: string;
-  sourceProductId?: string;
-}): Promise<SedifexComment[]> => {
-  const params = new URLSearchParams();
-  applyIdentityQueryParams(params, input);
-  const response = await fetch(`${buildUrl('/comments')}?${params.toString()}`, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`Unable to load comments. Status ${response.status}`);
-  const payload = (await response.json()) as { comments?: SedifexComment[] } | SedifexComment[];
-  const comments = Array.isArray(payload) ? payload : payload.comments ?? [];
-  return comments.filter((item) => item.moderationStatus !== 'rejected');
-};
-
-export const getEngagementSummary = async (input: {
-  publicProductId: string;
-  storeId?: string;
-  sourceProductId?: string;
-  token?: string;
-}): Promise<SedifexCommentSummary> => {
-  const params = new URLSearchParams();
-  applyIdentityQueryParams(params, input);
-  const response = await fetch(`${buildUrl('/summary')}?${params.toString()}`, { headers: buildHeaders(input.token), cache: 'no-store' });
-  if (!response.ok) throw new Error(`Unable to load summary. Status ${response.status}`);
-  const payload = (await response.json()) as Partial<SedifexCommentSummary>;
   return {
-    favoritesCount: payload.favoritesCount ?? 0,
-    commentsCount: payload.commentsCount ?? 0,
-    isFavoritedByViewer: payload.isFavoritedByViewer ?? false,
+    publicProductId,
+    storeId,
+    sourceProductId,
+    canonicalProductKey: `${storeId}:${sourceProductId || publicProductId}`,
   };
 };
 
-export const postEngagementComment = async (input: {
-  publicProductId: string;
-  storeId?: string;
-  sourceProductId?: string;
-  token: string;
-  text: string;
-}) => {
-  const response = await fetch(buildUrl('/comments'), {
-    method: 'POST',
-    headers: buildHeaders(input.token),
-    body: JSON.stringify({ ...buildIdentityPayload(input), text: input.text }),
-  });
-  if (!response.ok) throw new Error(`Unable to post comment. Status ${response.status}`);
+const writeThreadSummary = async (identity: ReturnType<typeof resolveIdentity>, commentsCount?: number) => {
+  try {
+    const firestore = requireDb();
+    await setDoc(doc(firestore, 'engagement_threads', identity.canonicalProductKey), {
+      canonicalProductKey: identity.canonicalProductKey,
+      storeId: identity.storeId,
+      sourceProductId: identity.sourceProductId,
+      publicProductId: identity.publicProductId || null,
+      ...(typeof commentsCount === 'number' ? { commentsCount } : {}),
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (error) {
+    console.warn('engagement.thread.write.skipped', error);
+  }
 };
 
-export const postEngagementFavorite = async (input: {
-  publicProductId: string;
-  storeId?: string;
-  sourceProductId?: string;
-  token: string;
-  reaction: 'favorite' | 'unfavorite';
-}) => {
-  const response = await fetch(buildUrl('/reactions'), {
-    method: 'POST',
-    headers: buildHeaders(input.token),
-    body: JSON.stringify({ ...buildIdentityPayload(input), reaction: input.reaction }),
+export const listEngagementComments = async (input: EngagementIdentityInput): Promise<SedifexComment[]> => {
+  const firestore = requireDb();
+  const identity = resolveIdentity(input);
+  const snapshot = await getDocs(
+    query(collection(firestore, 'engagement_comments'), where('canonicalProductKey', '==', identity.canonicalProductKey), limit(100)),
+  );
+
+  return snapshot.docs
+    .map((commentDoc) => {
+      const data = commentDoc.data() as Record<string, unknown>;
+      const text = cleanText(data.text ?? data.body, 2000);
+      const moderationStatus = cleanText(data.moderationStatus ?? data.status, 40) || 'approved';
+      return {
+        id: commentDoc.id,
+        text,
+        authorName: cleanText(data.authorName ?? data.authorDisplayName, 160) || 'Customer',
+        createdAt: toIso(data.createdAt),
+        moderationStatus,
+      };
+    })
+    .filter((item) => item.text && item.moderationStatus !== 'rejected')
+    .sort((left, right) => String(right.createdAt ?? '').localeCompare(String(left.createdAt ?? '')));
+};
+
+export const getEngagementSummary = async (input: EngagementIdentityInput & { token?: string }): Promise<SedifexCommentSummary> => {
+  try {
+    const comments = await listEngagementComments(input);
+    await writeThreadSummary(resolveIdentity(input), comments.length);
+    return {
+      favoritesCount: 0,
+      commentsCount: comments.length,
+      isFavoritedByViewer: false,
+    };
+  } catch (error) {
+    console.warn('engagement.summary.firebase.failed', error);
+    return { favoritesCount: 0, commentsCount: 0, isFavoritedByViewer: false };
+  }
+};
+
+export const postEngagementComment = async (input: EngagementIdentityInput & { token?: string; text: string }) => {
+  const firestore = requireDb();
+  const identity = resolveIdentity(input);
+  const text = cleanText(input.text, 2000);
+  if (!text) throw new Error('Comment text is required.');
+
+  const comment = await addDoc(collection(firestore, 'engagement_comments'), {
+    canonicalProductKey: identity.canonicalProductKey,
+    storeId: identity.storeId,
+    sourceProductId: identity.sourceProductId,
+    publicProductId: identity.publicProductId || null,
+    body: text,
+    text,
+    authorDisplayName: 'Customer',
+    authorName: 'Customer',
+    originPlatform: 'sedifexmarket',
+    status: 'approved',
+    moderationStatus: 'approved',
+    visibility: 'public',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
-  if (!response.ok) throw new Error(`Unable to update favorite. Status ${response.status}`);
+
+  const comments = await listEngagementComments(input).catch(() => []);
+  await writeThreadSummary(identity, comments.length || undefined);
+  return { ok: true, id: comment.id };
+};
+
+export const postEngagementFavorite = async () => {
+  throw new Error('Favorites are temporarily disabled while marketplace comments are being stabilized.');
 };
