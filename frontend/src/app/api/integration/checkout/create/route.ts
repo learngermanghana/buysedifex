@@ -1,4 +1,4 @@
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, firebaseConfigError } from '@/lib/firebase';
 import {
@@ -7,6 +7,7 @@ import {
   groupCartByMerchant,
   previewMerchantCheckout,
   type CheckoutItem,
+  type MerchantPaymentRouting,
   type SedifexCheckoutPreviewResponse,
 } from '@/lib/sedifex-checkout';
 
@@ -20,6 +21,28 @@ const isServiceCart = (cart: CheckoutItem[]) =>
   cart.some((item) => String((item as { type?: unknown }).type ?? '').trim().toUpperCase() === 'SERVICE');
 
 const cleanText = (value: unknown, max = 300) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+
+const readMerchantPaymentRouting = async (merchantId: string): Promise<MerchantPaymentRouting | null> => {
+  if (!db || firebaseConfigError) return null;
+  const storeSnap = await getDoc(doc(db, 'storeSettings', merchantId)).catch(() => null);
+  const fallbackSnap = storeSnap?.exists() ? storeSnap : await getDoc(doc(db, 'stores', merchantId)).catch(() => null);
+  if (!fallbackSnap?.exists()) return null;
+  const data = fallbackSnap.data() as Record<string, unknown>;
+  const routing = data.paymentRouting && typeof data.paymentRouting === 'object' ? (data.paymentRouting as MerchantPaymentRouting) : null;
+  const directSubaccount = cleanText(data.paystackSubaccountCode, 120);
+  if (routing) return routing;
+  if (directSubaccount) {
+    return {
+      provider: 'paystack',
+      settlementMode: 'subaccount',
+      paystackSubaccountCode: directSubaccount,
+      subaccountCode: directSubaccount,
+      commissionControlledBy: 'sedifex',
+      status: 'active',
+    };
+  }
+  return null;
+};
 
 export async function POST(request: NextRequest) {
   console.info('checkout.create.requested');
@@ -52,23 +75,35 @@ export async function POST(request: NextRequest) {
       Array.from(grouped.entries()).map(async ([merchantId, merchantCart]) => {
         console.info('checkout.create.merchant.started', { merchantId, cartItems: merchantCart.length });
         const preview = await previewMerchantCheckout(merchantId, merchantCart);
-        console.info('checkout.create.merchant.preview_succeeded', { merchantId });
+        const paymentRouting = await readMerchantPaymentRouting(merchantId);
+        console.info('checkout.create.merchant.preview_succeeded', {
+          merchantId,
+          hasPaystackSubaccount: Boolean(paymentRouting?.paystackSubaccountCode || paymentRouting?.subaccountCode),
+        });
         const reference = createCheckoutReference(merchantId);
         const checkout = await createMerchantCheckout(merchantId, merchantCart, reference, preview, {
           email: customerEmail,
           phone: customerPhone,
-        });
+        }, paymentRouting);
         console.info('checkout.create.merchant.checkout_succeeded', { merchantId, reference });
 
         const cartIsServiceBooking = isServiceCart(merchantCart);
         const collectionName = cartIsServiceBooking ? 'integrationBookings' : 'integrationOrders';
         const recordType = cartIsServiceBooking ? 'service_booking' : 'product_order';
+        const subaccountCode = paymentRouting?.paystackSubaccountCode ?? paymentRouting?.subaccountCode ?? null;
 
         const checkoutRecord = {
           recordType,
           merchantId,
           storeId: merchantId,
           reference,
+          sourceChannel: 'sedifex_market',
+          source_channel: 'sedifex_market',
+          sourceLabel: 'Sedifex Market',
+          source_label: 'Sedifex Market',
+          clientOrderId: reference,
+          client_order_id: reference,
+          sedifexOrderId: reference,
           customer: {
             name: customerName || null,
             email: customerEmail,
@@ -92,6 +127,17 @@ export async function POST(request: NextRequest) {
           items: merchantCart,
           pricingSnapshot: preview,
           pricing_snapshot: preview,
+          paymentRouting: paymentRouting ?? null,
+          paystackSplit: subaccountCode
+            ? {
+                provider: 'paystack',
+                mode: 'subaccount',
+                subaccount: subaccountCode,
+                percentageCharge: paymentRouting?.percentageCharge ?? null,
+                commissionControlledBy: paymentRouting?.commissionControlledBy ?? 'sedifex',
+                status: paymentRouting?.status ?? 'active',
+              }
+            : null,
           paymentReference: reference,
           payment_reference: reference,
           paymentStatus: 'pending',
@@ -136,6 +182,7 @@ export async function POST(request: NextRequest) {
           order_status: checkoutPayload.order_status ?? (cartIsServiceBooking ? 'pending_booking_payment' : 'pending_payment'),
           checkoutUrl: checkoutPayload.authorizationUrl ?? checkoutPayload.checkoutUrl,
           preview: checkoutPayload.pricing_snapshot ?? preview,
+          paystackSplit: subaccountCode ? { enabled: true, subaccount: subaccountCode } : { enabled: false },
         };
       }),
     );
