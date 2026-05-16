@@ -7,6 +7,9 @@ type ManualBookingBody = {
   merchantId?: string;
   serviceId?: string;
   serviceName?: string;
+  sourceChannel?: string;
+  sourceLabel?: string;
+  clientOrderId?: string;
   customer?: {
     name?: string;
     email?: string;
@@ -27,6 +30,23 @@ type ManualBookingBody = {
 
 const cleanText = (value: unknown, max = 300) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 
+const cleanChannel = (value: unknown) => {
+  const raw = cleanText(value, 80).toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+  if (!raw) return 'sedifex_market';
+  if (raw.includes('website') || raw.includes('wordpress') || raw.includes('client')) return 'client_website';
+  if (raw.includes('custom_page') || raw.includes('public_page')) return 'sedifex_custom_page';
+  if (raw.includes('market')) return 'sedifex_market';
+  return raw;
+};
+
+const channelLabel = (channel: string, value?: string) => {
+  const custom = cleanText(value, 100);
+  if (custom) return custom;
+  if (channel === 'client_website') return 'Client Website';
+  if (channel === 'sedifex_custom_page') return 'Sedifex Public Page';
+  return 'Sedifex Market';
+};
+
 export async function POST(request: NextRequest) {
   try {
     if (!db || firebaseConfigError) {
@@ -44,6 +64,8 @@ export async function POST(request: NextRequest) {
     const preferredTime = cleanText(body.booking?.preferredTime, 40);
     const preferredBranch = cleanText(body.booking?.preferredBranch, 180);
     const notes = cleanText(body.booking?.notes, 1200);
+    const sourceChannel = cleanChannel(body.sourceChannel);
+    const sourceLabel = channelLabel(sourceChannel, body.sourceLabel);
 
     if (!merchantId) return NextResponse.json({ error: 'merchantId is required' }, { status: 400 });
     if (!serviceId) return NextResponse.json({ error: 'serviceId is required' }, { status: 400 });
@@ -53,6 +75,7 @@ export async function POST(request: NextRequest) {
     if (!preferredTime) return NextResponse.json({ error: 'booking.preferredTime is required' }, { status: 400 });
 
     const reference = createCheckoutReference(merchantId);
+    const clientOrderId = cleanText(body.clientOrderId, 180) || `MARKET-BOOKING-${reference}`;
     const cartItem: CheckoutItem = { merchantId, productId: serviceId, quantity: 1, type: 'SERVICE' };
     const paymentMode = cleanText(body.payment?.mode, 50) || 'manual';
     const currency = cleanText(body.payment?.currency, 20) || 'GHS';
@@ -60,9 +83,18 @@ export async function POST(request: NextRequest) {
 
     const bookingRecord = {
       recordType: 'service_booking',
+      orderType: 'service',
       merchantId,
       storeId: merchantId,
       reference,
+      clientOrderId,
+      client_order_id: clientOrderId,
+      sedifexOrderId: reference,
+      bookingId: reference,
+      sourceChannel,
+      source_channel: sourceChannel,
+      sourceLabel,
+      source_label: sourceLabel,
       serviceId,
       serviceName,
       customer: {
@@ -97,7 +129,7 @@ export async function POST(request: NextRequest) {
       order_status: 'pending_store_confirmation',
       bookingStatus: 'pending_store_confirmation',
       paymentCollectionMode: paymentMode,
-      source: 'sedifex_market',
+      source: sourceChannel,
       syncStatus: 'pending',
       syncRequestedAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
@@ -111,7 +143,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       bookingId: created.id,
+      sedifexOrderId: created.id,
+      clientOrderId,
       reference,
+      sourceChannel,
       paymentStatus: 'pending_manual',
       bookingStatus: 'pending_store_confirmation',
     });
