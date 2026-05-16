@@ -5,6 +5,33 @@ import { useEffect, useMemo, useState } from 'react';
 import { getPurchaseHistory, signOutCustomer, subscribeToAuth, type PurchaseHistoryItem } from '@/lib/customer-auth';
 import { firebaseConfigError } from '@/lib/firebase';
 
+const STATUS_LABELS: Record<string, string> = {
+  pending_cash_collection: 'Pay on delivery',
+  pending_delivery: 'Waiting for store delivery',
+  pending_store_confirmation: 'Waiting for store confirmation',
+  pending_manual: 'Manual payment pending',
+  pending_manual_review: 'Manual payment pending',
+  pending_payment: 'Waiting for payment',
+  pending: 'Processing',
+  processing: 'Processing',
+  confirmed_by_store: 'Confirmed by store',
+  delivered: 'Delivered',
+  cash_collected: 'Payment collected on delivery',
+  completed: 'Completed',
+  success: 'Paid',
+  paid: 'Paid',
+  confirmed: 'Confirmed',
+  cancelled_by_store: 'Cancelled by store',
+  cancelled: 'Cancelled',
+  canceled: 'Cancelled',
+  failed: 'Failed',
+};
+
+const statusLabel = (status?: string) => {
+  const key = (status ?? 'pending').trim().toLowerCase();
+  return STATUS_LABELS[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 export default function AccountBookingsPage() {
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
@@ -42,8 +69,8 @@ export default function AccountBookingsPage() {
 
   const statusClass = (status?: string) => {
     const normalized = (status ?? 'pending').toLowerCase();
-    if (['confirmed', 'completed', 'success', 'paid', 'captured'].includes(normalized)) return 'success';
-    if (['failed', 'rejected', 'cancelled', 'canceled', 'abandoned'].includes(normalized)) return 'error';
+    if (['confirmed', 'completed', 'success', 'paid', 'captured', 'cash_collected', 'delivered', 'confirmed_by_store'].includes(normalized)) return 'success';
+    if (['failed', 'rejected', 'cancelled', 'canceled', 'abandoned', 'cancelled_by_store'].includes(normalized)) return 'error';
     return 'pending';
   };
 
@@ -84,8 +111,8 @@ export default function AccountBookingsPage() {
                 <br />
                 <small>
                   Ref: {item.reference ?? 'N/A'} · Payment:{' '}
-                  <span className={`statusBadge ${statusClass(item.paymentStatus)}`}>{item.paymentStatus ?? 'pending'}</span> · Booking:{' '}
-                  <span className={`statusBadge ${statusClass(item.orderStatus)}`}>{item.orderStatus ?? 'pending_store_confirmation'}</span>
+                  <span className={`statusBadge ${statusClass(item.paymentStatus)}`}>{statusLabel(item.paymentStatus)}</span> · Booking:{' '}
+                  <span className={`statusBadge ${statusClass(item.orderStatus)}`}>{statusLabel(item.orderStatus)}</span>
                 </small>
                 <br />
                 <small>{new Date(item.createdAt).toLocaleString()}</small>
