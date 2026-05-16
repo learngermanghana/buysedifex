@@ -31,7 +31,7 @@ type CheckoutFormState = {
   notes: string;
 };
 
-const createInitialFormState = (isService = false): CheckoutFormState => ({
+const createInitialFormState = (): CheckoutFormState => ({
   customerName: '',
   email: '',
   phone: '',
@@ -87,7 +87,7 @@ const trackEvent = async (eventName: string, payload: Record<string, unknown>) =
 
 export function ProductLeadPanel({ productId, merchantId, productName, city, storeName, whatsappPhone, itemType, price, currency }: ProductLeadPanelProps) {
   const isService = normalizeCheckoutItemType(itemType) === 'SERVICE';
-  const [formState, setFormState] = useState<CheckoutFormState>(() => createInitialFormState(isService));
+  const [formState, setFormState] = useState<CheckoutFormState>(() => createInitialFormState());
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [checkoutCards, setCheckoutCards] = useState<Array<{ merchantId: string; reference: string; checkoutUrl?: string; bookingId?: string; recordType?: string }>>([]);
   const [submitMode, setSubmitMode] = useState<SubmitMode>(null);
@@ -101,7 +101,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
   }, [isService, productId, productName]);
 
   useEffect(() => {
-    setFormState((current) => ({ ...createInitialFormState(isService), customerName: current.customerName, email: current.email, phone: current.phone }));
+    setFormState((current) => ({ ...createInitialFormState(), customerName: current.customerName, email: current.email, phone: current.phone }));
   }, [isService]);
 
   useEffect(() => {
@@ -275,7 +275,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
       }
 
       setSubmitState('success');
-      setFormState(createInitialFormState(isService));
+      setFormState(createInitialFormState());
     } catch (error) {
       console.error(error);
       const rawMessage = error instanceof Error ? error.message : isService ? 'Unable to create booking at the moment.' : 'Unable to create checkout at the moment.';
