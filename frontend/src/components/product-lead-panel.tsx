@@ -11,6 +11,8 @@ type ProductLeadPanelProps = {
   storeName: string;
   whatsappPhone?: string;
   itemType?: string;
+  price?: number | null;
+  currency?: string;
 };
 
 type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
@@ -83,7 +85,7 @@ const trackEvent = async (eventName: string, payload: Record<string, unknown>) =
   }
 };
 
-export function ProductLeadPanel({ productId, merchantId, productName, city, storeName, whatsappPhone, itemType }: ProductLeadPanelProps) {
+export function ProductLeadPanel({ productId, merchantId, productName, city, storeName, whatsappPhone, itemType, price, currency }: ProductLeadPanelProps) {
   const isService = normalizeCheckoutItemType(itemType) === 'SERVICE';
   const [formState, setFormState] = useState<CheckoutFormState>(() => createInitialFormState(isService));
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
@@ -205,6 +207,31 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
         payload = { merchantCheckouts: manualPayload?.reference ? [{ merchantId, reference: manualPayload.reference, recordType: 'service_booking' }] : [] };
         setCheckoutCards([]);
       } else {
+        const response = await fetch('/api/integration/orders/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            merchantId,
+            productId,
+            productName,
+            quantity,
+            unitPrice: price ?? null,
+            currency: currency ?? 'GHS',
+            customer: {
+              name: formState.customerName.trim(),
+              email: formState.email.trim(),
+              phone: formState.phone.trim(),
+            },
+            delivery: {
+              location: formState.deliveryLocation.trim(),
+              notes: formState.notes.trim(),
+            },
+          }),
+        });
+        const orderPayload = (await response.json().catch(() => null)) as { reference?: string; error?: string } | null;
+        if (!response.ok) throw new Error(orderPayload?.error ?? 'Failed to submit pay-on-delivery order');
+        setManualReference(orderPayload?.reference ?? '');
+        payload = { merchantCheckouts: orderPayload?.reference ? [{ merchantId, reference: orderPayload.reference, recordType: 'product_order' }] : [] };
         setCheckoutCards([]);
       }
 
@@ -242,8 +269,8 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
           paymentMethod: formState.paymentMethod,
           deliveryLocation: isService ? `${formState.preferredDate} ${formState.preferredTime} ${formState.preferredBranch}`.trim() : formState.deliveryLocation.trim(),
           reference: firstCheckout?.reference,
-          paymentStatus: isOnlinePayment ? 'pending' : isService ? 'pending_manual' : 'pending',
-          orderStatus: isService ? 'pending_store_confirmation' : 'pending',
+          paymentStatus: isOnlinePayment ? 'pending' : isService ? 'pending_manual' : 'pending_cash_collection',
+          orderStatus: isService ? 'pending_store_confirmation' : 'pending_delivery',
         });
       }
 
@@ -269,7 +296,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
       <p className="checkoutHint">
         {isService
           ? 'Choose your preferred date and time. The store will confirm your booking after payment or manual review.'
-          : 'Complete checkout here without leaving Sedifex. Online orders are paid with Paystack.'}
+          : 'Complete checkout here without leaving Sedifex. Online orders are paid with Paystack. Pay on delivery is free during launch.'}
       </p>
 
       <div className="paymentMethodList" aria-label="Available payment methods">
@@ -329,7 +356,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
           <p className="requestFeedback success">
             {isService
               ? `Booking request received${manualReference ? ` — Reference: ${manualReference}` : ''}. ${submitMode === 'online' ? 'Please complete payment using the Paystack checkout below.' : 'The store will review and confirm your preferred time.'}`
-              : `Success! Your order has been received and is being processed. ${submitMode === 'online' ? 'Please complete your payment using the Paystack checkout below.' : 'You selected pay on delivery and your request has been saved.'}`}
+              : `Success! Your order has been received and is being processed${manualReference ? ` — Reference: ${manualReference}` : ''}. ${submitMode === 'online' ? 'Please complete your payment using the Paystack checkout below.' : 'You selected pay on delivery. The store will collect payment directly during delivery. Sedifex charges no fee for pay on delivery during launch.'}`}
             {' '}A Sedifex team member will reach out shortly{supportPhone ? `, or call ${supportPhone} to speak directly with the store.` : '.'}
           </p>
         ) : null}
