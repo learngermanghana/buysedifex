@@ -1,12 +1,25 @@
 import {
   User,
+  GoogleAuthProvider,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   updateProfile,
 } from 'firebase/auth';
-import { addDoc, collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from 'firebase/firestore';
 import { db, firebaseConfigError, getFirebaseAuth } from '@/lib/firebase';
 
 export type PurchaseHistoryItem = {
@@ -29,8 +42,10 @@ export type PurchaseHistoryItem = {
 
 export type CustomerProfile = {
   fullName: string;
+  firstName?: string;
   email: string;
   phone: string;
+  defaultDeliveryLocation?: string;
 };
 
 const assertFirebaseReady = () => {
@@ -40,6 +55,8 @@ const assertFirebaseReady = () => {
 };
 
 const normalizeEmail = (value?: string | null) => value?.trim().toLowerCase() ?? '';
+const normalizeName = (value?: string | null) => value?.trim().replace(/\s+/g, ' ') ?? '';
+const firstNameFrom = (value?: string | null) => normalizeName(value).split(' ')[0] || '';
 
 const timestampToIso = (value: unknown) => {
   if (!value) return new Date().toISOString();
@@ -57,10 +74,40 @@ const pickNumber = (value: unknown, fallback = 1) => {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 };
 
+export const upsertMarketCustomerProfile = async (input: Partial<CustomerProfile> & { uid?: string }) => {
+  assertFirebaseReady();
+  const user = getFirebaseAuth()?.currentUser;
+  const uid = input.uid ?? user?.uid;
+  if (!uid) return null;
+
+  const fullName = normalizeName(input.fullName ?? user?.displayName ?? '');
+  const email = normalizeEmail(input.email ?? user?.email ?? '');
+  const phone = input.phone?.trim() ?? '';
+  const defaultDeliveryLocation = input.defaultDeliveryLocation?.trim() ?? '';
+  const firstName = input.firstName?.trim() || firstNameFrom(fullName);
+  const nowPayload = {
+    uid,
+    fullName,
+    displayName: fullName,
+    firstName,
+    email,
+    phone,
+    defaultDeliveryLocation,
+    updatedAt: serverTimestamp(),
+  };
+
+  await Promise.all([
+    setDoc(doc(db!, 'marketCustomers', uid), { ...nowPayload, createdAt: serverTimestamp() }, { merge: true }),
+    setDoc(doc(db!, 'customerProfiles', uid), { fullName, email, phone, updatedAt: serverTimestamp(), createdAt: serverTimestamp() }, { merge: true }),
+  ]);
+
+  return { fullName, firstName, email, phone, defaultDeliveryLocation };
+};
+
 export const registerCustomer = async (input: { fullName: string; email: string; phone: string; password: string }) => {
   assertFirebaseReady();
   const credential = await createUserWithEmailAndPassword(getFirebaseAuth()!, input.email.trim(), input.password);
-  const fullName = input.fullName.trim();
+  const fullName = normalizeName(input.fullName);
   const email = normalizeEmail(input.email);
   const phone = input.phone.trim();
 
@@ -68,23 +115,32 @@ export const registerCustomer = async (input: { fullName: string; email: string;
     await updateProfile(credential.user, { displayName: fullName });
   }
 
-  await setDoc(doc(db!, 'customerProfiles', credential.user.uid), {
-    fullName,
-    email,
-    phone,
-    updatedAt: serverTimestamp(),
-    createdAt: serverTimestamp(),
-  });
+  await upsertMarketCustomerProfile({ uid: credential.user.uid, fullName, email, phone });
 };
 
 export const signInCustomer = async (emailInput: string, password: string): Promise<boolean> => {
   assertFirebaseReady();
   try {
-    await signInWithEmailAndPassword(getFirebaseAuth()!, normalizeEmail(emailInput), password);
+    const credential = await signInWithEmailAndPassword(getFirebaseAuth()!, normalizeEmail(emailInput), password);
+    await upsertMarketCustomerProfile({ uid: credential.user.uid, fullName: credential.user.displayName ?? '', email: credential.user.email ?? '' });
     return true;
   } catch {
     return false;
   }
+};
+
+export const signInWithGoogleCustomer = async () => {
+  assertFirebaseReady();
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  const credential = await signInWithPopup(getFirebaseAuth()!, provider);
+  await upsertMarketCustomerProfile({
+    uid: credential.user.uid,
+    fullName: credential.user.displayName ?? '',
+    email: credential.user.email ?? '',
+    phone: credential.user.phoneNumber ?? '',
+  });
+  return credential.user;
 };
 
 export const signOutCustomer = async () => {
@@ -100,13 +156,20 @@ export const getSignedInCustomerProfile = async (): Promise<CustomerProfile | nu
   const user = getFirebaseAuth()?.currentUser;
   if (!user) return null;
 
-  const profileSnapshot = await getDoc(doc(db!, 'customerProfiles', user.uid));
-  const profileData = profileSnapshot.exists() ? (profileSnapshot.data() as Partial<CustomerProfile>) : {};
+  const [marketSnapshot, profileSnapshot] = await Promise.all([
+    getDoc(doc(db!, 'marketCustomers', user.uid)).catch(() => null),
+    getDoc(doc(db!, 'customerProfiles', user.uid)).catch(() => null),
+  ]);
+  const marketData = marketSnapshot?.exists() ? (marketSnapshot.data() as Partial<CustomerProfile & { displayName?: string }>) : {};
+  const profileData = profileSnapshot?.exists() ? (profileSnapshot.data() as Partial<CustomerProfile>) : {};
+  const fullName = normalizeName(marketData.fullName ?? marketData.displayName ?? profileData.fullName ?? user.displayName ?? '');
 
   return {
-    fullName: (profileData.fullName ?? user.displayName ?? '').trim(),
-    email: normalizeEmail(profileData.email ?? user.email ?? ''),
-    phone: (profileData.phone ?? '').trim(),
+    fullName,
+    firstName: marketData.firstName ?? firstNameFrom(fullName),
+    email: normalizeEmail(marketData.email ?? profileData.email ?? user.email ?? ''),
+    phone: (marketData.phone ?? profileData.phone ?? '').trim(),
+    defaultDeliveryLocation: marketData.defaultDeliveryLocation?.trim() ?? '',
   };
 };
 
@@ -142,6 +205,29 @@ const mapCustomerPurchaseHistoryDoc = (documentId: string, data: Record<string, 
   orderCompletedAt: data.orderCompletedAt ? timestampToIso(data.orderCompletedAt) : undefined,
   recordType: pickString(data.recordType) || undefined,
 });
+
+const mapCustomerOrderDoc = (documentId: string, data: Record<string, unknown>): PurchaseHistoryItem => {
+  const customer = data.customer && typeof data.customer === 'object' ? (data.customer as Record<string, unknown>) : {};
+  const items = Array.isArray(data.items) ? data.items : Array.isArray(data.cart) ? data.cart : [];
+  const firstItem = items[0] && typeof items[0] === 'object' ? (items[0] as Record<string, unknown>) : {};
+  return {
+    id: `marketCustomerOrder_${documentId}`,
+    productId: pickString(firstItem.productId ?? firstItem.item_id, 'unknown-product'),
+    productName: pickString(firstItem.productName ?? firstItem.name ?? data.productName, 'Product order'),
+    quantity: pickNumber(firstItem.quantity ?? firstItem.qty),
+    paymentMethod: pickString(data.paymentMethod ?? data.paymentCollectionMode, 'online_checkout'),
+    deliveryLocation: pickString(data.deliveryLocation ?? data.delivery?.toString(), 'Not provided'),
+    createdAt: timestampToIso(data.createdAtServer ?? data.createdAt),
+    reference: pickString(data.reference ?? data.paymentReference) || documentId,
+    customerEmail: normalizeEmail(pickString(customer.email ?? data.customerEmail)) || undefined,
+    customerPhone: pickString(customer.phone ?? data.customerPhone) || undefined,
+    paymentStatus: pickString(data.paymentStatus ?? data.payment_status, 'pending'),
+    orderStatus: pickString(data.orderStatus ?? data.order_status, 'pending_payment'),
+    paymentConfirmedAt: data.paymentConfirmedAt ? timestampToIso(data.paymentConfirmedAt) : undefined,
+    orderCompletedAt: data.orderCompletedAt ? timestampToIso(data.orderCompletedAt) : undefined,
+    recordType: pickString(data.recordType, 'product_order'),
+  };
+};
 
 const mapCheckoutRequestDoc = (documentId: string, data: Record<string, unknown>): PurchaseHistoryItem => {
   const contact = pickString(data.contact);
@@ -235,6 +321,11 @@ export const getPurchaseHistory = async (userId: string, email?: string | null):
 
   const byUserSnapshot = await getDocs(query(collection(db!, 'customerPurchaseHistory'), where('userId', '==', userId)));
   historyItems.push(...byUserSnapshot.docs.map((historyDoc) => mapCustomerPurchaseHistoryDoc(historyDoc.id, historyDoc.data() as Record<string, unknown>)));
+
+  try {
+    const customerOrdersSnapshot = await getDocs(collection(db!, 'marketCustomers', userId, 'orders'));
+    historyItems.push(...customerOrdersSnapshot.docs.map((orderDoc) => mapCustomerOrderDoc(orderDoc.id, orderDoc.data() as Record<string, unknown>)));
+  } catch {}
 
   if (normalizedEmail) {
     try {
