@@ -4,7 +4,9 @@ import { db, firebaseConfigError } from '@/lib/firebase';
 
 type LeadPayload = {
   productId?: string;
+  merchantId?: string;
   productName?: string;
+  storeName?: string;
   customerName?: string;
   contact?: string;
   companyName?: string;
@@ -13,6 +15,9 @@ type LeadPayload = {
   quantity?: number;
   notes?: string;
   pagePath?: string;
+  sourceChannel?: string;
+  leadType?: string;
+  customer?: Record<string, unknown>;
 };
 
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
@@ -20,6 +25,32 @@ const isNonEmptyString = (value: unknown): value is string => typeof value === '
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as LeadPayload;
 
+
+  const isWhatsappEnquiry = body.leadType === 'whatsapp_enquiry';
+
+  if (isWhatsappEnquiry) {
+    if (!isNonEmptyString(body.productId) || !isNonEmptyString(body.merchantId) || !isNonEmptyString(body.productName)) {
+      return NextResponse.json({ error: 'Invalid WhatsApp lead payload' }, { status: 400 });
+    }
+
+    if (!db || firebaseConfigError) {
+      return NextResponse.json({ error: 'Lead capture is not configured' }, { status: 503 });
+    }
+
+    const docRef = await addDoc(collection(db, 'marketLeads'), {
+      productId: body.productId.trim(),
+      merchantId: body.merchantId.trim(),
+      productName: body.productName.trim(),
+      storeName: isNonEmptyString(body.storeName) ? body.storeName.trim() : '',
+      customer: body.customer ?? null,
+      sourceChannel: isNonEmptyString(body.sourceChannel) ? body.sourceChannel.trim() : 'sedifex_market',
+      leadType: 'whatsapp_enquiry',
+      createdAt: new Date().toISOString(),
+      createdAtServer: serverTimestamp(),
+    });
+
+    return NextResponse.json({ ok: true, leadReference: docRef.id });
+  }
   if (
     !isNonEmptyString(body.productId) ||
     !isNonEmptyString(body.productName) ||

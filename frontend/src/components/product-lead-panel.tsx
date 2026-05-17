@@ -93,6 +93,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
   const [submitMode, setSubmitMode] = useState<SubmitMode>(null);
   const [manualReference, setManualReference] = useState('');
   const [submitErrorMessage, setSubmitErrorMessage] = useState('');
+  const [whatsappLeadPending, setWhatsappLeadPending] = useState(false);
   const supportPhone = (whatsappPhone ?? '').trim();
   const paymentMethods = isService ? SERVICE_PAYMENT_METHODS : PRODUCT_PAYMENT_METHODS;
 
@@ -121,15 +122,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
     return unsubscribe;
   }, []);
 
-  const whatsappMessage = useMemo(() => {
-    const action = isService ? 'book' : 'buy';
-    const noun = isService ? 'service' : 'product';
-    const message = `Hi ${storeName}, I want to ${action} ${productName} on Sedifex.\nMy ${isService ? 'preferred branch/location' : 'location'}: ${city?.trim() || 'Please share your location'}.`;
-    return encodeURIComponent(message.replace('service product', noun));
-  }, [city, isService, productName, storeName]);
-
   const whatsappHref = normalizeWhatsAppPhone(whatsappPhone);
-  const whatsappLinkWithMessage = whatsappHref ? `${whatsappHref}${whatsappHref.includes('?') ? '&' : '?'}text=${whatsappMessage}` : '';
 
   const isSubmitDisabled =
     submitState === 'submitting' ||
@@ -290,6 +283,39 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
     }
   };
 
+
+  const onWhatsAppEnquiry = async () => {
+    if (!whatsappHref || whatsappLeadPending) return;
+    setWhatsappLeadPending(true);
+    try {
+      const response = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId,
+          merchantId,
+          productName,
+          storeName,
+          customer: {
+            customerName: formState.customerName.trim(),
+            email: formState.email.trim(),
+            phone: formState.phone.trim(),
+          },
+          sourceChannel: 'sedifex_market',
+          leadType: 'whatsapp_enquiry',
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as { leadReference?: string } | null;
+      const leadReference = payload?.leadReference ?? 'pending';
+      const message = `Hi ${storeName}, I saw ${productName} on Sedifex Market. Lead ref: ${leadReference}. Is it available?`;
+      const href = `${whatsappHref}${whatsappHref.includes('?') ? '&' : '?'}text=${encodeURIComponent(message)}`;
+      window.open(href, '_blank', 'noopener,noreferrer');
+      await trackEvent('whatsapp_enquiry_click', { productId, productName, leadReference, itemType: isService ? 'service' : 'product' });
+    } finally {
+      setWhatsappLeadPending(false);
+    }
+  };
+
   return (
     <aside className="stickyProductActions" aria-label={isService ? 'Book service options' : 'Buy and checkout options'}>
       <h3>{isService ? 'Book this service' : 'Buy this product'}</h3>
@@ -375,10 +401,15 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
       <p className="checkoutHint">Payment confirmed only after Sedifex webhook verification.</p>
       <p className="checkoutHint">Need help? <a href="/contact">WhatsApp/email support</a> · <a href={isService ? '/services' : '/return-policy'}>{isService ? 'Browse more services' : 'Returns/refunds policy'}</a>{supportPhone ? ` · Store phone: ${supportPhone}` : ''}</p>
       <p className="checkoutHint">Need clarification before {isService ? 'booking' : 'ordering'}?</p>
-      {whatsappLinkWithMessage ? (
-        <a className="secondaryButton enquiryWhatsAppButton" href={whatsappLinkWithMessage} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent('whatsapp_enquiry_click', { productId, productName, itemType: isService ? 'service' : 'product' })}>
-          Ask about this {isService ? 'service' : 'product'} on WhatsApp
-        </a>
+      {whatsappHref ? (
+        <button
+          type="button"
+          className="secondaryButton enquiryWhatsAppButton"
+          onClick={onWhatsAppEnquiry}
+          disabled={whatsappLeadPending}
+        >
+          {whatsappLeadPending ? 'Preparing WhatsApp enquiry...' : `Ask a question on WhatsApp`}
+        </button>
       ) : <span className="secondaryButton enquiryWhatsAppButton" aria-disabled="true">WhatsApp unavailable for enquiries</span>}
     </aside>
   );
