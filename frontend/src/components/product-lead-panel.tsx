@@ -303,7 +303,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
         {paymentMethods.map((method) => <span key={method.id} className="paymentChip">{method.label}</span>)}
       </div>
 
-      <form className="requestForm" onSubmit={onSubmit}>
+      <form id="service-booking-form" className="requestForm" onSubmit={onSubmit}>
         <label htmlFor="checkout-name">Full name</label>
         <input id="checkout-name" name="customerName" type="text" required value={formState.customerName} onChange={(event) => setFormState((current) => ({ ...current, customerName: event.target.value }))} />
 
@@ -320,13 +320,13 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
 
         {isService ? (
           <>
-            <label htmlFor="booking-date">Preferred date</label>
-            <input id="booking-date" name="preferredDate" type="date" required value={formState.preferredDate} onChange={(event) => setFormState((current) => ({ ...current, preferredDate: event.target.value }))} />
+            <label htmlFor="booking-date">Preferred booking date</label>
+            <input id="booking-date" name="preferredDate" type="date" min={new Date().toISOString().split('T')[0]} required value={formState.preferredDate} onChange={(event) => setFormState((current) => ({ ...current, preferredDate: event.target.value }))} />
 
-            <label htmlFor="booking-time">Preferred time</label>
+            <label htmlFor="booking-time">Preferred booking time</label>
             <input id="booking-time" name="preferredTime" type="time" required value={formState.preferredTime} onChange={(event) => setFormState((current) => ({ ...current, preferredTime: event.target.value }))} />
 
-            <label htmlFor="booking-branch">Preferred branch / location</label>
+            <label htmlFor="booking-branch">Branch / location</label>
             <input id="booking-branch" name="preferredBranch" type="text" value={formState.preferredBranch} onChange={(event) => setFormState((current) => ({ ...current, preferredBranch: event.target.value }))} placeholder="Branch, town, or location preference" />
           </>
         ) : (
@@ -348,14 +348,14 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
               ? formState.paymentMethod === 'online' ? 'Creating booking checkout...' : 'Submitting booking request...'
               : formState.paymentMethod === 'online' ? 'Creating Paystack checkout...' : 'Submitting delivery order...'
             : isService
-              ? formState.paymentMethod === 'online' ? 'Pay and request booking' : 'Request booking'
+              ? formState.paymentMethod === 'online' ? 'Pay now & request booking' : 'Request booking'
               : formState.paymentMethod === 'online' ? 'Pay online with Paystack' : 'Place pay-on-delivery order'}
         </button>
 
         {submitState === 'success' ? (
           <p className="requestFeedback success">
             {isService
-              ? `Booking request received${manualReference ? ` — Reference: ${manualReference}` : ''}. ${submitMode === 'online' ? 'Please complete payment using the Paystack checkout below.' : 'The store will review and confirm your preferred time.'}`
+              ? `Booking request received${manualReference ? ` — Reference: ${manualReference}` : ''}. ${submitMode === 'online' ? 'Payment checkout created. After payment, the store will confirm your selected time.' : 'The store will review and confirm your preferred time.'}`
               : `Success! Your order has been received and is being processed${manualReference ? ` — Reference: ${manualReference}` : ''}. ${submitMode === 'online' ? 'Please complete your payment using the Paystack checkout below.' : 'You selected pay on delivery. The store will collect payment directly during delivery. Sedifex charges no fee for pay on delivery during launch.'}`}
             {' '}A Sedifex team member will reach out shortly{supportPhone ? `, or call ${supportPhone} to speak directly with the store.` : '.'}
           </p>
@@ -368,7 +368,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, city, sto
           <strong>{isService ? 'Booking checkout ready' : 'Merchant checkout ready'}</strong>
           <p>Merchant: {card.merchantId}</p>
           <p>Reference: {card.reference}</p>
-          {card.checkoutUrl ? <a className="requestButton" href={card.checkoutUrl}>{isService ? 'Pay and confirm booking' : 'Pay now'}</a> : <p className="requestFeedback error">Checkout URL unavailable.</p>}
+          {card.checkoutUrl ? <a className="requestButton" href={card.checkoutUrl}>{isService ? 'Pay now & request booking' : 'Pay now'}</a> : <p className="requestFeedback error">Checkout URL unavailable.</p>}
         </div>
       ))}
 

@@ -59,16 +59,22 @@ export async function POST(request: NextRequest) {
     const hit = await findRecordByReference(ref);
 
     if (hit) {
-      const paymentStatus = payload.paymentStatus ?? (eventName === 'payment.succeeded' ? 'confirmed' : 'pending');
+      const isPaymentSuccess = eventName === 'payment.succeeded' || ['success', 'confirmed', 'paid', 'captured'].includes((payload.paymentStatus ?? '').toLowerCase());
+      const paymentStatus = payload.paymentStatus ?? (isPaymentSuccess ? 'success' : 'pending');
       const orderStatus = payload.orderStatus ?? (eventName === 'order.confirmed' ? 'confirmed' : 'processing');
+      const bookingUpdate = hit.collectionName === 'integrationBookings'
+        ? (isPaymentSuccess
+          ? { bookingStatus: 'pending_store_confirmation', orderStatus: 'pending_store_confirmation', order_status: 'pending_store_confirmation' }
+          : { bookingStatus: orderStatus })
+        : {};
 
       await updateDoc(doc(db, hit.collectionName, hit.id), {
-        paymentStatus,
-        payment_status: paymentStatus,
+        paymentStatus: hit.collectionName === 'integrationBookings' && isPaymentSuccess ? 'success' : paymentStatus,
+        payment_status: hit.collectionName === 'integrationBookings' && isPaymentSuccess ? 'success' : paymentStatus,
         orderStatus,
         order_status: orderStatus,
-        ...(hit.collectionName === 'integrationBookings' ? { bookingStatus: orderStatus } : {}),
-        paymentConfirmedAt: ['confirmed', 'success', 'paid', 'captured'].includes(paymentStatus) ? new Date().toISOString() : null,
+        ...bookingUpdate,
+        paymentConfirmedAt: isPaymentSuccess ? new Date().toISOString() : null,
         sedifexOrderId: payload.sedifexOrderId ?? null,
         clientOrderId: payload.clientOrderId ?? null,
         syncStatus: 'synced',

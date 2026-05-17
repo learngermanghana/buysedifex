@@ -79,6 +79,9 @@ export async function POST(request: NextRequest) {
     const cartItem: CheckoutItem = { merchantId, productId: serviceId, quantity: 1, type: 'SERVICE' };
     const paymentMode = cleanText(body.payment?.mode, 50) || 'manual';
     const currency = cleanText(body.payment?.currency, 20) || 'GHS';
+    const isManual = paymentMode === 'manual';
+    const paymentStatus = isManual ? 'pending_manual' : 'pending';
+    const bookingStatus = isManual ? 'pending_store_confirmation' : 'pending_payment';
     const amount = typeof body.payment?.amount === 'number' && Number.isFinite(body.payment.amount) ? body.payment.amount : null;
 
     const bookingRecord = {
@@ -116,18 +119,18 @@ export async function POST(request: NextRequest) {
       items: [cartItem],
       payment: {
         mode: paymentMode,
-        status: 'pending_manual',
+        status: paymentStatus,
         amount,
         currency,
         reference,
       },
       paymentReference: reference,
       payment_reference: reference,
-      paymentStatus: 'pending_manual',
-      payment_status: 'pending_manual',
-      orderStatus: 'pending_store_confirmation',
-      order_status: 'pending_store_confirmation',
-      bookingStatus: 'pending_store_confirmation',
+      paymentStatus,
+      payment_status: paymentStatus,
+      orderStatus: bookingStatus,
+      order_status: bookingStatus,
+      bookingStatus,
       paymentCollectionMode: paymentMode,
       source: sourceChannel,
       syncStatus: 'pending',
@@ -147,8 +150,8 @@ export async function POST(request: NextRequest) {
       clientOrderId,
       reference,
       sourceChannel,
-      paymentStatus: 'pending_manual',
-      bookingStatus: 'pending_store_confirmation',
+      paymentStatus,
+      bookingStatus,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to create booking request';
