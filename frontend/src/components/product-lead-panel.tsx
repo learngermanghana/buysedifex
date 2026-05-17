@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { addPurchaseHistoryItem, getSignedInCustomerProfile, getSignedInUserId, subscribeToAuth } from '@/lib/customer-auth';
 
 type ProductLeadPanelProps = {
@@ -85,7 +85,7 @@ const trackEvent = async (eventName: string, payload: Record<string, unknown>) =
   }
 };
 
-export function ProductLeadPanel({ productId, merchantId, productName, city, storeName, whatsappPhone, itemType, price, currency }: ProductLeadPanelProps) {
+export function ProductLeadPanel({ productId, merchantId, productName, storeName, whatsappPhone, itemType, price, currency }: ProductLeadPanelProps) {
   const isService = normalizeCheckoutItemType(itemType) === 'SERVICE';
   const [formState, setFormState] = useState<CheckoutFormState>(() => createInitialFormState());
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
