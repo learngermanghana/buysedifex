@@ -48,10 +48,10 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
             <button type="button" onClick={() => setQuantity((current) => Math.max(1, current - 1))}>-</button><strong>{quantity}</strong><button type="button" onClick={() => setQuantity((current) => current + 1)}>+</button>
           </div>
           <div className="productCartActions">
-            <button type="button" className="requestButton" onClick={() => addItem(false)}>Add to cart</button>
-            <button type="button" className="secondaryButton" onClick={() => addItem(true)}>Checkout now</button>
+            <button type="button" className="requestButton" onClick={() => addItem(true)}>Buy on Sedifex</button>
+            <button type="button" className="secondaryButton" onClick={() => addItem(false)}>Add to cart</button>
           </div>
-          <div className="mobileProductBar"><span>{formatMoney(price, currency)}</span><button type="button" onClick={() => addItem(false)}>Add to cart</button><button type="button" onClick={() => addItem(true)}>Checkout</button></div>
+          <div className="mobileProductBar"><span>{formatMoney(price, currency)}</span><button type="button" onClick={() => addItem(true)}>Buy on Sedifex</button><button type="button" onClick={() => addItem(false)}>Add to cart</button></div>
         </>
       )}
 

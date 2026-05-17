@@ -114,6 +114,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     'Location unavailable';
   const resolvedStorePhone = storeProfile?.storePhone?.trim() || product.waLink?.trim() || 'Phone unavailable';
   const storePhoneHref = sanitizePhoneForTel(storeProfile?.storePhone ?? product.waLink);
+  const originalPrice = typeof (product as { originalPrice?: number }).originalPrice === 'number' ? (product as { originalPrice?: number }).originalPrice : null;
+  const hasSedifexDeal = originalPrice != null && product.price != null && product.price < originalPrice;
   const resolvedStoreId = getStoreRouteId(storeProfile?.storeId ?? product.storeId, resolvedStoreName);
   const storeHref = getStoreHref(resolvedStoreId ?? undefined, resolvedStoreName);
   const hasStorePage = Boolean(storeHref);
@@ -218,6 +220,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               <p>
                 <strong>Price:</strong> {priceLabel}
               </p>
+              {hasSedifexDeal ? <p><strong>Sedifex online deal:</strong> Order through Sedifex to get this price.</p> : null}
               {availabilityLabel ? (
                 <p>
                   <strong>Availability:</strong> {availabilityLabel}
@@ -241,10 +244,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             <p>
               <strong>Location:</strong> {resolvedLocation}
             </p>
-            <p>
-              <strong>Phone:</strong>{' '}
-              {storePhoneHref ? <a href={`tel:${storePhoneHref}`}>{resolvedStorePhone}</a> : <span>{resolvedStorePhone}</span>}
-            </p>
+            <p><strong>Contact:</strong> Order through Sedifex first to unlock direct store contact details.</p>
 
             <div className="productStoreActions">
               {hasStorePage ? (
@@ -263,6 +263,20 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
                 </a>
               ) : null}
             </div>
+          </section>
+
+
+
+          <section className="productStoreCard" aria-label="Why order through Sedifex">
+            <h2>Why order through Sedifex?</h2>
+            <ul>
+              <li>Verified store listing</li>
+              <li>Order receipt</li>
+              <li>Payment record</li>
+              <li>Store follow-up</li>
+              <li>Sedifex support if there is an issue</li>
+            </ul>
+            {storePhoneHref ? <p className="checkoutHint">Need urgent help after placing an order? Call <a href={`tel:${storePhoneHref}`}>{resolvedStorePhone}</a>.</p> : null}
           </section>
 
           <ProductEngagementPanel

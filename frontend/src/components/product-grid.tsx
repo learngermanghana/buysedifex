@@ -42,6 +42,7 @@ type PublicProduct = {
   images?: string[] | string;
   imageAlt?: string;
   price?: number;
+  originalPrice?: number;
   currency?: string;
   sku?: string;
   batchNumber?: string;
@@ -922,7 +923,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             ))
           : visibleProducts.map((item) => {
               const storeHref = getStoreHref(item.storeId, item.storeName);
-              const whatsAppHref = getWhatsAppHref(item);
               const shortDescription = (item.description ?? '')
                 .split(/\n+/)
                 .map((line) => line.trim())
@@ -930,7 +930,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
               return (
                 <article key={item.id} className="card">
-                  <div className="imageWrap">
+                  <Link href={getProductHref(item.id, item.productName)} className="imageWrap">
                     <Image
                       src={getDisplayImages(item)[0] ?? 'https://placehold.co/640x640'}
                       alt={item.imageAlt?.trim() || getProductName(item) || 'Product image'}
@@ -941,8 +941,8 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                       style={{ width: '100%', height: 'auto' }}
                     />
-                  </div>
-                  <h3>{getProductName(item)}</h3>
+                  </Link>
+                  <h3><Link href={getProductHref(item.id, item.productName)}>{getProductName(item)}</Link></h3>
                   <p className="productShortDescription">{shortDescription}</p>
                   <div className="meta">
                     <span className="storeIdentity">
@@ -961,25 +961,13 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                     <strong>{formatPrice(item.price, item.currency)}</strong>
                   </div>
                   {isVerifiedStore(item.verified) ? <p className="trustScoreCard">🛡 Sedifex Trust+ 98%</p> : null}
+                  {typeof item.originalPrice === 'number' && typeof item.price === 'number' && item.price < item.originalPrice ? (
+                    <p className="trustScoreCard">Sedifex online deal · Order through Sedifex to get this price.</p>
+                  ) : null}
                   <div className="cardActions">
-                    <Link href={getProductHref(item.id, item.productName)} className="buyNowButton" aria-label={`Buy ${getProductName(item)} now`}>
-                      Buy now
+                    <Link href={getProductHref(item.id, item.productName)} className="buyNowButton" aria-label={`Buy ${getProductName(item)} on Sedifex`}>
+                      Buy on Sedifex
                     </Link>
-                    {whatsAppHref ? (
-                      <a
-                        className="contactStoreButton"
-                        href={whatsAppHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Contact ${item.storeName ?? 'store'} on WhatsApp`}
-                      >
-                        Contact store
-                      </a>
-                    ) : (
-                      <span className="contactStoreButton" aria-disabled="true">
-                        Contact store unavailable
-                      </span>
-                    )}
                   </div>
                 </article>
               );
