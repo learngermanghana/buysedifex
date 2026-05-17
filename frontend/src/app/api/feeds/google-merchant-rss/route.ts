@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getProductHref } from '@/lib/product-route';
 import { canonicalUrlForPath } from '@/lib/seo';
+import { getPublicProductById, listPublicProductIds } from '@/lib/public-products';
 import { listIntegrationProducts } from '@/lib/sedifex-integration-api';
 
 export const revalidate = 900;
@@ -185,6 +186,48 @@ const toFeedItemXml = (item: FeedProduct) => {
   return lines.join('\n');
 };
 
+
+const buildFeedXml = (itemXml: string[], storeId?: string): string =>
+  [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">',
+    '  <channel>',
+    `    <title>${escapeXml(buildFeedTitle(storeId))}</title>`,
+    `    <link>${escapeXml(canonicalUrlForPath('/'))}</link>`,
+    `    <description>${escapeXml(buildFeedDescription(storeId))}</description>`,
+    ...itemXml,
+    '  </channel>',
+    '</rss>',
+  ].join('\n');
+
+
+const PUBLIC_FALLBACK_MAX_PRODUCTS = 120;
+
+const fetchFeedItemsFromPublicCatalog = async (): Promise<FeedProduct[]> => {
+  const productIds = await listPublicProductIds(PUBLIC_FALLBACK_MAX_PRODUCTS);
+  if (productIds.length === 0) {
+    return [];
+  }
+
+  const products = await Promise.all(productIds.map((productId) => getPublicProductById(productId).catch(() => null)));
+
+  return products
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .map((item) => ({
+      id: item.id,
+      productName: item.productName,
+      description: item.description,
+      imageUrls: item.imageUrls,
+      price: item.price,
+      currency: item.currency,
+      stockCount: item.stockCount,
+      storeName: item.storeName,
+      sku: item.sku,
+      categoryKey: item.categoryKey,
+      verified: item.verified,
+    }));
+};
+
 const fetchFeedItems = async (storeId?: string) => {
   const items: FeedProduct[] = [];
 
@@ -219,6 +262,10 @@ const fetchFeedItems = async (storeId?: string) => {
       } catch (error) {
         if (attempt === PAGE_FETCH_RETRY_ATTEMPTS) {
           if (page === 1) {
+            if (!storeId) {
+              console.warn('Falling back to Firestore publicProducts for Google Merchant feed.', error);
+              return fetchFeedItemsFromPublicCatalog();
+            }
             throw error;
           }
           response = null;
@@ -255,17 +302,7 @@ export async function GET(request: Request) {
       .map(toFeedItemXml)
       .filter((item): item is string => Boolean(item));
 
-    const feed = [
-      '<?xml version="1.0" encoding="UTF-8"?>',
-      '<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">',
-      '  <channel>',
-      `    <title>${escapeXml(buildFeedTitle(storeId))}</title>`,
-      `    <link>${escapeXml(canonicalUrlForPath('/'))}</link>`,
-      `    <description>${escapeXml(buildFeedDescription(storeId))}</description>`,
-      ...itemXml,
-      '  </channel>',
-      '</rss>',
-    ].join('\n');
+    const feed = buildFeedXml(itemXml, storeId);
 
     return new NextResponse(feed, {
       status: 200,
@@ -275,8 +312,16 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to generate Google Merchant RSS feed.';
+    console.error('Google Merchant RSS feed generation failed, returning empty feed.', error);
 
-    return NextResponse.json({ error: message }, { status: 502 });
+    const fallbackFeed = buildFeedXml([]);
+
+    return new NextResponse(fallbackFeed, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/xml; charset=utf-8',
+        'Cache-Control': 's-maxage=300, stale-while-revalidate=600',
+      },
+    });
   }
 }
