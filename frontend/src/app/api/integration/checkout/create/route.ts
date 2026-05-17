@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, firebaseConfigError } from '@/lib/firebase';
 import {

@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { collection, doc, serverTimestamp, setDoc, writeBatch, type Firestore } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, writeBatch, type Firestore } from 'firebase/firestore';
 import type { CheckoutItem, MerchantPaymentRouting, SedifexCheckoutPreviewResponse } from './sedifex-checkout';
 
 type PaystackInitializeResponse = {
