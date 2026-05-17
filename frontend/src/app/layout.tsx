@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Sora } from 'next/font/google';
 import Image from 'next/image';
 import Link from 'next/link';
+import { AccountNavButton } from '@/components/account-nav-button';
 import { CartNavButton, CartProvider } from '@/components/cart-provider';
 import { MainNav } from '@/components/main-nav';
 import { SiteFooter } from '@/components/site-footer';
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </Link>
               <div className="siteHeaderActions">
                 <MainNav />
+                <AccountNavButton />
                 <CartNavButton />
               </div>
             </div>
