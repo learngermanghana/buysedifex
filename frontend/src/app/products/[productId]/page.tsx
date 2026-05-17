@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { FormattedDescription } from '@/components/formatted-description';
 import { ShareButton } from '@/components/share-button';
-import { ProductLeadPanel } from '@/components/product-lead-panel';
+import { ProductPurchasePanel } from '@/components/product-purchase-panel';
 import { ProductEngagementPanel } from '@/components/product-engagement-panel';
 import { getPublicProductById } from '@/lib/public-products';
 import { getStoreProfileById } from '@/lib/public-stores';
@@ -119,7 +119,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const hasStorePage = Boolean(storeHref);
   const hasWebsite = Boolean(storeProfile?.websiteUrl);
   const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
-  const whatsappPhone = product.waLink ?? storeProfile?.storeWhatsapp ?? storeProfile?.storePhone ?? '';
   const checkoutProductId = product.sourceProductId?.trim() || product.id;
 
   const productPath = getProductHref(product.id, product.productName);
@@ -274,14 +273,15 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           />
         </div>
 
-        <ProductLeadPanel
+        <ProductPurchasePanel
           productId={checkoutProductId}
           merchantId={product.storeId ?? ''}
           productName={product.productName}
-          city={resolvedLocation}
           storeName={resolvedStoreName}
-          whatsappPhone={whatsappPhone}
           itemType={product.itemType}
+          price={product.price}
+          currency={product.currency}
+          imageUrl={product.imageUrls[0]}
         />
       </div>
     </main>
