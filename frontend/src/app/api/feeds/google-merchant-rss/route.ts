@@ -200,34 +200,6 @@ const buildFeedXml = (itemXml: string[], storeId?: string): string =>
     '</rss>',
   ].join('\n');
 
-
-const PUBLIC_FALLBACK_MAX_PRODUCTS = 120;
-
-const fetchFeedItemsFromPublicCatalog = async (): Promise<FeedProduct[]> => {
-  const productIds = await listPublicProductIds(PUBLIC_FALLBACK_MAX_PRODUCTS);
-  if (productIds.length === 0) {
-    return [];
-  }
-
-  const products = await Promise.all(productIds.map((productId) => getPublicProductById(productId).catch(() => null)));
-
-  return products
-    .filter((item): item is NonNullable<typeof item> => Boolean(item))
-    .map((item) => ({
-      id: item.id,
-      productName: item.productName,
-      description: item.description,
-      imageUrls: item.imageUrls,
-      price: item.price,
-      currency: item.currency,
-      stockCount: item.stockCount,
-      storeName: item.storeName,
-      sku: item.sku,
-      categoryKey: item.categoryKey,
-      verified: item.verified,
-    }));
-};
-
 const fetchFeedItems = async (storeId?: string) => {
   const items: FeedProduct[] = [];
 
