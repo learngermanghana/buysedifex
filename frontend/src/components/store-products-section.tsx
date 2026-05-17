@@ -34,6 +34,25 @@ type StoreProduct = {
   isHidden?: boolean | string | number;
   deleted?: boolean | string | number;
   isDeleted?: boolean | string | number;
+  listingType?: string;
+  salesMode?: string;
+  serviceKind?: string;
+  enrollmentMode?: string;
+  eventKind?: string;
+  registrationMode?: string;
+  linkedCourseId?: string;
+  startAt?: string;
+  endAt?: string;
+  duration?: string;
+  courseLevel?: string;
+  mode?: string;
+  classTimes?: string;
+  registrationFee?: number;
+  allowDepositPayment?: boolean;
+  marketplaceEnabled?: boolean;
+  capacity?: number;
+  seatsRemaining?: number;
+  location?: string;
 };
 
 type StoreProductsSectionProps = {
@@ -125,6 +144,24 @@ const getCategory = (item: StoreProduct) =>
     itemType: item.itemType,
   });
 
+const lower = (value?: string) => value?.trim().toLowerCase();
+
+const getListingType = (item: StoreProduct): 'product' | 'service' | 'course' | 'event' => {
+  const listingType = lower(item.listingType);
+  if (listingType === 'course') return 'course';
+  if (listingType === 'event') return 'event';
+  if (listingType === 'service') return 'service';
+  if (listingType === 'product') return 'product';
+  return lower(item.itemType) === 'service' ? 'service' : 'product';
+};
+
+const formatDateTime = (value?: string) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+};
+
 function StoreProductAction({ product, imageUrl, storeId, storeName }: { product: StoreProduct; imageUrl: string; storeId: string; storeName: string }) {
   const cart = useCart();
   const isService = product.itemType?.trim().toLowerCase() === 'service';
@@ -183,8 +220,16 @@ export function StoreProductsSection({ storeId, storeName }: StoreProductsSectio
     };
   }, [storeId]);
 
-  const productListings = useMemo(() => items.filter((item) => item.itemType?.trim().toLowerCase() !== 'service'), [items]);
-  const serviceListings = useMemo(() => items.filter((item) => item.itemType?.trim().toLowerCase() === 'service'), [items]);
+  const productListings = useMemo(() => items.filter((item) => getListingType(item) === 'product'), [items]);
+  const serviceListings = useMemo(() => items.filter((item) => getListingType(item) === 'service'), [items]);
+  const courseListings = useMemo(
+    () => items.filter((item) => getListingType(item) === 'course' || lower(item.enrollmentMode) === 'always_open'),
+    [items],
+  );
+  const upcomingEvents = useMemo(
+    () => items.filter((item) => getListingType(item) === 'event' || lower(item.enrollmentMode) === 'scheduled'),
+    [items],
+  );
 
   return (
     <section className="storeInfoCard" aria-label="Store products and services">
@@ -223,6 +268,45 @@ export function StoreProductsSection({ storeId, storeName }: StoreProductsSectio
                 <h3>{getProductName(service)}</h3>
                 <p>{formatPrice(service.price, service.currency)}</p>
                 <div className="cardActions"><StoreProductAction product={service} imageUrl={imageUrl} storeId={storeId} storeName={storeName} /><Link href={getProductHref(service.id, service.productName ?? service.name)} className="contactStoreButton">View details</Link></div>
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
+      {courseListings.length > 0 ? <h3>Courses / Programmes ({courseListings.length})</h3> : null}
+      {courseListings.length > 0 ? (
+        <div className="grid">
+          {courseListings.map((course) => {
+            const imageUrl = getDisplayImages(course)[0] ?? 'https://placehold.co/640x640';
+            return (
+              <article key={course.id} className="card">
+                <div className="imageWrap"><Image src={imageUrl} alt={course.imageAlt?.trim() || getProductName(course)} width={360} height={360} unoptimized style={{ width: '100%', height: 'auto' }} /></div>
+                <h3>{getProductName(course)}</h3>
+                <p>{formatPrice(course.price, course.currency)}</p>
+                {course.duration ? <p><strong>Duration:</strong> {course.duration}</p> : null}
+                {course.courseLevel ? <p><strong>Level:</strong> {course.courseLevel}</p> : null}
+                {course.mode ? <p><strong>Mode:</strong> {course.mode}</p> : null}
+                {course.classTimes ? <p><strong>Class times:</strong> {course.classTimes}</p> : null}
+                <div className="cardActions"><Link href={getProductHref(course.id, course.productName ?? course.name)} className="buyNowButton">Register</Link></div>
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
+      {upcomingEvents.length > 0 ? <h3>Upcoming ({upcomingEvents.length})</h3> : null}
+      {upcomingEvents.length > 0 ? (
+        <div className="grid">
+          {upcomingEvents.map((event) => {
+            const imageUrl = getDisplayImages(event)[0] ?? 'https://placehold.co/640x640';
+            const startLabel = formatDateTime(event.startAt);
+            return (
+              <article key={event.id} className="card">
+                <div className="imageWrap"><Image src={imageUrl} alt={event.imageAlt?.trim() || getProductName(event)} width={360} height={360} unoptimized style={{ width: '100%', height: 'auto' }} /></div>
+                <h3>{getProductName(event)}</h3>
+                {startLabel ? <p><strong>Starts:</strong> {startLabel}</p> : null}
+                {event.capacity != null ? <p><strong>Capacity:</strong> {event.capacity}</p> : null}
+                {event.seatsRemaining != null ? <p><strong>Seats remaining:</strong> {event.seatsRemaining}</p> : null}
+                <div className="cardActions"><Link href={getProductHref(event.id, event.productName ?? event.name)} className="buyNowButton">{event.linkedCourseId ? 'Register for this batch' : 'Reserve seat'}</Link></div>
               </article>
             );
           })}
