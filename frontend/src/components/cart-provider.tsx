@@ -1,31 +1,155 @@
 'use client';
 
-import { createContext, type FormEvent, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  type FormEvent,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useCustomerAuth } from './customer-auth-provider';
 import { saveMarketCustomerProfile } from './account-nav-button';
 
 export type CartItemType = 'PRODUCT' | 'SERVICE';
-export type CartItem = { productId: string; merchantId: string; productName: string; quantity: number; type: CartItemType; price?: number | null; currency?: string; imageUrl?: string; storeName?: string };
+export type CartItem = {
+  productId: string;
+  merchantId: string;
+  productName: string;
+  quantity: number;
+  type: CartItemType;
+  price?: number | null;
+  currency?: string;
+  imageUrl?: string;
+  storeName?: string;
+};
 
-type CartContextValue = { items: CartItem[]; itemCount: number; subtotal: number; addItem: (item: CartItem) => void; removeItem: (key: string) => void; updateQuantity: (key: string, quantity: number) => void; clearCart: () => void; openCart: () => void };
+type CartContextValue = {
+  items: CartItem[];
+  itemCount: number;
+  subtotal: number;
+  addItem: (item: CartItem) => void;
+  removeItem: (key: string) => void;
+  updateQuantity: (key: string, quantity: number) => void;
+  clearCart: () => void;
+  openCart: () => void;
+};
+
 type CheckoutCard = { merchantId: string; reference: string; checkoutUrl?: string };
 
 const STORAGE_KEY = 'sedifexmarket_cart_v1';
 const CartContext = createContext<CartContextValue | null>(null);
 const keyFor = (item: Pick<CartItem, 'merchantId' | 'productId' | 'type'>) => `${item.merchantId}:${item.productId}:${item.type}`;
+const docIdForCartKey = (key: string) => encodeURIComponent(key).replace(/%/g, '_');
 const money = (value: number, currency = 'GHS') => `${currency.toUpperCase() === 'GHS' ? 'GH₵' : currency.toUpperCase()} ${value.toFixed(2)}`;
-const normalize = (item: CartItem): CartItem => ({ ...item, quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)), type: item.type === 'SERVICE' ? 'SERVICE' : 'PRODUCT', currency: item.currency || 'GHS' });
+const normalize = (item: CartItem): CartItem => ({
+  ...item,
+  quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
+  type: item.type === 'SERVICE' ? 'SERVICE' : 'PRODUCT',
+  currency: item.currency || 'GHS',
+});
+const mergeCartItems = (current: CartItem[], incoming: CartItem[]) => {
+  const map = new Map<string, CartItem>();
+  for (const item of [...current, ...incoming].map(normalize)) {
+    const key = keyFor(item);
+    const existing = map.get(key);
+    map.set(key, existing ? { ...existing, quantity: existing.quantity + item.quantity } : item);
+  }
+  return [...map.values()];
+};
 
-export function useCart() { const context = useContext(CartContext); if (!context) throw new Error('useCart must be used inside CartProvider'); return context; }
+export function useCart() {
+  const context = useContext(CartContext);
+  if (!context) throw new Error('useCart must be used inside CartProvider');
+  return context;
+}
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user, profile, updateCustomerProfile } = useCustomerAuth();
-  const [items, setItems] = useState<CartItem[]>([]); const [ready, setReady] = useState(false); const [open, setOpen] = useState(false);
-  const [customerName, setCustomerName] = useState(''); const [email, setEmail] = useState(''); const [phone, setPhone] = useState(''); const [deliveryLocation, setDeliveryLocation] = useState(''); const [notes, setNotes] = useState('');
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle'); const [error, setError] = useState(''); const [checkouts, setCheckouts] = useState<CheckoutCard[]>([]);
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [ready, setReady] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [deliveryLocation, setDeliveryLocation] = useState('');
+  const [notes, setNotes] = useState('');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [error, setError] = useState('');
+  const [checkouts, setCheckouts] = useState<CheckoutCard[]>([]);
+  const firestoreLoadedForUid = useRef<string | null>(null);
+  const localLoadedItems = useRef<CartItem[]>([]);
+  const suppressNextWrite = useRef(false);
 
-  useEffect(() => { try { const saved = window.localStorage.getItem(STORAGE_KEY); if (saved) { const parsed = JSON.parse(saved) as CartItem[]; if (Array.isArray(parsed)) setItems(parsed.map(normalize)); } } catch {} setReady(true); }, []);
-  useEffect(() => { if (ready) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }, [items, ready]);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as CartItem[];
+        if (Array.isArray(parsed)) {
+          const normalized = parsed.map(normalize);
+          localLoadedItems.current = normalized;
+          setItems(normalized);
+        }
+      }
+    } catch {}
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (ready) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  }, [items, ready]);
+
+  useEffect(() => {
+    if (!user?.uid || !db || !ready) return;
+    const cartRef = collection(db, 'marketCustomers', user.uid, 'cart');
+    const unsubscribe = onSnapshot(cartRef, async (snapshot) => {
+      const remoteItems = snapshot.docs.map((cartDoc) => normalize(cartDoc.data() as CartItem));
+      const shouldMergeLocal = firestoreLoadedForUid.current !== user.uid && localLoadedItems.current.length > 0;
+      const nextItems = shouldMergeLocal ? mergeCartItems(remoteItems, localLoadedItems.current) : remoteItems;
+      firestoreLoadedForUid.current = user.uid;
+      suppressNextWrite.current = true;
+      setItems(nextItems);
+
+      if (shouldMergeLocal) {
+        const batch = writeBatch(db);
+        nextItems.forEach((item) => {
+          const key = keyFor(item);
+          batch.set(doc(db, 'marketCustomers', user.uid, 'cart', docIdForCartKey(key)), {
+            ...item,
+            cartKey: key,
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+        });
+        await batch.commit().catch(() => null);
+        localLoadedItems.current = [];
+      }
+    });
+    return unsubscribe;
+  }, [ready, user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid || !db || !ready || firestoreLoadedForUid.current !== user.uid) return;
+    if (suppressNextWrite.current) {
+      suppressNextWrite.current = false;
+      return;
+    }
+    const batch = writeBatch(db);
+    items.forEach((item) => {
+      const key = keyFor(item);
+      batch.set(doc(db, 'marketCustomers', user.uid, 'cart', docIdForCartKey(key)), {
+        ...item,
+        cartKey: key,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    });
+    void batch.commit().catch(() => null);
+  }, [items, ready, user?.uid]);
+
   useEffect(() => {
     if (!user && !profile) return;
     if (!customerName) setCustomerName(profile?.displayName || user?.displayName || '');
@@ -38,23 +162,61 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + (Number(item.price) || 0) * item.quantity, 0), [items]);
 
   const value = useMemo<CartContextValue>(() => ({
-    items, itemCount, subtotal,
-    addItem: (item) => { const next = normalize(item); setItems((current) => { const key = keyFor(next); const exists = current.find((entry) => keyFor(entry) === key); return exists ? current.map((entry) => keyFor(entry) === key ? { ...entry, quantity: entry.quantity + next.quantity } : entry) : [...current, next]; }); setStatus('idle'); setCheckouts([]); },
-    removeItem: (key) => setItems((current) => current.filter((item) => keyFor(item) !== key)),
-    updateQuantity: (key, quantity) => setItems((current) => current.map((item) => keyFor(item) === key ? { ...item, quantity: Math.max(1, quantity) } : item)),
-    clearCart: () => { setItems([]); setCheckouts([]); setStatus('idle'); },
+    items,
+    itemCount,
+    subtotal,
+    addItem: (item) => {
+      const next = normalize(item);
+      setItems((current) => mergeCartItems(current, [next]));
+      setStatus('idle');
+      setCheckouts([]);
+    },
+    removeItem: (key) => {
+      setItems((current) => current.filter((item) => keyFor(item) !== key));
+      if (user?.uid && db) void deleteDoc(doc(db, 'marketCustomers', user.uid, 'cart', docIdForCartKey(key))).catch(() => null);
+    },
+    updateQuantity: (key, quantity) => {
+      setItems((current) => current.map((item) => keyFor(item) === key ? { ...item, quantity: Math.max(1, quantity) } : item));
+    },
+    clearCart: () => {
+      if (user?.uid && db) {
+        const batch = writeBatch(db);
+        items.forEach((item) => batch.delete(doc(db, 'marketCustomers', user.uid, 'cart', docIdForCartKey(keyFor(item)))));
+        void batch.commit().catch(() => null);
+      }
+      setItems([]);
+      setCheckouts([]);
+      setStatus('idle');
+    },
     openCart: () => setOpen(true),
-  }), [itemCount, items, subtotal]);
+  }), [itemCount, items, subtotal, user?.uid]);
 
   async function checkout(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setStatus('submitting'); setError(''); setCheckouts([]);
+    event.preventDefault();
+    setStatus('submitting');
+    setError('');
+    setCheckouts([]);
     try {
       saveMarketCustomerProfile({ name: customerName, email, phone });
       if (user) await updateCustomerProfile({ displayName: customerName, phone, defaultDeliveryLocation: deliveryLocation });
-      const response = await fetch('/api/integration/checkout/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerUid: user?.uid ?? null, cart: items.map((item) => ({ productId: item.productId, merchantId: item.merchantId, quantity: item.quantity, type: item.type })), customer: { name: customerName.trim(), email: email.trim(), phone: phone.trim(), uid: user?.uid ?? null }, delivery: { location: deliveryLocation.trim(), notes: notes.trim() } }) });
+      const response = await fetch('/api/integration/checkout/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerUid: user?.uid ?? null,
+          cart: items.map((item) => ({ productId: item.productId, merchantId: item.merchantId, quantity: item.quantity, type: item.type })),
+          customer: { name: customerName.trim(), email: email.trim(), phone: phone.trim(), uid: user?.uid ?? null },
+          delivery: { location: deliveryLocation.trim(), notes: notes.trim() },
+        }),
+      });
       const payload = (await response.json().catch(() => null)) as { merchantCheckouts?: CheckoutCard[]; error?: string } | null;
-      if (!response.ok) throw new Error(payload?.error || 'Unable to create checkout.'); setCheckouts(payload?.merchantCheckouts ?? []); setStatus('success');
-    } catch (checkoutError) { setError(checkoutError instanceof Error ? checkoutError.message : 'Unable to create checkout.'); setStatus('error'); }
+      if (!response.ok) throw new Error(payload?.error || 'Unable to create checkout.');
+      setCheckouts(payload?.merchantCheckouts ?? []);
+      setStatus('success');
+    } catch (checkoutError) {
+      setError(checkoutError instanceof Error ? checkoutError.message : 'Unable to create checkout.');
+      setStatus('error');
+    }
   }
 
   return (
