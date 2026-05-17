@@ -16,15 +16,7 @@ const PAGE_FETCH_TIMEOUT_MS = 30000;
 const PAGE_FETCH_RETRY_ATTEMPTS = 3;
 const PAGE_FETCH_BACKOFF_MS = 500;
 const BLOCKED_CATEGORY_KEYS = new Set(['health', 'medicine', 'supplements', 'pharmacy']);
-const RESTRICTED_KEYWORDS = [
-  'medicine',
-  'drug',
-  'pharmacy',
-  'supplement',
-  'prescription',
-  'cure',
-  'treatment',
-];
+const RESTRICTED_KEYWORDS = ['medicine', 'drug', 'pharmacy', 'supplement', 'prescription', 'cure', 'treatment'];
 const MIN_TITLE_LENGTH = 3;
 const MAX_TITLE_LENGTH = 150;
 const MIN_DESCRIPTION_LENGTH = 10;
@@ -45,40 +37,15 @@ type FeedProduct = {
   verified?: boolean;
 };
 
-const buildFeedTitle = (storeId?: string): string =>
-  storeId ? `${FEED_TITLE} - Store ${storeId}` : FEED_TITLE;
-
-const buildFeedDescription = (storeId?: string): string =>
-  storeId ? `${FEED_DESCRIPTION} Filtered for store ${storeId}.` : FEED_DESCRIPTION;
+const buildFeedTitle = (storeId?: string): string => (storeId ? `${FEED_TITLE} - Store ${storeId}` : FEED_TITLE);
+const buildFeedDescription = (storeId?: string): string => (storeId ? `${FEED_DESCRIPTION} Filtered for store ${storeId}.` : FEED_DESCRIPTION);
 
 const escapeXml = (value: string): string =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+  value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
-const normalizeCurrency = (value?: string): string => {
-  const normalized = value?.trim().toUpperCase();
-  return normalized || DEFAULT_CURRENCY;
-};
-
-const normalizePrice = (value?: number): string | null => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return null;
-  }
-
-  return value.toFixed(2);
-};
-
-const normalizeAvailability = (stockCount?: number): string => {
-  if (typeof stockCount === 'number') {
-    return stockCount > 0 ? 'in stock' : 'out of stock';
-  }
-
-  return 'in stock';
-};
+const normalizeCurrency = (value?: string): string => value?.trim().toUpperCase() || DEFAULT_CURRENCY;
+const normalizePrice = (value?: number): string | null => (typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : null);
+const normalizeAvailability = (stockCount?: number): string => (typeof stockCount === 'number' ? (stockCount > 0 ? 'in stock' : 'out of stock') : 'in stock');
 
 const extractStoreId = (rawStoreParam?: string | null): string | undefined => {
   const input = rawStoreParam?.trim();
@@ -89,10 +56,7 @@ const extractStoreId = (rawStoreParam?: string | null): string | undefined => {
   const pathSegments = storePath.split('/').filter(Boolean);
   const storesIndex = pathSegments.findIndex((segment) => segment === 'stores');
 
-  if (storesIndex >= 0 && pathSegments[storesIndex + 1]) {
-    return pathSegments[storesIndex + 1];
-  }
-
+  if (storesIndex >= 0 && pathSegments[storesIndex + 1]) return pathSegments[storesIndex + 1];
   return candidate;
 };
 
@@ -112,41 +76,19 @@ const isHttpUrl = (value: string): boolean => {
 
 const isMerchantEligible = (product: FeedProduct): boolean => {
   const normalizedCategory = product.categoryKey?.trim().toLowerCase();
-  if (normalizedCategory && BLOCKED_CATEGORY_KEYS.has(normalizedCategory)) {
-    return false;
-  }
+  if (normalizedCategory && BLOCKED_CATEGORY_KEYS.has(normalizedCategory)) return false;
 
   const normalizedTitle = product.productName.trim();
-  if (normalizedTitle.length < MIN_TITLE_LENGTH || normalizedTitle.length > MAX_TITLE_LENGTH) {
-    return false;
-  }
+  if (normalizedTitle.length < MIN_TITLE_LENGTH || normalizedTitle.length > MAX_TITLE_LENGTH) return false;
 
   const normalizedDescription = product.description?.trim() ?? '';
-  if (normalizedDescription) {
-    if (
-      normalizedDescription.length < MIN_DESCRIPTION_LENGTH ||
-      normalizedDescription.length > MAX_DESCRIPTION_LENGTH
-    ) {
-      return false;
-    }
-  }
-
-  if (hasRestrictedKeyword(`${normalizedTitle} ${normalizedDescription}`)) {
-    return false;
-  }
+  if (normalizedDescription.length > 0 && (normalizedDescription.length < MIN_DESCRIPTION_LENGTH || normalizedDescription.length > MAX_DESCRIPTION_LENGTH)) return false;
+  if (hasRestrictedKeyword(`${normalizedTitle} ${normalizedDescription}`)) return false;
 
   const primaryImage = product.imageUrls[0]?.trim();
-  if (!primaryImage || !isHttpUrl(primaryImage)) {
-    return false;
-  }
-
-  if (typeof product.price !== 'number' || !Number.isFinite(product.price) || product.price <= 0) {
-    return false;
-  }
-
-  if (REQUIRE_VERIFIED_STORE && !product.verified) {
-    return false;
-  }
+  if (!primaryImage || !isHttpUrl(primaryImage)) return false;
+  if (typeof product.price !== 'number' || !Number.isFinite(product.price) || product.price <= 0) return false;
+  if (REQUIRE_VERIFIED_STORE && !product.verified) return false;
 
   return true;
 };
@@ -157,9 +99,7 @@ const toFeedItemXml = (item: FeedProduct) => {
   const priceValue = normalizePrice(item.price);
   const priceCurrency = normalizeCurrency(item.currency);
 
-  if (!imageLink || !priceValue) {
-    return null;
-  }
+  if (!imageLink || !priceValue) return null;
 
   const lines = [
     '    <item>',
@@ -174,18 +114,12 @@ const toFeedItemXml = (item: FeedProduct) => {
     `      <g:brand>${escapeXml(item.storeName?.trim() || 'Sedifex')}</g:brand>`,
   ];
 
-  if (item.sku?.trim()) {
-    lines.push(`      <g:mpn>${escapeXml(item.sku.trim())}</g:mpn>`);
-  }
-
-  if (item.categoryKey?.trim()) {
-    lines.push(`      <g:product_type>${escapeXml(item.categoryKey.trim())}</g:product_type>`);
-  }
+  if (item.sku?.trim()) lines.push(`      <g:mpn>${escapeXml(item.sku.trim())}</g:mpn>`);
+  if (item.categoryKey?.trim()) lines.push(`      <g:product_type>${escapeXml(item.categoryKey.trim())}</g:product_type>`);
 
   lines.push('    </item>');
   return lines.join('\n');
 };
-
 
 const buildFeedXml = (itemXml: string[], storeId?: string): string =>
   [
@@ -200,33 +134,43 @@ const buildFeedXml = (itemXml: string[], storeId?: string): string =>
     '</rss>',
   ].join('\n');
 
+const fetchFeedItemsFromPublicCatalog = async (): Promise<FeedProduct[]> => {
+  const ids = await listPublicProductIds(DEFAULT_PAGE_SIZE * MAX_PAGES);
+  const products = await Promise.all(ids.map(async (id) => getPublicProductById(id).catch(() => null)));
+
+  return products.flatMap((product): FeedProduct[] => {
+    if (!product) return [];
+    return [
+      {
+        id: product.id,
+        productName: product.productName,
+        description: product.description,
+        imageUrls: product.imageUrls,
+        price: product.price,
+        currency: product.currency,
+        stockCount: product.stockCount,
+        storeName: product.storeName,
+        sku: product.sku,
+        categoryKey: product.categoryKey,
+        verified: product.verified,
+      },
+    ];
+  });
+};
+
 const fetchFeedItems = async (storeId?: string) => {
   const items: FeedProduct[] = [];
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    let response:
-      | {
-          items: FeedProduct[];
-          hasMore: boolean;
-        }
-      | null = null;
+    let response: { items: FeedProduct[]; hasMore: boolean } | null = null;
 
     for (let attempt = 1; attempt <= PAGE_FETCH_RETRY_ATTEMPTS; attempt += 1) {
       try {
         response = await Promise.race([
-          listIntegrationProducts({
-            storeId,
-            page,
-            pageSize: DEFAULT_PAGE_SIZE,
-            sort: 'newest',
-          }),
+          listIntegrationProducts({ storeId, page, pageSize: DEFAULT_PAGE_SIZE, sort: 'newest' }),
           new Promise<never>((_, reject) => {
             setTimeout(() => {
-              reject(
-                new Error(
-                  `Timed out while fetching Google Merchant feed page ${page} (attempt ${attempt}/${PAGE_FETCH_RETRY_ATTEMPTS}).`,
-                ),
-              );
+              reject(new Error(`Timed out while fetching Google Merchant feed page ${page} (attempt ${attempt}/${PAGE_FETCH_RETRY_ATTEMPTS}).`));
             }, PAGE_FETCH_TIMEOUT_MS);
           }),
         ]);
@@ -250,15 +194,9 @@ const fetchFeedItems = async (storeId?: string) => {
       }
     }
 
-    if (!response) {
-      break;
-    }
-
+    if (!response) break;
     items.push(...response.items);
-
-    if (!response.hasMore || response.items.length === 0) {
-      break;
-    }
+    if (!response.hasMore || response.items.length === 0) break;
   }
 
   return items;
@@ -269,11 +207,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const storeId = extractStoreId(searchParams.get('storeId'));
     const products = await fetchFeedItems(storeId);
-    const itemXml = products
-      .filter(isMerchantEligible)
-      .map(toFeedItemXml)
-      .filter((item): item is string => Boolean(item));
-
+    const itemXml = products.filter(isMerchantEligible).map(toFeedItemXml).filter((item): item is string => Boolean(item));
     const feed = buildFeedXml(itemXml, storeId);
 
     return new NextResponse(feed, {
@@ -285,7 +219,6 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('Google Merchant RSS feed generation failed, returning empty feed.', error);
-
     const fallbackFeed = buildFeedXml([]);
 
     return new NextResponse(fallbackFeed, {
