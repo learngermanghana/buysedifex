@@ -11,6 +11,8 @@ import { getStoreProfileById } from '@/lib/public-stores';
 import { getStoreHref, getStoreRouteId } from '@/lib/store-route';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 import { extractProductIdFromRouteParam, getProductHref } from '@/lib/product-route';
+import { listIntegrationProducts } from '@/lib/sedifex-integration-api';
+import { RelatedMarketplaceItems } from '@/components/related-marketplace-items';
 
 type ProductPageProps = {
   params: { productId: string };
@@ -122,6 +124,24 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const hasWebsite = Boolean(storeProfile?.websiteUrl);
   const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
   const checkoutProductId = product.sourceProductId?.trim() || product.id;
+
+  const catalogResponse = await listIntegrationProducts({ page: 1, pageSize: 120, sort: 'store-diverse' }).catch(() => ({ items: [] }));
+  const relatedPool = catalogResponse.items.map((item) => ({
+    id: item.id,
+    storeId: item.storeId,
+    storeName: item.storeName,
+    productName: item.productName,
+    categoryKey: item.categoryKey,
+    itemType: item.itemType,
+    price: item.price,
+    currency: item.currency,
+    imageUrls: item.imageUrls,
+    listingType: (item as { listingType?: string }).listingType,
+    serviceKind: (item as { serviceKind?: string }).serviceKind,
+    salesMode: (item as { salesMode?: string }).salesMode,
+    marketplaceEnabled: (item as { marketplaceEnabled?: boolean }).marketplaceEnabled,
+    public: (item as { public?: boolean }).public,
+  }));
 
   const productPath = getProductHref(product.id, product.productName);
   const productUrl = canonicalUrlForPath(productPath);
@@ -284,6 +304,16 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             storeId={product.storeId}
             sourceProductId={product.sourceProductId}
             isPublished={product.isPublished}
+          />
+          <RelatedMarketplaceItems
+            currentItemId={product.id}
+            currentStoreId={product.storeId}
+            currentCategory={product.categoryKey}
+            currentListingType={(product as { listingType?: string }).listingType ?? product.itemType}
+            currentItemType={product.itemType}
+            currentServiceKind={(product as { serviceKind?: string }).serviceKind}
+            currentPrice={product.price}
+            items={relatedPool}
           />
         </div>
 
