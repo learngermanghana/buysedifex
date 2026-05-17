@@ -146,17 +146,6 @@ const buildWhatsAppMessage = (item: PublicProduct) => {
   return `Hi ${storeLabel}, I'm interested in the ${productLabel} I saw on Sedifex Market.`;
 };
 
-const getWhatsAppHref = (item: PublicProduct) => {
-  const contactPhone = getContactPhone(item);
-  if (!contactPhone) return '';
-
-  const normalizedPhone = contactPhone.replace(/[^\d]/g, '');
-  if (!normalizedPhone) return '';
-
-  const encodedMessage = encodeURIComponent(buildWhatsAppMessage(item));
-  return `https://wa.me/${normalizedPhone}?text=${encodedMessage}`;
-};
-
 const getProductName = (item: PublicProduct) => (item.productName ?? item.name)?.trim() || 'Untitled item';
 const getCategory = (item: PublicProduct) =>
   resolveClosestCategoryKey({
