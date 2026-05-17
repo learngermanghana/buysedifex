@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCustomerAuth } from './customer-auth-provider';
 import { saveMarketCustomerProfile } from './account-nav-button';
