@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Sora } from 'next/font/google';
 import Image from 'next/image';
 import Link from 'next/link';
-import { CartProvider } from '@/components/cart-provider';
+import { CartNavButton, CartProvider } from '@/components/cart-provider';
 import { MainNav } from '@/components/main-nav';
 import { SiteFooter } from '@/components/site-footer';
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
@@ -63,7 +63,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Image src="/sedifex-logo.svg" alt="Sedifex logo" width={32} height={32} priority />
                 <span>Sedifex Market</span>
               </Link>
-              <MainNav />
+              <div className="siteHeaderActions">
+                <MainNav />
+                <CartNavButton />
+              </div>
             </div>
           </header>
           {children}
