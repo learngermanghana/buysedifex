@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getProductHref } from '@/lib/product-route';
 import { canonicalUrlForPath } from '@/lib/seo';
+import { getPublicProductById, listPublicProductIds } from '@/lib/public-products';
 import { listIntegrationProducts } from '@/lib/sedifex-integration-api';
 
 export const revalidate = 900;
@@ -233,6 +234,10 @@ const fetchFeedItems = async (storeId?: string) => {
       } catch (error) {
         if (attempt === PAGE_FETCH_RETRY_ATTEMPTS) {
           if (page === 1) {
+            if (!storeId) {
+              console.warn('Falling back to Firestore publicProducts for Google Merchant feed.', error);
+              return fetchFeedItemsFromPublicCatalog();
+            }
             throw error;
           }
           response = null;
