@@ -185,6 +185,20 @@ const toFeedItemXml = (item: FeedProduct) => {
   return lines.join('\n');
 };
 
+
+const buildFeedXml = (itemXml: string[], storeId?: string): string =>
+  [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">',
+    '  <channel>',
+    `    <title>${escapeXml(buildFeedTitle(storeId))}</title>`,
+    `    <link>${escapeXml(canonicalUrlForPath('/'))}</link>`,
+    `    <description>${escapeXml(buildFeedDescription(storeId))}</description>`,
+    ...itemXml,
+    '  </channel>',
+    '</rss>',
+  ].join('\n');
+
 const fetchFeedItems = async (storeId?: string) => {
   const items: FeedProduct[] = [];
 
@@ -255,17 +269,7 @@ export async function GET(request: Request) {
       .map(toFeedItemXml)
       .filter((item): item is string => Boolean(item));
 
-    const feed = [
-      '<?xml version="1.0" encoding="UTF-8"?>',
-      '<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">',
-      '  <channel>',
-      `    <title>${escapeXml(buildFeedTitle(storeId))}</title>`,
-      `    <link>${escapeXml(canonicalUrlForPath('/'))}</link>`,
-      `    <description>${escapeXml(buildFeedDescription(storeId))}</description>`,
-      ...itemXml,
-      '  </channel>',
-      '</rss>',
-    ].join('\n');
+    const feed = buildFeedXml(itemXml, storeId);
 
     return new NextResponse(feed, {
       status: 200,
@@ -275,8 +279,16 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to generate Google Merchant RSS feed.';
+    console.error('Google Merchant RSS feed generation failed, returning empty feed.', error);
 
-    return NextResponse.json({ error: message }, { status: 502 });
+    const fallbackFeed = buildFeedXml([]);
+
+    return new NextResponse(fallbackFeed, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/xml; charset=utf-8',
+        'Cache-Control': 's-maxage=300, stale-while-revalidate=600',
+      },
+    });
   }
 }
