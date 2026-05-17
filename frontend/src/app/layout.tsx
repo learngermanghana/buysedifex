@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Sora } from 'next/font/google';
 import Image from 'next/image';
 import Link from 'next/link';
+import { CartProvider } from '@/components/cart-provider';
 import { MainNav } from '@/components/main-nav';
 import { SiteFooter } from '@/components/site-footer';
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
@@ -11,10 +12,10 @@ import './globals.css';
 export const metadata: Metadata = {
   metadataBase: new URL(canonicalUrlForPath('/')),
   title: {
-    default: 'Buy on Sedifex',
-    template: '%s | Buy on Sedifex',
+    default: 'Sedifex Market',
+    template: '%s | Sedifex Market',
   },
-  description: 'Public storefront for approved Sedifex products',
+  description: 'Shop verified stores, products, and services on Sedifex Market.',
   keywords: baseSeoKeywords,
   alternates: {
     canonical: canonicalUrlForPath('/'),
@@ -22,9 +23,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     url: canonicalUrlForPath('/'),
-    title: 'Buy on Sedifex',
-    description: 'Public storefront for approved Sedifex products',
-    siteName: 'Sedifex',
+    title: 'Sedifex Market',
+    description: 'Shop verified stores, products, and services on Sedifex Market.',
+    siteName: 'Sedifex Market',
     images: [{ url: defaultSocialImageUrl() }],
   },
   icons: {
@@ -34,8 +35,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Buy on Sedifex',
-    description: 'Public storefront for approved Sedifex products',
+    title: 'Sedifex Market',
+    description: 'Shop verified stores, products, and services on Sedifex Market.',
     images: [defaultSocialImageUrl()],
   },
 };
@@ -54,20 +55,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ></script>
       </head>
       <body className={`${inter.variable} ${sora.variable}`}>
-        <WebVitalsReporter />
-        <header className="siteHeader">
-          <div className="container siteHeaderInner">
-            <Link href="/" className="siteBrand" aria-label="Sedifex Market home">
-              <Image src="/sedifex-logo.svg" alt="Sedifex logo" width={32} height={32} priority />
-              <span>Sedifex Market</span>
-            </Link>
-            <MainNav />
+        <CartProvider>
+          <WebVitalsReporter />
+          <header className="siteHeader">
+            <div className="container siteHeaderInner">
+              <Link href="/" className="siteBrand" aria-label="Sedifex Market home">
+                <Image src="/sedifex-logo.svg" alt="Sedifex logo" width={32} height={32} priority />
+                <span>Sedifex Market</span>
+              </Link>
+              <MainNav />
+            </div>
+          </header>
+          {children}
+          <div className="container">
+            <SiteFooter />
           </div>
-        </header>
-        {children}
-        <div className="container">
-          <SiteFooter />
-        </div>
+        </CartProvider>
       </body>
     </html>
   );
