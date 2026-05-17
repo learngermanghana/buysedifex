@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { AccountNavButton } from '@/components/account-nav-button';
 import { CartNavButton, CartProvider } from '@/components/cart-provider';
+import { CustomerAuthProvider } from '@/components/customer-auth-provider';
 import { MainNav } from '@/components/main-nav';
 import { SiteFooter } from '@/components/site-footer';
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
@@ -56,26 +57,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ></script>
       </head>
       <body className={`${inter.variable} ${sora.variable}`}>
-        <CartProvider>
-          <WebVitalsReporter />
-          <header className="siteHeader">
-            <div className="container siteHeaderInner">
-              <Link href="/" className="siteBrand" aria-label="Sedifex Market home">
-                <Image src="/sedifex-logo.svg" alt="Sedifex logo" width={32} height={32} priority />
-                <span>Sedifex Market</span>
-              </Link>
-              <div className="siteHeaderActions">
-                <MainNav />
-                <AccountNavButton />
-                <CartNavButton />
+        <CustomerAuthProvider>
+          <CartProvider>
+            <WebVitalsReporter />
+            <header className="siteHeader">
+              <div className="container siteHeaderInner">
+                <Link href="/" className="siteBrand" aria-label="Sedifex Market home">
+                  <Image src="/sedifex-logo.svg" alt="Sedifex logo" width={32} height={32} priority />
+                  <span>Sedifex Market</span>
+                </Link>
+                <div className="siteHeaderActions">
+                  <MainNav />
+                  <AccountNavButton />
+                  <CartNavButton />
+                </div>
               </div>
+            </header>
+            {children}
+            <div className="container">
+              <SiteFooter />
             </div>
-          </header>
-          {children}
-          <div className="container">
-            <SiteFooter />
-          </div>
-        </CartProvider>
+          </CartProvider>
+        </CustomerAuthProvider>
       </body>
     </html>
   );
