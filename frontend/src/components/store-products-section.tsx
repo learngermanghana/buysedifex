@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { useCart } from '@/components/cart-provider';
 import { db, firebaseConfigError } from '@/lib/firebase';
 import { getProductHref } from '@/lib/product-route';
 import { resolveClosestCategoryKey } from '@/lib/category-taxonomy';
@@ -92,11 +93,7 @@ const decodeImageValues = (value: unknown): string[] => {
 };
 
 const normalizeImageUrl = (value: string) => {
-  const trimmed = value
-    .trim()
-    .replace(/^['"]+|['"]+$/g, '')
-    .replace(/\\u002F/gi, '/')
-    .replace(/\\\//g, '/');
+  const trimmed = value.trim().replace(/^['\"]+|['\"]+$/g, '').replace(/\\u002F/gi, '/').replace(/\\\//g, '/');
   if (!trimmed.toLowerCase().startsWith('gs://')) return trimmed;
   const withoutPrefix = trimmed.slice(5);
   const slashIndex = withoutPrefix.indexOf('/');
@@ -116,14 +113,7 @@ const isValidImageUrl = (value: string) => {
 };
 
 const getDisplayImages = (item: StoreProduct) => {
-  const candidates = [
-    item.imageUrls,
-    item.imageUrl,
-    item.image,
-    item.serviceImageUrls,
-    item.serviceImageUrl,
-    item.serviceImage,
-  ].flatMap((value) => decodeImageValues(value));
+  const candidates = [item.imageUrls, item.imageUrl, item.image, item.serviceImageUrls, item.serviceImageUrl, item.serviceImage].flatMap((value) => decodeImageValues(value));
   return Array.from(new Set(candidates.map(normalizeImageUrl).filter(isValidImageUrl)));
 };
 
@@ -135,6 +125,30 @@ const getCategory = (item: StoreProduct) =>
     itemType: item.itemType,
   });
 
+function StoreProductAction({ product, imageUrl, storeId, storeName }: { product: StoreProduct; imageUrl: string; storeId: string; storeName: string }) {
+  const cart = useCart();
+  const isService = product.itemType?.trim().toLowerCase() === 'service';
+  return (
+    <button
+      type="button"
+      className="buyNowButton"
+      onClick={() => cart.addItem({
+        productId: product.id,
+        merchantId: product.storeId || storeId,
+        productName: getProductName(product),
+        quantity: 1,
+        type: isService ? 'SERVICE' : 'PRODUCT',
+        price: product.price ?? null,
+        currency: product.currency || 'GHS',
+        imageUrl,
+        storeName,
+      })}
+    >
+      {isService ? 'Add service' : 'Add to cart'}
+    </button>
+  );
+}
+
 export function StoreProductsSection({ storeId, storeName }: StoreProductsSectionProps) {
   const [items, setItems] = useState<StoreProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -142,22 +156,18 @@ export function StoreProductsSection({ storeId, storeName }: StoreProductsSectio
 
   useEffect(() => {
     let active = true;
-
     const loadStoreProducts = async () => {
       if (!db) {
         setError(firebaseConfigError ?? 'Firebase is not configured.');
         setIsLoading(false);
         return;
       }
-
       try {
         setIsLoading(true);
         setError(null);
         const snapshot = await getDocs(query(collection(db, 'publicProducts'), where('storeId', '==', storeId), limit(120)));
         if (!active) return;
-        const loaded = snapshot.docs
-          .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as StoreProduct)
-          .filter((item) => isPublicListing(item) && getDisplayImages(item).length > 0);
+        const loaded = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as StoreProduct).filter((item) => isPublicListing(item) && getDisplayImages(item).length > 0);
         setItems(loaded);
       } catch (loadError) {
         console.error('Failed to load store products', loadError);
@@ -167,30 +177,22 @@ export function StoreProductsSection({ storeId, storeName }: StoreProductsSectio
         if (active) setIsLoading(false);
       }
     };
-
     void loadStoreProducts();
     return () => {
       active = false;
     };
   }, [storeId]);
 
-  const productListings = useMemo(
-    () => items.filter((item) => item.itemType?.trim().toLowerCase() !== 'service'),
-    [items],
-  );
-  const serviceListings = useMemo(
-    () => items.filter((item) => item.itemType?.trim().toLowerCase() === 'service'),
-    [items],
-  );
+  const productListings = useMemo(() => items.filter((item) => item.itemType?.trim().toLowerCase() !== 'service'), [items]);
+  const serviceListings = useMemo(() => items.filter((item) => item.itemType?.trim().toLowerCase() === 'service'), [items]);
 
   return (
     <section className="storeInfoCard" aria-label="Store products and services">
       <h2>Products &amp; Services from {storeName}</h2>
-      <p>🚚 Delivery: Discuss with seller · 💳 Payment method: Online payment via Paystack checkout.</p>
+      <p>🚚 Delivery: Discuss with seller · 💳 Add items to cart and pay securely with Paystack checkout.</p>
       {isLoading ? <p>Loading store products…</p> : null}
       {error ? <p className="error">{error}</p> : null}
       {!isLoading && !error && items.length === 0 ? <p>No products listed yet.</p> : null}
-
       {productListings.length > 0 ? <h3>Products ({productListings.length})</h3> : null}
       <div className="grid">
         {productListings.map((product) => {
@@ -198,38 +200,33 @@ export function StoreProductsSection({ storeId, storeName }: StoreProductsSectio
           const category = getCategory(product);
           return (
             <article key={product.id} className="card">
-              <div className="imageWrap">
-                <Image
-                  src={imageUrl}
-                  alt={product.imageAlt?.trim() || getProductName(product)}
-                  width={360}
-                  height={360}
-                  unoptimized
-                  style={{ width: '100%', height: 'auto' }}
-                />
-              </div>
+              <div className="imageWrap"><Image src={imageUrl} alt={product.imageAlt?.trim() || getProductName(product)} width={360} height={360} unoptimized style={{ width: '100%', height: 'auto' }} /></div>
               <h3>{getProductName(product)}</h3>
               <p>{formatPrice(product.price, product.currency)}</p>
               {category ? <p className="trustScoreCard">{category}</p> : null}
               <div className="cardActions">
-                <Link href={getProductHref(product.id, product.productName ?? product.name)} className="buyNowButton">
-                  Buy now
-                </Link>
+                <StoreProductAction product={product} imageUrl={imageUrl} storeId={storeId} storeName={storeName} />
+                <Link href={getProductHref(product.id, product.productName ?? product.name)} className="contactStoreButton">View details</Link>
               </div>
             </article>
           );
         })}
       </div>
-
       {serviceListings.length > 0 ? <h3>Services ({serviceListings.length})</h3> : null}
       {serviceListings.length > 0 ? (
-        <ul>
-          {serviceListings.map((service) => (
-            <li key={service.id}>
-              <Link href={getProductHref(service.id, service.productName ?? service.name)}>{getProductName(service)}</Link>
-            </li>
-          ))}
-        </ul>
+        <div className="grid">
+          {serviceListings.map((service) => {
+            const imageUrl = getDisplayImages(service)[0] ?? 'https://placehold.co/640x640';
+            return (
+              <article key={service.id} className="card">
+                <div className="imageWrap"><Image src={imageUrl} alt={service.imageAlt?.trim() || getProductName(service)} width={360} height={360} unoptimized style={{ width: '100%', height: 'auto' }} /></div>
+                <h3>{getProductName(service)}</h3>
+                <p>{formatPrice(service.price, service.currency)}</p>
+                <div className="cardActions"><StoreProductAction product={service} imageUrl={imageUrl} storeId={storeId} storeName={storeName} /><Link href={getProductHref(service.id, service.productName ?? service.name)} className="contactStoreButton">View details</Link></div>
+              </article>
+            );
+          })}
+        </div>
       ) : null}
     </section>
   );
