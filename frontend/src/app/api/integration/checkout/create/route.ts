@@ -28,7 +28,11 @@ type CheckoutCreateBody = {
   booking?: { preferredDate?: string; preferredTime?: string; preferredBranch?: string; notes?: string };
 };
 
-const isServiceCart = (cart: CheckoutItem[]) => cart.some((item) => String((item as { type?: unknown }).type ?? '').trim().toUpperCase() === 'SERVICE');
+const isServiceCart = (cart: CheckoutItem[]) => cart.some((item) => normalizeType(item) === 'SERVICE');
+
+const normalizeType = (item: CheckoutItem) => String((item as { type?: unknown }).type ?? 'PRODUCT').trim().toUpperCase();
+const isProductOnlyCart = (cart: CheckoutItem[]) => cart.every((item) => normalizeType(item) === 'PRODUCT');
+const hasMixedTypes = (cart: CheckoutItem[]) => new Set(cart.map((item) => normalizeType(item))).size > 1;
 const cleanText = (value: unknown, max = 300) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 const cleanEmail = (value: unknown) => cleanText(value, 220).toLowerCase();
 
@@ -160,9 +164,12 @@ export async function POST(request: NextRequest) {
     if (cart.length === 0) return NextResponse.json({ error: 'Cart is required' }, { status: 400 });
     if (!customerEmail) return NextResponse.json({ error: 'customer.email is required' }, { status: 400 });
     const grouped = groupCartByMerchant(cart);
+    if (!isProductOnlyCart(cart) && (hasMixedTypes(cart) || grouped.size > 1)) {
+      return NextResponse.json({ error: 'Only physical products can be checked out together. Services, courses, and events must be booked separately.' }, { status: 400 });
+    }
     const merchantIds = Array.from(grouped.keys());
     if (db && !firebaseConfigError) await saveMarketplaceCustomerCopies({ db, customerUid, customer: { name: customerName, email: customerEmail, phone: customerPhone }, deliveryLocation, merchantIds });
-    if (grouped.size > 1) {
+    if (grouped.size > 1 && isProductOnlyCart(cart)) {
       const masterCheckout = await createMasterCheckout(grouped, { customerUid, customerName, customerEmail, customerPhone, deliveryLocation, deliveryNotes });
       return NextResponse.json({ ok: true, checkoutMode: 'master_multi_store', merchantCheckouts: [masterCheckout], masterCheckout });
     }
