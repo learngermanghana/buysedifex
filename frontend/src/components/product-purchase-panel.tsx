@@ -24,7 +24,8 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
   const cart = useCart();
   const [quantity, setQuantity] = useState(1);
   const [message, setMessage] = useState('');
-  const isService = itemType?.trim().toLowerCase() === 'service';
+  const normalizedType = itemType?.trim().toLowerCase();
+  const isServiceLike = normalizedType === 'service' || normalizedType === 'course' || normalizedType === 'event';
 
   const addItem = (openAfterAdd = false) => {
     cart.addItem({ productId, merchantId, productName, quantity, type: 'PRODUCT', price: price ?? null, currency, imageUrl, storeName });
@@ -34,14 +35,14 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
   };
 
   return (
-    <aside className="productCartPanel" aria-label={isService ? 'Service booking options' : 'Product cart options'}>
+    <aside className="productCartPanel" aria-label={isServiceLike ? 'Service booking options' : 'Product cart options'}>
       <p className="eyebrow">Secure checkout</p>
-      <h3>{isService ? 'Book this service' : 'Buy this product'}</h3>
+      <h3>{isServiceLike ? 'Book this service or class' : 'Buy this product'}</h3>
       <p className="productCartPrice">{formatMoney(price, currency)}</p>
-      <p className="checkoutHint">{isService ? 'Choose booking details in the service form before checkout.' : 'Add this product to cart, continue shopping, or checkout when ready.'}</p>
+      <p className="checkoutHint">{isServiceLike ? 'Services and classes must be booked separately so you can choose date, time, and registration details.' : 'Add this product to cart, continue shopping, or checkout when ready.'}</p>
 
-      {isService ? (
-        <a className="requestButton" href="#service-booking-form">Book this service</a>
+      {isServiceLike ? (
+        <a className="requestButton" href="#service-booking-form">Book separately</a>
       ) : (
         <>
           <div className="productCartQty" aria-label="Quantity selector">
