@@ -331,7 +331,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             productName={product.productName}
             price={product.price}
             currency={product.currency}
-            whatsappPhone={storeProfile?.whatsappPhone ?? product.waLink}
+            whatsappPhone={storeProfile?.storeWhatsapp ?? storeProfile?.storePhone ?? product.waLink}
           />
         ) : (
           <ProductPurchasePanel

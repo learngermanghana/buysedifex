@@ -2,7 +2,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 
 type Props = { productId: string; merchantId: string; productName: string; price?: number | null; currency?: string; whatsappPhone?: string };
-type Slot = { id: string; label?: string; bookingDate?: string; bookingTime?: string; seatsRemaining?: number };
+type Slot = { id: string; startAt?: string; endAt?: string; timezone?: string; seatsRemaining?: number; location?: string; serviceName?: string; description?: string; registrationMode?: string; price?: number | null; depositAmount?: number | null };
 
 const formatMoney = (value?: number | null, currency = 'GHS') => (typeof value === 'number' ? `${currency.toUpperCase() === 'GHS' ? 'GH₵' : currency.toUpperCase()} ${value.toFixed(2)}` : 'Price confirmed by store');
 
@@ -11,6 +11,7 @@ export function ServiceBookingPanel({ productId, merchantId, productName, price,
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [message, setMessage] = useState('');
   const [state, setState] = useState({ fullName: '', email: '', phone: '', preferredDate: '', preferredTime: '', preferredBranch: '', notes: '', paymentMethod: 'online', slotId: '' });
+  const slotsAvailable = slots.length > 0;
   const isOnline = state.paymentMethod === 'online';
   const whatsappHref = whatsappPhone ? `https://wa.me/${whatsappPhone.replace(/[^\d]/g, '')}` : '';
 
@@ -31,9 +32,10 @@ export function ServiceBookingPanel({ productId, merchantId, productName, price,
     event.preventDefault();
     setMessage('Submitting...');
     const customer = { name: state.fullName.trim(), email: state.email.trim(), phone: state.phone.trim() };
+    if (!customer.email && !customer.phone) return setMessage('Provide phone number or email.');
     const booking = { preferredDate: state.preferredDate, preferredTime: state.preferredTime, preferredBranch: state.preferredBranch, notes: state.notes };
     const response = await fetch(isOnline ? '/api/integration/checkout/create' : '/api/integration/bookings/request', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(isOnline ? { cart: [{ productId, merchantId, quantity: 1, type: 'SERVICE' }], customer, booking } : { merchantId, serviceId: productId, serviceName: productName, slotId: state.slotId || undefined, customer, booking, payment: { mode: 'manual', currency } }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(isOnline ? { cart: [{ productId, merchantId, quantity: 1, type: 'SERVICE' }], customer, booking: { ...booking, serviceId: productId, serviceName: productName, slotId: state.slotId || undefined, bookingDate: booking.preferredDate, bookingTime: booking.preferredTime, branchLocationName: booking.preferredBranch, sourceChannel: 'sedifex_market', recordType: 'service_booking' } } : { merchantId, serviceId: productId, serviceName: productName, slotId: state.slotId || undefined, customer, booking, payment: { mode: 'manual', currency } }),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) return setMessage(data?.error || 'Unable to submit booking request.');
@@ -52,11 +54,11 @@ export function ServiceBookingPanel({ productId, merchantId, productName, price,
       <p className="checkoutHint">Choose a preferred date and time. The store will confirm your booking.</p>
       <form onSubmit={submit} className="leadForm">
         <label>Full name<input required value={state.fullName} onChange={(e) => setState((s) => ({ ...s, fullName: e.target.value }))} /></label>
-        <label>Email<input type="email" required value={state.email} onChange={(e) => setState((s) => ({ ...s, email: e.target.value }))} /></label>
-        <label>Phone<input required value={state.phone} onChange={(e) => setState((s) => ({ ...s, phone: e.target.value }))} /></label>
-        {slots.length > 0 && <label>Available slots<select value={state.slotId} onChange={(e) => { const slot = slots.find((item) => item.id === e.target.value); setState((s) => ({ ...s, slotId: e.target.value, preferredDate: slot?.bookingDate || s.preferredDate, preferredTime: slot?.bookingTime || s.preferredTime })); }}><option value="">Select a slot</option>{slots.map((slot) => <option key={slot.id} value={slot.id}>{slot.label || `${slot.bookingDate || ''} ${slot.bookingTime || ''}`.trim()} {typeof slot.seatsRemaining === 'number' ? `(${slot.seatsRemaining} left)` : ''}</option>)}</select></label>}
-        <label>Preferred date<input type="date" required value={state.preferredDate} onChange={(e) => setState((s) => ({ ...s, preferredDate: e.target.value }))} /></label>
-        <label>Preferred time<input type="time" required value={state.preferredTime} onChange={(e) => setState((s) => ({ ...s, preferredTime: e.target.value }))} /></label>
+        <label>Email<input type="email" value={state.email} onChange={(e) => setState((s) => ({ ...s, email: e.target.value }))} /></label>
+        <label>Phone<input value={state.phone} onChange={(e) => setState((s) => ({ ...s, phone: e.target.value }))} /></label>
+        {slotsAvailable && <label>Available slots<select value={state.slotId} onChange={(e) => { const slot = slots.find((item) => item.id === e.target.value); const start = slot?.startAt ? new Date(slot.startAt) : null; const date = start ? start.toISOString().slice(0, 10) : ''; const time = start ? start.toISOString().slice(11, 16) : ''; setState((s) => ({ ...s, slotId: e.target.value, preferredDate: date || s.preferredDate, preferredTime: time || s.preferredTime, preferredBranch: slot?.location || s.preferredBranch })); }}><option value="">Select a slot</option>{slots.map((slot) => { const start = slot.startAt ? new Date(slot.startAt) : null; const end = slot.endAt ? new Date(slot.endAt) : null; const label = [start ? start.toLocaleString() : 'Time TBD', end ? `- ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '', slot.location ? `· ${slot.location}` : '', typeof slot.seatsRemaining === 'number' ? `· ${slot.seatsRemaining} seat(s) left` : ''].filter(Boolean).join(' '); return <option key={slot.id} value={slot.id}>{label}</option>;})}</select></label>}
+        <label>Preferred date<input type="date" required={!slotsAvailable} value={state.preferredDate} onChange={(e) => setState((s) => ({ ...s, preferredDate: e.target.value }))} /></label>
+        <label>Preferred time<input type="time" required={!slotsAvailable} value={state.preferredTime} onChange={(e) => setState((s) => ({ ...s, preferredTime: e.target.value }))} /></label>
         <label>Branch / location<input value={state.preferredBranch} onChange={(e) => setState((s) => ({ ...s, preferredBranch: e.target.value }))} /></label>
         <label>Notes<textarea value={state.notes} onChange={(e) => setState((s) => ({ ...s, notes: e.target.value }))} /></label>
         <fieldset><legend>Payment method</legend><label><input type="radio" checked={isOnline} onChange={() => setState((s) => ({ ...s, paymentMethod: 'online' }))} /> Pay now with Paystack</label><label><input type="radio" checked={!isOnline} onChange={() => setState((s) => ({ ...s, paymentMethod: 'manual' }))} /> Request booking / pay later</label></fieldset>

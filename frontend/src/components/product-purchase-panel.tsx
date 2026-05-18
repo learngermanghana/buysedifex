@@ -39,10 +39,10 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
       <p className="eyebrow">Secure checkout</p>
       <h3>{isServiceLike ? 'Book this service or class' : 'Buy this product'}</h3>
       <p className="productCartPrice">{formatMoney(price, currency)}</p>
-      <p className="checkoutHint">{isServiceLike ? 'Services and classes must be booked separately so you can choose date, time, and registration details.' : 'Add this product to cart, continue shopping, or checkout when ready.'}</p>
+      <p className="checkoutHint">{isServiceLike ? 'Services and classes can be booked here with date, time, and registration details.' : 'Add this product to cart, continue shopping, or checkout when ready.'}</p>
 
       {isServiceLike ? (
-        <a className="requestButton" href="#service-booking-form">Book separately</a>
+        <a className="requestButton" href="#service-booking-form">Book this service</a>
       ) : (
         <>
           <div className="productCartQty" aria-label="Quantity selector">
