@@ -73,7 +73,7 @@ const scoreItem = (item: MarketplaceItem, current: RelatedMarketplaceItemsProps)
   const sameServiceKind = lower(item.serviceKind) === lower(current.currentServiceKind);
   const hasImage = Boolean(getImage(item));
   const hasPrice = typeof item.price === 'number' && Number.isFinite(item.price);
-  const sameStore = item.storeId && item.storeId === current.currentStoreId;
+  const sameStore = Boolean(item.storeId && current.currentStoreId && item.storeId === current.currentStoreId);
 
   let score = 0;
   if (sameStore) score += 50;
@@ -127,7 +127,7 @@ export function RelatedMarketplaceItems(props: RelatedMarketplaceItemsProps) {
     };
 
     const sameKind = (item: MarketplaceItem) => getKind(item) === currentKind;
-    const sameStore = (item: MarketplaceItem) => item.storeId && item.storeId === props.currentStoreId;
+    const sameStore = (item: MarketplaceItem) => Boolean(item.storeId && props.currentStoreId && item.storeId === props.currentStoreId);
     const sameCategory = (item: MarketplaceItem) => lower(getCategory(item)) === lower(props.currentCategory);
 
     const primary = pick((item) => sameKind(item) && sameCategory(item), 4);
