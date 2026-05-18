@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 type OrderPayload = Record<string, unknown>;
 
 type OrderView = {
+  recordType?: string;
   reference: string;
   paymentStatus: string;
   orderStatus: string;
@@ -18,6 +19,9 @@ type OrderView = {
   customerPhone?: string;
   productName?: string;
   quantity?: string;
+  merchantIds: string[];
+  childReferences: string[];
+  merchantOrders: Array<{ merchantId: string; storeId: string; amount: string; orderStatus: string }>;
 };
 
 const pickString = (source: OrderPayload | undefined, keys: string[], fallback = '') => {
@@ -64,8 +68,24 @@ const normalizeOrder = (payload: OrderPayload, fallbackReference: string): Order
   const firstItem = getFirstItem(source);
   const currency = pickString(source, ['currency'], 'GHS');
   const amount = pickString(source, ['amountPaid', 'finalTotal', 'final_total', 'amount', 'total']);
+  const merchantIds = Array.isArray(source.merchantIds) ? source.merchantIds.map((id) => String(id)).filter(Boolean) : [];
+  const childReferences = Array.isArray(source.childReferences) ? source.childReferences.map((id) => String(id)).filter(Boolean) : [];
+  const merchantOrders = Array.isArray(source.merchantOrders)
+    ? source.merchantOrders
+        .filter((entry) => entry && typeof entry === 'object')
+        .map((entry) => {
+          const value = entry as OrderPayload;
+          return {
+            merchantId: pickString(value, ['merchantId', 'storeId']),
+            storeId: pickString(value, ['storeId', 'merchantId']),
+            amount: formatMoney(pickString(value, ['amount', 'amountPaid', 'amountMinor']), currency),
+            orderStatus: pickString(value, ['settlementStatus', 'orderStatus', 'order_status', 'paymentStatus'], 'pending'),
+          };
+        })
+    : [];
 
   return {
+    recordType: pickString(source, ['recordType']),
     reference: pickString(source, ['reference', 'paymentReference', 'payment_reference', 'clientOrderId', 'client_order_id'], fallbackReference),
     paymentStatus: pickString(source, ['paymentStatus', 'payment_status', 'paystackStatus'], 'pending'),
     orderStatus: pickString(source, ['orderStatus', 'order_status', 'status'], 'processing'),
@@ -77,6 +97,9 @@ const normalizeOrder = (payload: OrderPayload, fallbackReference: string): Order
     customerPhone: pickString(source, ['customerPhone', 'phone']) || undefined,
     productName: pickString(firstItem, ['name', 'productName', 'item_name', 'serviceName']) || pickString(source, ['productName', 'serviceName']) || undefined,
     quantity: pickString(firstItem, ['qty', 'quantity']) || undefined,
+    merchantIds,
+    childReferences,
+    merchantOrders,
   };
 };
 
@@ -118,6 +141,7 @@ export default function AccountOrderDetailPage() {
   }, [reference]);
 
   const order = useMemo(() => normalizeOrder(payload ?? {}, reference), [payload, reference]);
+  const isMarketplaceMasterOrder = order.recordType === 'marketplace_master_order';
 
   return (
     <main className="container accountPage">
@@ -131,11 +155,26 @@ export default function AccountOrderDetailPage() {
 
         <div className="historyList">
           <p><strong>Reference:</strong> {order.reference || 'N/A'}</p>
+          {isMarketplaceMasterOrder ? <p><strong>Type:</strong> Marketplace order</p> : null}
           <p><strong>Payment:</strong> <span className={`statusBadge ${statusClass(order.paymentStatus)}`}>{order.paymentStatus}</span></p>
           <p><strong>Order:</strong> <span className={`statusBadge ${statusClass(order.orderStatus)}`}>{order.orderStatus}</span></p>
-          {order.productName ? <p><strong>Item:</strong> {order.productName}{order.quantity ? ` × ${order.quantity}` : ''}</p> : null}
           {order.amount ? <p><strong>Amount:</strong> {order.amount}</p> : null}
-          {order.storeName ? <p><strong>Store:</strong> {order.storeName}</p> : null}
+          {!isMarketplaceMasterOrder && order.productName ? <p><strong>Item:</strong> {order.productName}{order.quantity ? ` × ${order.quantity}` : ''}</p> : null}
+          {!isMarketplaceMasterOrder && order.storeName ? <p><strong>Store:</strong> {order.storeName}</p> : null}
+          {isMarketplaceMasterOrder ? <p><strong>Stores:</strong> {order.merchantIds.length}</p> : null}
+          {isMarketplaceMasterOrder && order.childReferences.length > 0 ? <p><strong>Child references:</strong> {order.childReferences.join(', ')}</p> : null}
+          {isMarketplaceMasterOrder && order.merchantOrders.length > 0 ? (
+            <div>
+              <p><strong>Merchant orders:</strong></p>
+              <ul>
+                {order.merchantOrders.map((merchantOrder) => (
+                  <li key={`${merchantOrder.merchantId}:${merchantOrder.storeId}`}>
+                    {(merchantOrder.merchantId || merchantOrder.storeId || 'Unknown store')} — {merchantOrder.amount || 'Amount unavailable'} — {merchantOrder.orderStatus}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {order.customerEmail ? <p><strong>Email:</strong> {order.customerEmail}</p> : null}
           {order.customerPhone ? <p><strong>Phone:</strong> {order.customerPhone}</p> : null}
         </div>

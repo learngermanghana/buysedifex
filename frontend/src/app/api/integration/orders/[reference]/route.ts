@@ -1,4 +1,4 @@
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, firebaseConfigError } from '@/lib/firebase';
 import { getMerchantToken } from '@/lib/sedifex-checkout';
@@ -31,6 +31,8 @@ const getMerchantIdFromReference = (reference: string) => {
   return reference.slice(0, firstSeparatorIndex).trim();
 };
 
+const isMarketplaceMasterReference = (reference: string) => reference.startsWith('market_');
+
 type RouteContext = {
   params: Promise<{ reference: string }> | { reference: string };
 };
@@ -38,11 +40,32 @@ type RouteContext = {
 const findLocalRecordByReference = async (reference: string) => {
   if (!db || firebaseConfigError) return null;
 
-  for (const collectionName of ['integrationOrders', 'integrationBookings']) {
+  for (const collectionName of ['integrationOrders', 'integrationBookings', 'marketplaceOrders']) {
     const snapshot = await getDocs(query(collection(db, collectionName), where('reference', '==', reference), limit(1)));
     const hit = snapshot.docs[0];
     if (hit) return { id: hit.id, collectionName, data: hit.data() as Record<string, unknown> };
   }
+
+  const adminMarketDoc = await getDoc(doc(db, 'sedifexAdmin', 'marketplace', 'orders', reference));
+  if (adminMarketDoc.exists()) {
+    return { id: adminMarketDoc.id, collectionName: 'sedifexAdmin.marketplace.orders', data: adminMarketDoc.data() as Record<string, unknown> };
+  }
+
+  return null;
+};
+
+const findMarketplaceMasterRecord = async (reference: string) => {
+  if (!db || firebaseConfigError) return null;
+
+  const primaryDoc = await getDoc(doc(db, 'marketplaceOrders', reference));
+  if (primaryDoc.exists()) return { id: primaryDoc.id, collectionName: 'marketplaceOrders', data: primaryDoc.data() as Record<string, unknown> };
+
+  const fallbackDoc = await getDoc(doc(db, 'sedifexAdmin', 'marketplace', 'orders', reference));
+  if (fallbackDoc.exists()) return { id: fallbackDoc.id, collectionName: 'sedifexAdmin.marketplace.orders', data: fallbackDoc.data() as Record<string, unknown> };
+
+  const byReference = await getDocs(query(collection(db, 'marketplaceOrders'), where('reference', '==', reference), limit(1)));
+  const hit = byReference.docs[0];
+  if (hit) return { id: hit.id, collectionName: 'marketplaceOrders', data: hit.data() as Record<string, unknown> };
 
   return null;
 };
@@ -71,6 +94,31 @@ const normalizeLocalRecord = (record: Awaited<ReturnType<typeof findLocalRecordB
     paymentConfirmedAt: data.paymentConfirmedAt ?? null,
     sedifexOrderId: data.sedifexOrderId ?? null,
     clientOrderId: data.clientOrderId ?? null,
+  };
+};
+
+const normalizeMarketplaceMasterRecord = (record: Awaited<ReturnType<typeof findMarketplaceMasterRecord>>, reference: string) => {
+  if (!record) return null;
+  const data = record.data;
+
+  return {
+    ok: true,
+    recordType: 'marketplace_master_order',
+    orderScope: 'multi_merchant_master',
+    reference: data.reference ?? reference,
+    paymentReference: data.paymentReference ?? data.payment_reference ?? data.reference ?? reference,
+    paymentStatus: data.paymentStatus ?? data.payment_status ?? 'pending',
+    orderStatus: data.orderStatus ?? data.order_status ?? 'pending_payment',
+    amount: data.amount ?? null,
+    amountMinor: data.amountMinor ?? null,
+    currency: data.currency ?? 'GHS',
+    customer: data.customer ?? null,
+    merchantIds: data.merchantIds ?? [],
+    childReferences: data.childReferences ?? [],
+    merchantOrders: data.merchantOrders ?? [],
+    checkoutUrl: data.checkoutUrl ?? null,
+    createdAt: data.createdAt ?? null,
+    updatedAt: data.updatedAt ?? null,
   };
 };
 
@@ -114,10 +162,16 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       return NextResponse.json({ ok: false, error: 'missing-reference' }, { status: 400 });
     }
 
-    const merchantId = getMerchantIdFromReference(reference);
-    if (!merchantId) {
-      return NextResponse.json({ ok: false, error: 'invalid-reference' }, { status: 400 });
+    if (isMarketplaceMasterReference(reference)) {
+      const masterRecord = normalizeMarketplaceMasterRecord(await findMarketplaceMasterRecord(reference), reference);
+      if (!masterRecord) {
+        return NextResponse.json({ ok: false, error: 'marketplace-master-order-not-found', reference }, { status: 404 });
+      }
+      return NextResponse.json(masterRecord, { headers: { 'Cache-Control': 'no-store' } });
     }
+
+    const merchantId = getMerchantIdFromReference(reference);
+    if (!merchantId) return NextResponse.json({ ok: false, error: 'invalid-reference' }, { status: 400 });
 
     const localRecord = normalizeLocalRecord(await findLocalRecordByReference(reference), reference);
     if (localRecord && isSettledLocalStatus(localRecord)) {
