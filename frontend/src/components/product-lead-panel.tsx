@@ -150,7 +150,7 @@ export function ProductLeadPanel({ productId, merchantId, productName, storeName
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            cart: [{ productId, merchantId, quantity, type: checkoutType }],
+            cart: [{ productId, merchantId, quantity, type: checkoutType, productName, serviceName: checkoutType === 'SERVICE' ? productName : undefined, itemName: productName }],
             customer: {
               name: formState.customerName.trim(),
               email: formState.email.trim(),

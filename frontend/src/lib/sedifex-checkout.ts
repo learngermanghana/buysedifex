@@ -5,6 +5,10 @@ export type CheckoutItem = {
   quantity: number;
   merchantId: string;
   type?: 'PRODUCT' | 'SERVICE';
+  itemName?: string;
+  productName?: string;
+  serviceName?: string;
+  imageUrl?: string;
 };
 
 export type MerchantPaymentRouting = {
@@ -35,6 +39,10 @@ type SedifexCheckoutItem = {
   item_type: 'product' | 'service';
   item_id: string;
   qty: number;
+  name?: string;
+  itemName?: string;
+  productName?: string;
+  serviceName?: string;
 };
 
 export type SedifexCheckoutPreviewRequest = {
@@ -230,11 +238,16 @@ const normalizeCheckoutItemId = (item: CheckoutItem) => {
 const toSedifexCheckoutItem = (item: CheckoutItem): SedifexCheckoutItem => {
   const itemId = normalizeCheckoutItemId(item);
   const itemType = normalizeCheckoutItemType(item.type);
+  const name = item.itemName?.trim() || item.productName?.trim() || item.serviceName?.trim() || undefined;
   return {
     type: itemType.contractType,
     item_type: itemType.backendItemType,
     item_id: itemId,
     qty: normalizeCheckoutQuantity(item.quantity),
+    name,
+    itemName: item.itemName?.trim() || undefined,
+    productName: item.productName?.trim() || undefined,
+    serviceName: item.serviceName?.trim() || undefined,
   };
 };
 

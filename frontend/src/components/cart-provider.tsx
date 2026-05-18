@@ -20,6 +20,7 @@ export type CartItem = {
   productId: string;
   merchantId: string;
   productName: string;
+  itemName?: string;
   quantity: number;
   type: CartItemType;
   price?: number | null;
@@ -215,7 +216,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerUid: user?.uid ?? null,
-          cart: items.map((item) => ({ productId: item.productId, merchantId: item.merchantId, quantity: item.quantity, type: item.type })),
+          cart: items.map((item) => ({ productId: item.productId, merchantId: item.merchantId, quantity: item.quantity, type: item.type, productName: item.productName, itemName: item.itemName || item.productName, imageUrl: item.imageUrl })),
           customer: { name: customerName.trim(), email: email.trim(), phone: phone.trim(), uid: user?.uid ?? null },
           delivery: { location: deliveryLocation.trim(), notes: notes.trim() },
         }),

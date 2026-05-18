@@ -28,7 +28,7 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
   const isServiceLike = normalizedType === 'service' || normalizedType === 'course' || normalizedType === 'event';
 
   const addItem = (openAfterAdd = false) => {
-    cart.addItem({ productId, merchantId, productName, quantity, type: 'PRODUCT', price: price ?? null, currency, imageUrl, storeName });
+    cart.addItem({ productId, merchantId, productName, itemName: productName, quantity, type: 'PRODUCT', price: price ?? null, currency, imageUrl, storeName });
     setMessage('Product added.');
     window.setTimeout(() => setMessage(''), 1800);
     if (openAfterAdd) cart.openCart();
