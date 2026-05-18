@@ -35,6 +35,14 @@ const isProductOnlyCart = (cart: CheckoutItem[]) => cart.every((item) => normali
 const hasMixedTypes = (cart: CheckoutItem[]) => new Set(cart.map((item) => normalizeType(item))).size > 1;
 const cleanText = (value: unknown, max = 300) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 const cleanEmail = (value: unknown) => cleanText(value, 220).toLowerCase();
+const readFirstItemName = (cart: CheckoutItem[]) => {
+  const first = cart[0] as (CheckoutItem & { itemName?: string; productName?: string; serviceName?: string }) | undefined;
+  return {
+    itemName: cleanText(first?.itemName || first?.productName || first?.serviceName, 220),
+    productName: cleanText(first?.productName || first?.itemName, 220),
+    serviceName: cleanText(first?.serviceName || first?.itemName, 220),
+  };
+};
 
 const readMerchantPaymentRouting = async (merchantId: string): Promise<MerchantPaymentRouting | null> => {
   if (!db || firebaseConfigError) return null;
@@ -59,7 +67,7 @@ async function createSingleMerchantCheckout(input: {
   customerPhone?: string;
   deliveryLocation?: string;
   deliveryNotes?: string;
-  booking: { preferredDate: string; preferredTime: string; preferredBranch: string; notes: string };
+  booking: { preferredDate: string; preferredTime: string; preferredBranch: string; notes: string; serviceName?: string };
 }) {
   const preview = await previewMerchantCheckout(input.merchantId, input.merchantCart);
   const paymentRouting = await readMerchantPaymentRouting(input.merchantId);
@@ -70,6 +78,12 @@ async function createSingleMerchantCheckout(input: {
   const recordType = cartIsServiceBooking ? 'service_booking' : 'product_order';
   const subaccountCode = paymentRouting?.paystackSubaccountCode ?? paymentRouting?.subaccountCode ?? null;
   const checkoutPayload = checkout as { authorizationUrl?: string; checkoutUrl?: string; bookingId?: string; orderId?: string; payment_reference?: string; payment_status?: string; order_status?: string; pricing_snapshot?: SedifexCheckoutPreviewResponse };
+  const firstNames = readFirstItemName(input.merchantCart);
+  const enrichedItems = input.merchantCart.map((item) => {
+    const named = item as CheckoutItem & { itemName?: string; productName?: string; serviceName?: string };
+    const fallbackName = firstNames.itemName || firstNames.productName || firstNames.serviceName || undefined;
+    return { ...named, itemName: cleanText(named.itemName || named.productName || named.serviceName || fallbackName, 220) || undefined, productName: cleanText(named.productName || named.itemName || fallbackName, 220) || undefined, serviceName: cleanText(named.serviceName || named.itemName || fallbackName, 220) || undefined };
+  });
   const checkoutRecord = {
     recordType,
     merchantId: input.merchantId,
@@ -86,9 +100,17 @@ async function createSingleMerchantCheckout(input: {
     customer: { uid: input.customerUid || null, name: input.customerName || null, email: input.customerEmail, phone: input.customerPhone || null },
     deliveryLocation: input.deliveryLocation || null,
     deliveryNotes: input.deliveryNotes || null,
-    ...(cartIsServiceBooking ? { booking: input.booking, bookingDate: input.booking.preferredDate || null, bookingTime: input.booking.preferredTime || null, preferredBranch: input.booking.preferredBranch || null, branchLocationName: input.booking.preferredBranch || null, notes: input.booking.notes || null, serviceId: input.merchantCart[0]?.productId ?? null, serviceName: null, sourceChannel: 'sedifex_market', recordType: 'service_booking' } : {}),
-    cart: input.merchantCart,
-    items: input.merchantCart,
+    ...(cartIsServiceBooking ? { booking: input.booking, bookingDate: input.booking.preferredDate || null, bookingTime: input.booking.preferredTime || null, preferredBranch: input.booking.preferredBranch || null, branchLocationName: input.booking.preferredBranch || null, notes: input.booking.notes || null, serviceId: input.merchantCart[0]?.productId ?? null, serviceName: cleanText((input as { booking?: { serviceName?: string } }).booking?.serviceName, 220) || firstNames.serviceName || firstNames.itemName || null, sourceChannel: 'sedifex_market', recordType: 'service_booking' } : {}),
+    itemName: firstNames.itemName || firstNames.productName || firstNames.serviceName || null,
+    productName: firstNames.productName || firstNames.itemName || null,
+    serviceName: cartIsServiceBooking ? (cleanText((input as { booking?: { serviceName?: string } }).booking?.serviceName, 220) || firstNames.serviceName || firstNames.itemName || null) : (firstNames.serviceName || null),
+    data: {
+      itemName: firstNames.itemName || firstNames.productName || firstNames.serviceName || null,
+      productName: firstNames.productName || firstNames.itemName || null,
+      serviceName: cartIsServiceBooking ? (cleanText((input as { booking?: { serviceName?: string } }).booking?.serviceName, 220) || firstNames.serviceName || firstNames.itemName || null) : (firstNames.serviceName || null),
+    },
+    cart: enrichedItems,
+    items: enrichedItems,
     pricingSnapshot: preview,
     pricing_snapshot: preview,
     paymentRouting: paymentRouting ?? null,
@@ -175,7 +197,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, checkoutMode: 'master_multi_store', merchantCheckouts: [masterCheckout], masterCheckout });
     }
     const [merchantId, merchantCart] = Array.from(grouped.entries())[0];
-    const result = await createSingleMerchantCheckout({ merchantId, merchantCart, customerUid, customerName, customerEmail: resolvedEmail, customerPhone, deliveryLocation, deliveryNotes, booking: { preferredDate: cleanText(body.booking?.preferredDate || body.booking?.bookingDate, 40), preferredTime: cleanText(body.booking?.preferredTime || body.booking?.bookingTime, 40), preferredBranch: cleanText(body.booking?.preferredBranch || body.booking?.branchLocationName, 180), notes: cleanText(body.booking?.notes, 1200) } });
+    const result = await createSingleMerchantCheckout({ merchantId, merchantCart, customerUid, customerName, customerEmail: resolvedEmail, customerPhone, deliveryLocation, deliveryNotes, booking: { preferredDate: cleanText(body.booking?.preferredDate || body.booking?.bookingDate, 40), preferredTime: cleanText(body.booking?.preferredTime || body.booking?.bookingTime, 40), preferredBranch: cleanText(body.booking?.preferredBranch || body.booking?.branchLocationName, 180), notes: cleanText(body.booking?.notes, 1200), serviceName: cleanText(body.booking?.serviceName, 220) } });
     return NextResponse.json({ ok: true, checkoutMode: 'single_merchant', merchantCheckouts: [result] });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown checkout error';
