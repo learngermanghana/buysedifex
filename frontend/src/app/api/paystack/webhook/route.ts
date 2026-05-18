@@ -22,6 +22,7 @@ type MerchantOrder = {
   merchantId?: string;
   storeId?: string;
   childReference?: string;
+  [key: string]: unknown;
 };
 
 const getWebhookSecret = () =>
@@ -118,10 +119,35 @@ async function updateMarketplaceMasterOrder(reference: string, update: Record<st
   const merchantOrders = Array.isArray(master.merchantOrders) ? (master.merchantOrders as MerchantOrder[]) : [];
   const customerUid = typeof master.customerUid === 'string' ? master.customerUid : '';
 
+  const nextMerchantOrders = merchantOrders.map((merchantOrder) => {
+    const paymentStatus = String(update.paymentStatus ?? '');
+    if (paymentStatus === 'success') {
+      return {
+        ...merchantOrder,
+        settlementStatus: 'pending_settlement',
+        paymentStatus: 'success',
+        orderStatus: 'confirmed',
+        paymentReference: reference,
+        paidAt: update.paymentConfirmedAt ?? null,
+        paymentConfirmedAt: update.paymentConfirmedAt ?? null,
+      };
+    }
+    if (paymentStatus === 'failed') {
+      return {
+        ...merchantOrder,
+        settlementStatus: 'payment_failed',
+        paymentStatus: 'failed',
+        orderStatus: 'payment_failed',
+      };
+    }
+    return merchantOrder;
+  });
+
+  const masterUpdate = { ...update, merchantOrders: nextMerchantOrders };
   const batch = writeBatch(firestore);
-  batch.set(masterRef, update, { merge: true });
-  batch.set(doc(firestore, 'sedifexAdmin', 'marketplace', 'orders', reference), update, { merge: true });
-  if (customerUid) batch.set(doc(firestore, 'marketCustomers', customerUid, 'orders', reference), update, { merge: true });
+  batch.set(masterRef, masterUpdate, { merge: true });
+  batch.set(doc(firestore, 'sedifexAdmin', 'marketplace', 'orders', reference), masterUpdate, { merge: true });
+  if (customerUid) batch.set(doc(firestore, 'marketCustomers', customerUid, 'orders', reference), masterUpdate, { merge: true });
 
   merchantOrders.forEach((merchantOrder) => {
     const merchantId = merchantOrder.merchantId || merchantOrder.storeId;
