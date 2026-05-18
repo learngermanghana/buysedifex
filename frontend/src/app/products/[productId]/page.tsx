@@ -132,7 +132,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     storeName: item.storeName,
     productName: item.productName,
     categoryKey: item.categoryKey,
-    itemType: item.itemType,
+    itemType: (item as { itemType?: string }).itemType,
     price: item.price,
     currency: item.currency,
     imageUrls: item.imageUrls,
