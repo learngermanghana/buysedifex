@@ -86,7 +86,7 @@ async function createSingleMerchantCheckout(input: {
     customer: { uid: input.customerUid || null, name: input.customerName || null, email: input.customerEmail, phone: input.customerPhone || null },
     deliveryLocation: input.deliveryLocation || null,
     deliveryNotes: input.deliveryNotes || null,
-    ...(cartIsServiceBooking ? { booking: input.booking, bookingDate: input.booking.preferredDate || null, bookingTime: input.booking.preferredTime || null, preferredBranch: input.booking.preferredBranch || null, notes: input.booking.notes || null } : {}),
+    ...(cartIsServiceBooking ? { booking: input.booking, bookingDate: input.booking.preferredDate || null, bookingTime: input.booking.preferredTime || null, preferredBranch: input.booking.preferredBranch || null, branchLocationName: input.booking.preferredBranch || null, notes: input.booking.notes || null, serviceId: input.merchantCart[0]?.productId ?? null, serviceName: null, sourceChannel: 'sedifex_market', recordType: 'service_booking' } : {}),
     cart: input.merchantCart,
     items: input.merchantCart,
     pricingSnapshot: preview,
