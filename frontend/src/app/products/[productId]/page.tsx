@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { FormattedDescription } from '@/components/formatted-description';
 import { ShareButton } from '@/components/share-button';
 import { ProductPurchasePanel } from '@/components/product-purchase-panel';
+import { ServiceBookingPanel } from '@/components/service-booking-panel';
 import { ProductEngagementPanel } from '@/components/product-engagement-panel';
 import { getPublicProductById } from '@/lib/public-products';
 import { getStoreProfileById } from '@/lib/public-stores';
@@ -38,6 +39,12 @@ const sanitizePhoneForTel = (value?: string) => {
   }
 
   return value.replace(/[^\d+]/g, '');
+};
+
+
+const isServiceLikeItem = (input: { itemType?: string; listingType?: string; serviceKind?: string; salesMode?: string }) => {
+  const values = [input.itemType, input.listingType, input.serviceKind, input.salesMode].map((v) => (v ?? '').trim().toLowerCase());
+  return values.some((value) => ['service', 'course', 'event', 'appointment', 'booking'].includes(value));
 };
 
 const buildMetadataDescription = (input: {
@@ -317,16 +324,27 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           />
         </div>
 
-        <ProductPurchasePanel
-          productId={checkoutProductId}
-          merchantId={product.storeId ?? ''}
-          productName={product.productName}
-          storeName={resolvedStoreName}
-          itemType={product.itemType}
-          price={product.price}
-          currency={product.currency}
-          imageUrl={product.imageUrls[0]}
-        />
+        {isServiceLikeItem({ itemType: product.itemType, listingType: (product as { listingType?: string }).listingType, serviceKind: (product as { serviceKind?: string }).serviceKind, salesMode: (product as { salesMode?: string }).salesMode }) ? (
+          <ServiceBookingPanel
+            productId={checkoutProductId}
+            merchantId={product.storeId ?? ''}
+            productName={product.productName}
+            price={product.price}
+            currency={product.currency}
+            whatsappPhone={storeProfile?.whatsappPhone ?? product.waLink}
+          />
+        ) : (
+          <ProductPurchasePanel
+            productId={checkoutProductId}
+            merchantId={product.storeId ?? ''}
+            productName={product.productName}
+            storeName={resolvedStoreName}
+            itemType={product.itemType}
+            price={product.price}
+            currency={product.currency}
+            imageUrl={product.imageUrls[0]}
+          />
+        )}
       </div>
     </main>
   );
