@@ -41,38 +41,63 @@ export const createMasterReference = () => `market_${Date.now()}_${crypto.random
 export const customerHashKey = (email?: string, phone?: string) =>
   crypto.createHash('sha256').update((email || phone || `guest_${Date.now()}`).toLowerCase()).digest('hex').slice(0, 32);
 
+type ReceiptSourceItem = Record<string, unknown>;
+
+const asRecord = (value: unknown): ReceiptSourceItem =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as ReceiptSourceItem) : {};
+
+const getArrayField = (source: unknown, key: string): ReceiptSourceItem[] => {
+  const record = asRecord(source);
+  const value = record[key];
+
+  if (!Array.isArray(value)) return [];
+
+  return value.map((entry) => asRecord(entry)).filter((entry) => Object.keys(entry).length > 0);
+};
+
+const getStringField = (source: ReceiptSourceItem, keys: string[]) => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+};
+
+const getNumberField = (source: ReceiptSourceItem, keys: string[]) => {
+  for (const key of keys) {
+    const value = source[key];
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return Math.round(parsed);
+  }
+  return undefined;
+};
+
 const buildReceiptFriendlyItems = (merchant: MerchantPreviewBundle) => {
-  const previewItems = Array.isArray(merchant.preview?.items) ? merchant.preview.items : [];
-  const fallbackItems = Array.isArray(merchant.preview?.cart) ? merchant.preview.cart : [];
-  const merchantPreviewItems = Array.isArray(merchant.preview?.preview?.items) ? merchant.preview.preview.items : [];
+  const previewItems = getArrayField(merchant.preview, 'items');
+  const fallbackItems = getArrayField(merchant.preview, 'cart');
+  const nestedPreview = asRecord(merchant.preview.preview);
+  const merchantPreviewItems = getArrayField(nestedPreview, 'items');
+
   const sourceItems = previewItems.length ? previewItems : merchantPreviewItems.length ? merchantPreviewItems : fallbackItems;
 
-  return sourceItems.map((item: any, index: number) => {
-    const cartItem = merchant.merchantCart[index] ?? {};
-    const name = item?.name ?? item?.productName ?? item?.itemName ?? cartItem?.name ?? cartItem?.productName ?? null;
-    const qtyValue = item?.quantity ?? item?.qty ?? cartItem?.quantity ?? cartItem?.qty ?? 1;
-    const unitPriceMinor = Number.isFinite(item?.unitPriceMinor)
-      ? Math.round(item.unitPriceMinor)
-      : Number.isFinite(item?.unit_price)
-        ? Math.round(item.unit_price)
-        : Number.isFinite(item?.unitPrice)
-          ? Math.round(item.unitPrice)
-          : undefined;
-    const lineSubtotalMinor = Number.isFinite(item?.lineSubtotalMinor)
-      ? Math.round(item.lineSubtotalMinor)
-      : Number.isFinite(item?.subtotal)
-        ? Math.round(item.subtotal)
-        : Number.isFinite(item?.lineTotalMinor)
-          ? Math.round(item.lineTotalMinor)
-          : undefined;
+  return sourceItems.map((item, index) => {
+    const cartItem = asRecord(merchant.merchantCart[index]);
+    const name =
+      getStringField(item, ['name', 'productName', 'itemName']) ?? getStringField(cartItem, ['name', 'productName', 'itemName']);
+
+    const qtyValue = getNumberField(item, ['quantity', 'qty']) ?? getNumberField(cartItem, ['quantity', 'qty']) ?? 1;
+
+    const unitPriceMinor = getNumberField(item, ['unitPriceMinor', 'unit_price', 'unitPrice']);
+    const lineSubtotalMinor = getNumberField(item, ['lineSubtotalMinor', 'subtotal', 'lineTotalMinor']);
+
     return {
-      productId: item?.productId ?? item?.itemId ?? cartItem?.productId ?? cartItem?.itemId ?? null,
-      itemId: item?.itemId ?? item?.productId ?? cartItem?.itemId ?? cartItem?.productId ?? null,
+      productId: getStringField(item, ['productId', 'itemId']) ?? getStringField(cartItem, ['productId', 'itemId']),
+      itemId: getStringField(item, ['itemId', 'productId']) ?? getStringField(cartItem, ['itemId', 'productId']),
       name,
       productName: name,
       quantity: qtyValue,
       qty: qtyValue,
-      type: item?.type ?? cartItem?.type ?? 'product',
+      type: getStringField(item, ['type']) ?? getStringField(cartItem, ['type']) ?? 'product',
       unitPriceMinor,
       lineSubtotalMinor,
     };
