@@ -132,8 +132,42 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
   const checkoutProductId = product.sourceProductId?.trim() || product.id;
 
-  const catalogResponse = await listIntegrationProducts({ page: 1, pageSize: 120, sort: 'store-diverse' }).catch(() => ({ items: [] }));
-  const relatedPool = catalogResponse.items.map((item) => ({
+  const [sameStoreSameCategory, sameCategoryMarketplace, sameStoreItems, marketplaceFallback] = await Promise.all([
+    listIntegrationProducts({
+      storeId: product.storeId,
+      categoryKey: product.categoryKey,
+      pageSize: 12,
+      sort: 'latest',
+    }).catch(() => ({ items: [] })),
+    listIntegrationProducts({
+      categoryKey: product.categoryKey,
+      pageSize: 24,
+      sort: 'store-diverse',
+    }).catch(() => ({ items: [] })),
+    listIntegrationProducts({
+      storeId: product.storeId,
+      pageSize: 24,
+      sort: 'latest',
+    }).catch(() => ({ items: [] })),
+    listIntegrationProducts({
+      page: 1,
+      pageSize: 60,
+      sort: 'store-diverse',
+    }).catch(() => ({ items: [] })),
+  ]);
+
+  const relatedPool = Array.from(
+    new Map(
+      [
+        ...sameStoreSameCategory.items,
+        ...sameCategoryMarketplace.items,
+        ...sameStoreItems.items,
+        ...marketplaceFallback.items,
+      ]
+        .filter((item) => item.id && item.id !== product.id)
+        .map((item) => [item.id, item]),
+    ).values(),
+  ).map((item) => ({
     id: item.id,
     storeId: item.storeId,
     storeName: item.storeName,
