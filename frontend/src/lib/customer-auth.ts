@@ -26,6 +26,8 @@ export type PurchaseHistoryItem = {
   id: string;
   productId: string;
   productName: string;
+  itemName?: string;
+  displayName?: string;
   quantity: number;
   paymentMethod: string;
   deliveryLocation: string;
@@ -38,6 +40,21 @@ export type PurchaseHistoryItem = {
   paymentConfirmedAt?: string;
   orderCompletedAt?: string;
   recordType?: 'product_order' | 'service_booking' | string;
+  storeId?: string;
+  storeName?: string;
+  amount?: number;
+  currency?: string;
+  imageUrl?: string;
+  productUrl?: string;
+  serviceUrl?: string;
+  storeUrl?: string;
+  sourceChannel?: string;
+  itemType?: string;
+  checkoutUrl?: string;
+  receiptUrl?: string;
+  bookingDate?: string;
+  bookingTime?: string;
+  branchLocationName?: string;
 };
 
 export type CustomerProfile = {
@@ -73,6 +90,42 @@ const pickNumber = (value: unknown, fallback = 1) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 };
+const getNestedRecord = (record: Record<string, unknown>, key: string) =>
+  record[key] && typeof record[key] === 'object' && !Array.isArray(record[key]) ? (record[key] as Record<string, unknown>) : {};
+const firstArrayRecord = (record: Record<string, unknown>, key: string) => {
+  const value = record[key];
+  if (!Array.isArray(value) || value.length === 0 || typeof value[0] !== 'object') return {};
+  return value[0] as Record<string, unknown>;
+};
+const pickFirstString = (record: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+};
+const pickOrderDisplayName = (data: Record<string, unknown>, firstItem: Record<string, unknown>) => {
+  const keys = ['itemName', 'name', 'productName', 'serviceName', 'title'];
+  const nestedData = getNestedRecord(data, 'data');
+  return (
+    pickFirstString(firstArrayRecord(data, 'items'), keys) ||
+    pickFirstString(firstArrayRecord(data, 'cart'), keys) ||
+    pickFirstString(firstArrayRecord(getNestedRecord(data, 'pricingSnapshot'), 'items'), keys) ||
+    pickFirstString(firstArrayRecord(getNestedRecord(data, 'pricing_snapshot'), 'items'), keys) ||
+    pickFirstString(nestedData, ['itemName', 'productName', 'serviceName']) ||
+    pickFirstString(data, ['itemName', 'productName', 'serviceName']) ||
+    pickFirstString(firstItem, keys) ||
+    (pickString(data.recordType) === 'service_booking' ? 'Service booking' : 'Product order')
+  );
+};
+const pickOrderImage = (data: Record<string, unknown>, firstItem: Record<string, unknown>) =>
+  pickFirstString(firstItem, ['imageUrl', 'image']) ||
+  (Array.isArray(firstItem.imageUrls) ? pickString(firstItem.imageUrls[0]) : '') ||
+  pickFirstString(data, ['imageUrl']);
+const buildProductHref = (productId?: string, displayName?: string) =>
+  productId ? `/products/${encodeURIComponent(productId)}` : displayName ? `/products?search=${encodeURIComponent(displayName)}` : '';
+const buildStoreHref = (storeId?: string, storeName?: string) =>
+  storeId ? `/stores/${encodeURIComponent(storeId)}` : storeName ? `/stores?search=${encodeURIComponent(storeName)}` : '';
 
 export const upsertMarketCustomerProfile = async (input: Partial<CustomerProfile> & { uid?: string }) => {
   assertFirebaseReady();
@@ -210,10 +263,16 @@ const mapCustomerOrderDoc = (documentId: string, data: Record<string, unknown>):
   const customer = data.customer && typeof data.customer === 'object' ? (data.customer as Record<string, unknown>) : {};
   const items = Array.isArray(data.items) ? data.items : Array.isArray(data.cart) ? data.cart : [];
   const firstItem = items[0] && typeof items[0] === 'object' ? (items[0] as Record<string, unknown>) : {};
+  const displayName = pickOrderDisplayName(data, firstItem);
+  const storeId = pickString(data.storeId ?? data.merchantId);
+  const storeName = pickString(data.storeName);
+  const productId = pickString(firstItem.productId ?? firstItem.item_id ?? firstItem.itemId, 'unknown-product');
   return {
     id: `marketCustomerOrder_${documentId}`,
-    productId: pickString(firstItem.productId ?? firstItem.item_id, 'unknown-product'),
-    productName: pickString(firstItem.productName ?? firstItem.name ?? data.productName, 'Product order'),
+    productId,
+    productName: displayName,
+    itemName: displayName,
+    displayName,
     quantity: pickNumber(firstItem.quantity ?? firstItem.qty),
     paymentMethod: pickString(data.paymentMethod ?? data.paymentCollectionMode, 'online_checkout'),
     deliveryLocation: pickString(data.deliveryLocation ?? data.delivery?.toString(), 'Not provided'),
@@ -226,6 +285,12 @@ const mapCustomerOrderDoc = (documentId: string, data: Record<string, unknown>):
     paymentConfirmedAt: data.paymentConfirmedAt ? timestampToIso(data.paymentConfirmedAt) : undefined,
     orderCompletedAt: data.orderCompletedAt ? timestampToIso(data.orderCompletedAt) : undefined,
     recordType: pickString(data.recordType, 'product_order'),
+    storeId: storeId || undefined,
+    storeName: storeName || undefined,
+    imageUrl: pickOrderImage(data, firstItem) || undefined,
+    productUrl: buildProductHref(productId, displayName) || undefined,
+    storeUrl: buildStoreHref(storeId, storeName) || undefined,
+    receiptUrl: `/account/orders/${encodeURIComponent(pickString(data.reference ?? data.paymentReference) || documentId)}`,
   };
 };
 
@@ -254,10 +319,18 @@ const mapIntegrationOrderDoc = (documentId: string, data: Record<string, unknown
   const customer = data.customer && typeof data.customer === 'object' ? (data.customer as Record<string, unknown>) : {};
   const items = Array.isArray(data.items) ? data.items : Array.isArray(data.cart) ? data.cart : [];
   const firstItem = items[0] && typeof items[0] === 'object' ? (items[0] as Record<string, unknown>) : {};
+  const nestedData = getNestedRecord(data, 'data');
+  const displayName = pickOrderDisplayName(data, firstItem);
+  const productId = pickString(firstItem.productId ?? firstItem.item_id ?? firstItem.itemId, 'unknown-product');
+  const storeId = pickString(nestedData.storeId ?? nestedData.merchantId ?? data.storeId ?? data.merchantId);
+  const storeName = pickString(nestedData.storeName ?? data.storeName);
+  const amount = Number(data.amount ?? data.amountPaid ?? data.finalTotal ?? getNestedRecord(data, 'pricingSnapshot').final_total);
   return {
     id: `integrationOrder_${documentId}`,
-    productId: pickString(firstItem.productId ?? firstItem.item_id, 'unknown-product'),
-    productName: pickString(firstItem.name ?? firstItem.productName ?? data.productName, 'Product order'),
+    productId,
+    productName: displayName,
+    itemName: displayName,
+    displayName,
     quantity: pickNumber(firstItem.quantity ?? firstItem.qty),
     paymentMethod: pickString(data.paymentCollectionMode, 'online'),
     deliveryLocation: pickString(data.deliveryLocation, 'Not provided'),
@@ -270,6 +343,16 @@ const mapIntegrationOrderDoc = (documentId: string, data: Record<string, unknown
     paymentConfirmedAt: data.paymentConfirmedAt ? timestampToIso(data.paymentConfirmedAt) : undefined,
     orderCompletedAt: data.orderCompletedAt ? timestampToIso(data.orderCompletedAt) : undefined,
     recordType: pickString(data.recordType, 'product_order'),
+    storeId: storeId || undefined,
+    storeName: storeName || undefined,
+    amount: Number.isFinite(amount) ? amount : undefined,
+    currency: pickString(data.currency ?? getNestedRecord(data, 'pricingSnapshot').currency, 'GHS'),
+    imageUrl: pickOrderImage(data, firstItem) || undefined,
+    productUrl: buildProductHref(productId, displayName) || undefined,
+    storeUrl: buildStoreHref(storeId, storeName) || undefined,
+    sourceChannel: pickString(data.sourceChannel) || undefined,
+    itemType: pickString(data.itemType) || undefined,
+    receiptUrl: `/account/orders/${encodeURIComponent(pickString(data.reference) || documentId)}`,
   };
 };
 
@@ -281,10 +364,15 @@ const mapIntegrationBookingDoc = (documentId: string, data: Record<string, unkno
   const preferredDate = pickString(data.bookingDate ?? booking.preferredDate);
   const preferredTime = pickString(data.bookingTime ?? booking.preferredTime);
   const preferredBranch = pickString(data.preferredBranch ?? booking.preferredBranch);
+  const displayName = pickOrderDisplayName(data, firstItem);
+  const storeId = pickString(data.storeId ?? data.merchantId);
+  const storeName = pickString(data.storeName ?? data.merchantName);
   return {
     id: `integrationBooking_${documentId}`,
     productId: pickString(data.serviceId ?? firstItem.productId ?? firstItem.item_id, 'unknown-service'),
-    productName: pickString(data.serviceName ?? firstItem.name ?? firstItem.productName, 'Service booking'),
+    productName: displayName,
+    itemName: displayName,
+    displayName,
     quantity: 1,
     paymentMethod: pickString(data.paymentCollectionMode, 'booking'),
     deliveryLocation: [preferredDate, preferredTime, preferredBranch].filter(Boolean).join(' · ') || 'Preferred time not provided',
@@ -297,6 +385,14 @@ const mapIntegrationBookingDoc = (documentId: string, data: Record<string, unkno
     paymentConfirmedAt: data.paymentConfirmedAt ? timestampToIso(data.paymentConfirmedAt) : undefined,
     orderCompletedAt: data.orderCompletedAt ? timestampToIso(data.orderCompletedAt) : undefined,
     recordType: 'service_booking',
+    storeId: storeId || undefined,
+    storeName: storeName || undefined,
+    storeUrl: buildStoreHref(storeId, storeName) || undefined,
+    serviceUrl: buildProductHref(pickString(data.serviceId), displayName) || undefined,
+    receiptUrl: `/account/orders/${encodeURIComponent(pickString(data.reference) || documentId)}`,
+    bookingDate: preferredDate || undefined,
+    bookingTime: preferredTime || undefined,
+    branchLocationName: preferredBranch || undefined,
   };
 };
 

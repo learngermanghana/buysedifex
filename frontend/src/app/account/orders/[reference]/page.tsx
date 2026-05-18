@@ -18,11 +18,14 @@ type OrderView = {
   customerEmail?: string;
   customerPhone?: string;
   productName?: string;
+  productUrl?: string;
+  storeUrl?: string;
   quantity?: string;
   merchantIds: string[];
   childReferences: string[];
   merchantOrders: Array<{ merchantId: string; storeId: string; amount: string; orderStatus: string }>;
 };
+const shortRef = (reference: string) => (reference.length > 18 ? `${reference.slice(0, 8)}...${reference.slice(-8)}` : reference);
 
 const pickString = (source: OrderPayload | undefined, keys: string[], fallback = '') => {
   if (!source) return fallback;
@@ -96,6 +99,8 @@ const normalizeOrder = (payload: OrderPayload, fallbackReference: string): Order
     customerEmail: pickString(source, ['customerEmail', 'email']) || undefined,
     customerPhone: pickString(source, ['customerPhone', 'phone']) || undefined,
     productName: pickString(firstItem, ['name', 'productName', 'item_name', 'serviceName']) || pickString(source, ['productName', 'serviceName']) || undefined,
+    productUrl: pickString(source, ['productUrl']) || undefined,
+    storeUrl: pickString(source, ['storeUrl']) || undefined,
     quantity: pickString(firstItem, ['qty', 'quantity']) || undefined,
     merchantIds,
     childReferences,
@@ -147,20 +152,24 @@ export default function AccountOrderDetailPage() {
     <main className="container accountPage">
       <section className="accountCard">
         <p className="eyebrow">Order details</p>
-        <h1>Order {order.reference || reference}</h1>
+        <h1>Order confirmed</h1>
+        <p>{order.productName || 'Product order'}</p>
         <p>Use this page to check payment confirmation, order status, and support information.</p>
 
         {isLoading ? <p>Loading order...</p> : null}
         {error ? <p className="requestFeedback error">{error}</p> : null}
 
         <div className="historyList">
-          <p><strong>Reference:</strong> {order.reference || 'N/A'}</p>
+          <p><strong>Reference:</strong> {order.reference || 'N/A'} <button onClick={() => navigator.clipboard.writeText(order.reference || '')}>Copy</button></p>
+          <p><strong>Short reference:</strong> {shortRef(order.reference || reference)}</p>
           {isMarketplaceMasterOrder ? <p><strong>Type:</strong> Marketplace order</p> : null}
           <p><strong>Payment:</strong> <span className={`statusBadge ${statusClass(order.paymentStatus)}`}>{order.paymentStatus}</span></p>
           <p><strong>Order:</strong> <span className={`statusBadge ${statusClass(order.orderStatus)}`}>{order.orderStatus}</span></p>
           {order.amount ? <p><strong>Amount:</strong> {order.amount}</p> : null}
           {!isMarketplaceMasterOrder && order.productName ? <p><strong>Item:</strong> {order.productName}{order.quantity ? ` × ${order.quantity}` : ''}</p> : null}
           {!isMarketplaceMasterOrder && order.storeName ? <p><strong>Store:</strong> {order.storeName}</p> : null}
+          {!isMarketplaceMasterOrder && order.productUrl ? <p><strong>Item link:</strong> <Link href={order.productUrl}>View item/service</Link></p> : null}
+          {!isMarketplaceMasterOrder && order.storeUrl ? <p><strong>Store link:</strong> <Link href={order.storeUrl}>View store</Link></p> : null}
           {isMarketplaceMasterOrder ? <p><strong>Stores:</strong> {order.merchantIds.length}</p> : null}
           {isMarketplaceMasterOrder && order.childReferences.length > 0 ? <p><strong>Child references:</strong> {order.childReferences.join(', ')}</p> : null}
           {isMarketplaceMasterOrder && order.merchantOrders.length > 0 ? (

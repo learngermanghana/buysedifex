@@ -38,6 +38,8 @@ const getCustomerStatusLabel = (status?: string) => {
   const normalized = (status ?? 'pending').trim().toLowerCase();
   return CUSTOMER_STATUS_LABELS[normalized] ?? normalized.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 };
+const shortRef = (reference?: string) => (reference && reference.length > 18 ? `${reference.slice(0, 8)}...${reference.slice(-8)}` : reference ?? 'N/A');
+const formatAmount = (amount?: number, currency?: string) => (typeof amount === 'number' && Number.isFinite(amount) ? `${currency || 'GHS'} ${amount.toFixed(2)}` : '');
 
 export default function AccountPage() {
   const [mode, setMode] = useState<'signup' | 'signin'>('signup');
@@ -194,23 +196,31 @@ export default function AccountPage() {
         {!sessionEmail ? <p>Sign in to view your orders and bookings.</p> : null}
         {sessionEmail && !loadingHistory && orderHistory.length === 0 ? <p>No product orders yet. Place an order to start tracking.</p> : null}
         {sessionEmail && orderHistory.length > 0 ? (
-          <ul className="historyList">
+          <div className="historyList orderCards">
             {orderHistory.map((item) => (
-              <li key={item.id}>
-                <strong>{item.productName}</strong> × {item.quantity} · {item.paymentMethod} · {item.deliveryLocation}
-                <br />
-                <small>
-                  Ref: {item.reference ?? 'N/A'} · Payment: <span className={`statusBadge ${statusClass(item.paymentStatus)}`}>{getCustomerStatusLabel(item.paymentStatus)}</span> · Order:{' '}
-                  <span className={`statusBadge ${statusClass(item.orderStatus)}`}>{getCustomerStatusLabel(item.orderStatus)}</span>
-                </small>
-                <br />
-                <small>{new Date(item.createdAt).toLocaleString()}</small>
-                {item.reference ? <><br /><Link href={`/account/orders/${encodeURIComponent(item.reference)}`}>View order details</Link></> : null}
-                {item.paymentConfirmedAt ? <><br /><small>Payment confirmed: {new Date(item.paymentConfirmedAt).toLocaleString()}</small></> : null}
-                {item.orderCompletedAt ? <><br /><small>Order completed: {new Date(item.orderCompletedAt).toLocaleString()}</small></> : null}
-              </li>
+              <article key={item.id} className="orderCard">
+                {item.imageUrl ? <img src={item.imageUrl} alt={item.displayName ?? item.productName} className="orderThumb" /> : null}
+                <div>
+                  <strong>{item.displayName ?? item.itemName ?? item.productName}</strong>
+                  {item.storeName ? <p>{item.storeName}</p> : null}
+                  <p><span className="statusBadge pending">{item.recordType === 'service_booking' ? 'Service booking' : 'Product order'}</span> × {item.quantity}</p>
+                  {formatAmount(item.amount, item.currency) ? <p>{formatAmount(item.amount, item.currency)}</p> : null}
+                  <small>Ref: {shortRef(item.reference)} · {new Date(item.createdAt).toLocaleString()}</small>
+                  <p>
+                    Payment: <span className={`statusBadge ${statusClass(item.paymentStatus)}`}>{getCustomerStatusLabel(item.paymentStatus)}</span> · Order:{' '}
+                    <span className={`statusBadge ${statusClass(item.orderStatus)}`}>{getCustomerStatusLabel(item.orderStatus)}</span>
+                  </p>
+                  {item.bookingDate || item.bookingTime ? <small>Booking: {[item.bookingDate, item.bookingTime].filter(Boolean).join(' · ')}</small> : null}
+                  <div className="productStoreActions">
+                    {item.reference ? <Link href={`/account/orders/${encodeURIComponent(item.reference)}`}>View details</Link> : null}
+                    {item.productUrl || item.serviceUrl ? <Link href={item.productUrl ?? item.serviceUrl ?? '#'}>View item/service</Link> : null}
+                    {item.storeUrl ? <Link href={item.storeUrl}>View store</Link> : null}
+                    <Link href="/contact">Contact support</Link>
+                  </div>
+                </div>
+              </article>
             ))}
-          </ul>
+          </div>
         ) : null}
       </section>
     </main>
