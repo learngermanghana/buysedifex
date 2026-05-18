@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { collection, doc, serverTimestamp, writeBatch, type Firestore } from 'firebase/firestore';
+import { doc, serverTimestamp, writeBatch, type Firestore } from 'firebase/firestore';
 import type { CheckoutItem, MerchantPaymentRouting, SedifexCheckoutPreviewResponse } from './sedifex-checkout';
 
 type PaystackInitializeResponse = {
@@ -40,6 +40,44 @@ export const majorFromMinor = (minor: number) => Math.round(minor) / 100;
 export const createMasterReference = () => `market_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 export const customerHashKey = (email?: string, phone?: string) =>
   crypto.createHash('sha256').update((email || phone || `guest_${Date.now()}`).toLowerCase()).digest('hex').slice(0, 32);
+
+const buildReceiptFriendlyItems = (merchant: MerchantPreviewBundle) => {
+  const previewItems = Array.isArray(merchant.preview?.items) ? merchant.preview.items : [];
+  const fallbackItems = Array.isArray(merchant.preview?.cart) ? merchant.preview.cart : [];
+  const merchantPreviewItems = Array.isArray(merchant.preview?.preview?.items) ? merchant.preview.preview.items : [];
+  const sourceItems = previewItems.length ? previewItems : merchantPreviewItems.length ? merchantPreviewItems : fallbackItems;
+
+  return sourceItems.map((item: any, index: number) => {
+    const cartItem = merchant.merchantCart[index] ?? {};
+    const name = item?.name ?? item?.productName ?? item?.itemName ?? cartItem?.name ?? cartItem?.productName ?? null;
+    const qtyValue = item?.quantity ?? item?.qty ?? cartItem?.quantity ?? cartItem?.qty ?? 1;
+    const unitPriceMinor = Number.isFinite(item?.unitPriceMinor)
+      ? Math.round(item.unitPriceMinor)
+      : Number.isFinite(item?.unit_price)
+        ? Math.round(item.unit_price)
+        : Number.isFinite(item?.unitPrice)
+          ? Math.round(item.unitPrice)
+          : undefined;
+    const lineSubtotalMinor = Number.isFinite(item?.lineSubtotalMinor)
+      ? Math.round(item.lineSubtotalMinor)
+      : Number.isFinite(item?.subtotal)
+        ? Math.round(item.subtotal)
+        : Number.isFinite(item?.lineTotalMinor)
+          ? Math.round(item.lineTotalMinor)
+          : undefined;
+    return {
+      productId: item?.productId ?? item?.itemId ?? cartItem?.productId ?? cartItem?.itemId ?? null,
+      itemId: item?.itemId ?? item?.productId ?? cartItem?.itemId ?? cartItem?.productId ?? null,
+      name,
+      productName: name,
+      quantity: qtyValue,
+      qty: qtyValue,
+      type: item?.type ?? cartItem?.type ?? 'product',
+      unitPriceMinor,
+      lineSubtotalMinor,
+    };
+  });
+};
 
 const getPaystackSecret = () =>
   process.env.SEDIFEX_MARKET_PAYSTACK_SECRET_KEY?.trim() || process.env.PAYSTACK_SECRET_KEY?.trim() || '';
@@ -182,6 +220,7 @@ export async function saveMasterCheckoutRecords(input: MasterCheckoutInput & { c
   if (input.customerUid) batch.set(doc(input.db, 'marketCustomers', input.customerUid, 'orders', input.masterReference), masterRecord, { merge: true });
 
   input.merchantPreviews.forEach((merchant) => {
+    const receiptItems = buildReceiptFriendlyItems(merchant);
     const childRecord = {
       recordType: 'product_order',
       orderScope: 'multi_merchant_child',
@@ -197,7 +236,7 @@ export async function saveMasterCheckoutRecords(input: MasterCheckoutInput & { c
       deliveryLocation: input.deliveryLocation || null,
       deliveryNotes: input.deliveryNotes || null,
       cart: merchant.merchantCart,
-      items: merchant.merchantCart,
+      items: receiptItems.length ? receiptItems : merchant.merchantCart,
       pricingSnapshot: merchant.preview,
       amountMinor: merchant.amountMinor,
       amount: majorFromMinor(merchant.amountMinor),
@@ -212,7 +251,7 @@ export async function saveMasterCheckoutRecords(input: MasterCheckoutInput & { c
       createdAtServer: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
-    batch.set(doc(collection(input.db, 'integrationOrders')), childRecord);
+    batch.set(doc(input.db, 'integrationOrders', merchant.childReference), childRecord, { merge: true });
     batch.set(doc(input.db, 'stores', merchant.merchantId, 'integrationOrders', merchant.childReference), childRecord, { merge: true });
     batch.set(doc(input.db, 'marketplaceOrders', input.masterReference, 'merchantOrders', merchant.merchantId), childRecord, { merge: true });
   });
