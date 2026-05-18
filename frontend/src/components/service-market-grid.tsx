@@ -39,8 +39,11 @@ type PublicService = {
   updatedAt?: { seconds?: number } | string;
 };
 
+const INITIAL_VISIBLE_COUNT = 24;
+const LOAD_MORE_COUNT = 24;
 const SERVICE_SCAN_LIMIT = 1000;
 const VERIFIED_STORE_SCAN_LIMIT = 500;
+const FIRST_SCREEN_PER_STORE_LIMIT = 4;
 
 const normalizeBoolean = (value: unknown): boolean | null => {
   if (typeof value === 'boolean') return value;
@@ -87,7 +90,11 @@ const decodeImageValues = (value: unknown): string[] => {
 };
 
 const normalizeImageUrl = (value: string) => {
-  const trimmed = value.trim().replace(/^['"]+|['"]+$/g, '').replace(/\\u002F/gi, '/').replace(/\\\//g, '/');
+  const trimmed = value
+    .trim()
+    .replace(/^['"]+|['"]+$/g, '')
+    .replace(/\\u002F/gi, '/')
+    .replace(/\\\//g, '/');
   if (!trimmed.toLowerCase().startsWith('gs://')) return trimmed;
   const withoutPrefix = trimmed.slice(5);
   const slashIndex = withoutPrefix.indexOf('/');
@@ -107,7 +114,9 @@ const isValidImageUrl = (value: string) => {
 };
 
 const getDisplayImages = (item: PublicService) => {
-  const candidates = [item.imageUrls, item.imageUrl, item.serviceImageUrls, item.serviceImageUrl].flatMap((value) => decodeImageValues(value));
+  const candidates = [item.imageUrls, item.imageUrl, item.serviceImageUrls, item.serviceImageUrl].flatMap((value) =>
+    decodeImageValues(value),
+  );
   return Array.from(new Set(candidates.map(normalizeImageUrl).filter(isValidImageUrl)));
 };
 
@@ -132,9 +141,53 @@ const getTimestampScore = (value: PublicService['updatedAt'] | PublicService['pu
   return typeof value.seconds === 'number' ? value.seconds : 0;
 };
 
+const getStoreKey = (item: PublicService) =>
+  item.storeId?.trim() || item.storeName?.trim() || `unknown-store-${item.id}`;
+
+const mixServicesAcrossStores = (items: PublicService[]) => {
+  const buckets = new Map<string, PublicService[]>();
+  for (const item of items) {
+    const storeKey = getStoreKey(item);
+    const bucket = buckets.get(storeKey) ?? [];
+    bucket.push(item);
+    buckets.set(storeKey, bucket);
+  }
+
+  const mixed: PublicService[] = [];
+  while (buckets.size > 0) {
+    for (const [storeKey, storeItems] of buckets) {
+      const nextItem = storeItems.shift();
+      if (nextItem) mixed.push(nextItem);
+      if (storeItems.length === 0) buckets.delete(storeKey);
+    }
+  }
+  return mixed;
+};
+
+const prioritizeBalancedFirstScreen = (items: PublicService[]) => {
+  const firstScreenCounts = new Map<string, number>();
+  const firstScreen: PublicService[] = [];
+  const remaining: PublicService[] = [];
+
+  for (const item of items) {
+    const storeKey = getStoreKey(item);
+    const count = firstScreenCounts.get(storeKey) ?? 0;
+    if (count < FIRST_SCREEN_PER_STORE_LIMIT) {
+      firstScreenCounts.set(storeKey, count + 1);
+      firstScreen.push(item);
+    } else {
+      remaining.push(item);
+    }
+  }
+
+  return [...firstScreen, ...remaining];
+};
+
 const getServiceApprovedStoreIds = async () => {
   if (!db) return new Set<string>();
-  const snapshot = await getDocs(query(collection(db, 'stores'), where('verified', '==', true), limit(VERIFIED_STORE_SCAN_LIMIT)));
+  const snapshot = await getDocs(
+    query(collection(db, 'stores'), where('verified', '==', true), limit(VERIFIED_STORE_SCAN_LIMIT)),
+  );
   const ids = new Set<string>();
 
   snapshot.docs.forEach((storeDoc) => {
@@ -142,7 +195,12 @@ const getServiceApprovedStoreIds = async () => {
     const status = typeof data.status === 'string' ? data.status.trim().toLowerCase() : '';
     const eligibleForBuy = normalizeBoolean(data.eligibleForBuy);
     const verifiedService = normalizeBoolean(data.verified_service ?? data.verifiedService);
-    if (['inactive', 'suspended', 'deleted', 'disabled'].includes(status) || eligibleForBuy === false || verifiedService === false) return;
+    if (
+      ['inactive', 'suspended', 'deleted', 'disabled'].includes(status) ||
+      eligibleForBuy === false ||
+      verifiedService === false
+    )
+      return;
 
     ids.add(storeDoc.id);
     for (const key of ['storeId', 'id', 'ownerUid', 'workspaceSlug']) {
@@ -158,6 +216,7 @@ export function ServiceMarketGrid() {
   const [services, setServices] = useState<PublicService[]>([]);
   const [searchText, setSearchText] = useState('');
   const [selectedCity, setSelectedCity] = useState('all');
+  const [visibleLimit, setVisibleLimit] = useState(INITIAL_VISIBLE_COUNT);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -184,7 +243,13 @@ export function ServiceMarketGrid() {
           .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as PublicService)
           .filter((item) => {
             const storeId = item.storeId?.trim();
-            return Boolean(storeId && serviceApprovedStoreIds.has(storeId) && isServiceItem(item) && isPublicListing(item) && getDisplayImages(item).length > 0);
+            return Boolean(
+              storeId &&
+              serviceApprovedStoreIds.has(storeId) &&
+              isServiceItem(item) &&
+              isPublicListing(item) &&
+              getDisplayImages(item).length > 0,
+            );
           })
           .sort((left, right) => {
             const leftTime = getTimestampScore(left.publishedAt) || getTimestampScore(left.updatedAt);
@@ -216,29 +281,58 @@ export function ServiceMarketGrid() {
 
   const filteredServices = useMemo(() => {
     const text = searchText.trim().toLowerCase();
-    return services.filter((service) => {
+    const filtered = services.filter((service) => {
       const cityMatches = selectedCity === 'all' || getStoreCity(service).toLowerCase() === selectedCity.toLowerCase();
       if (!cityMatches) return false;
       if (!text) return true;
-      const haystack = [getServiceName(service), service.description, service.storeName, service.category, service.categoryKey]
+      const haystack = [
+        getServiceName(service),
+        service.description,
+        service.storeName,
+        service.category,
+        service.categoryKey,
+      ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
       return haystack.includes(text);
     });
+    return prioritizeBalancedFirstScreen(mixServicesAcrossStores(filtered));
   }, [searchText, selectedCity, services]);
+
+  const visibleServices = filteredServices.slice(0, visibleLimit);
 
   return (
     <section className="marketplace" aria-label="Verified services marketplace">
       <div className="toolbar">
         <div className="searchWrap">
           <label htmlFor="service-search">Search services</label>
-          <input id="service-search" type="search" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Search services..." />
+          <input
+            id="service-search"
+            type="search"
+            value={searchText}
+            onChange={(event) => {
+              setSearchText(event.target.value);
+              setVisibleLimit(INITIAL_VISIBLE_COUNT);
+            }}
+            placeholder="Search services..."
+          />
         </div>
         <div className="sortWrap">
           <label htmlFor="service-city-filter">City</label>
-          <select id="service-city-filter" value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>
-            {cities.map((city) => <option key={city} value={city}>{city === 'all' ? 'All cities' : city}</option>)}
+          <select
+            id="service-city-filter"
+            value={selectedCity}
+            onChange={(event) => {
+              setSelectedCity(event.target.value);
+              setVisibleLimit(INITIAL_VISIBLE_COUNT);
+            }}
+          >
+            {cities.map((city) => (
+              <option key={city} value={city}>
+                {city === 'all' ? 'All cities' : city}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -255,35 +349,80 @@ export function ServiceMarketGrid() {
                 <div className="skeleton skeletonButton" />
               </article>
             ))
-          : filteredServices.map((service) => {
+          : visibleServices.map((service) => {
               const imageUrl = getDisplayImages(service)[0] ?? 'https://placehold.co/640x640';
               const storeHref = getStoreHref(service.storeId, service.storeName);
-              const description = (service.description ?? '').split(/\n+/).map((line) => line.trim()).filter(Boolean)[0] ?? '';
+              const description =
+                (service.description ?? '')
+                  .split(/\n+/)
+                  .map((line) => line.trim())
+                  .filter(Boolean)[0] ?? '';
               return (
                 <article key={service.id} className="card">
                   <div className="imageWrap">
-                    <Image src={imageUrl} alt={service.imageAlt?.trim() || getServiceName(service)} loading="lazy" unoptimized width={360} height={360} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw" style={{ width: '100%', height: 'auto' }} />
+                    <Image
+                      src={imageUrl}
+                      alt={service.imageAlt?.trim() || getServiceName(service)}
+                      loading="lazy"
+                      unoptimized
+                      width={360}
+                      height={360}
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                      style={{ width: '100%', height: 'auto' }}
+                    />
                   </div>
                   <h3>{getServiceName(service)}</h3>
                   <p className="productShortDescription">{description}</p>
                   <div className="meta">
                     <span className="storeIdentity">
-                      {storeHref ? <Link href={storeHref}>{service.storeName ?? 'Unknown store'}</Link> : service.storeName ?? 'Unknown store'}
-                      <span className="verifiedBadge" aria-label="Verified by Sedifex"><span className="verifiedPulse" aria-hidden="true" />Verified by Sedifex</span>
+                      {storeHref ? (
+                        <Link href={storeHref}>{service.storeName ?? 'Unknown store'}</Link>
+                      ) : (
+                        (service.storeName ?? 'Unknown store')
+                      )}
+                      <span className="verifiedBadge" aria-label="Verified by Sedifex">
+                        <span className="verifiedPulse" aria-hidden="true" />
+                        Verified by Sedifex
+                      </span>
                     </span>
                     <strong>{formatPrice(service.price, service.currency)}</strong>
                   </div>
                   <p className="trustScoreCard">📅 Book through Sedifex · Pay online or request support</p>
                   <div className="cardActions">
-                    <Link href={getProductHref(service.id, service.productName ?? service.name)} className="buyNowButton" aria-label={`Book ${getServiceName(service)}`}>Book service</Link>
-                    {storeHref ? <Link className="contactStoreButton" href={storeHref}>View store</Link> : null}
+                    <Link
+                      href={getProductHref(service.id, service.productName ?? service.name)}
+                      className="buyNowButton"
+                      aria-label={`Book ${getServiceName(service)}`}
+                    >
+                      Book service
+                    </Link>
+                    {storeHref ? (
+                      <Link className="contactStoreButton" href={storeHref}>
+                        View store
+                      </Link>
+                    ) : null}
                   </div>
                 </article>
               );
             })}
       </div>
 
-      {!isLoading && filteredServices.length === 0 && !error ? <div className="emptyState"><h3>No services found</h3><p>Try a different search term or city.</p></div> : null}
+      {!isLoading && filteredServices.length === 0 && !error ? (
+        <div className="emptyState">
+          <h3>No services found</h3>
+          <p>Try a different search term or city.</p>
+        </div>
+      ) : null}
+
+      <div className="actions">
+        <button
+          type="button"
+          disabled={isLoading || visibleLimit >= filteredServices.length}
+          onClick={() => setVisibleLimit((current) => current + LOAD_MORE_COUNT)}
+        >
+          {visibleLimit >= filteredServices.length ? 'All services loaded' : 'Load more services'}
+        </button>
+      </div>
     </section>
   );
 }
