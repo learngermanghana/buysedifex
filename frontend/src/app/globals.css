@@ -1921,3 +1921,48 @@ select:focus {
     flex-wrap: wrap;
   }
 }
+
+.relatedMarketplaceRoot {
+  display: grid;
+  gap: 1rem;
+}
+
+.relatedMarketplaceGrid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.relatedMarketplaceCard {
+  border: 1px solid var(--border-neutral);
+  border-radius: 0.9rem;
+  padding: 0.75rem;
+  background: var(--bg-card);
+}
+
+.relatedMarketplaceImageWrap {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 0.7rem;
+  background: #f1f5f9;
+  margin-bottom: 0.65rem;
+}
+
+.relatedMarketplaceImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.relatedFallbackCard {
+  text-align: left;
+}
+
+@media (min-width: 640px) {
+  .relatedMarketplaceGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .relatedMarketplaceGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

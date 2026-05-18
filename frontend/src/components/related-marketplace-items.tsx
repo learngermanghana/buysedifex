@@ -22,6 +22,7 @@ type MarketplaceItem = {
   currency?: string;
   marketplaceEnabled?: boolean;
   public?: boolean;
+  verified?: boolean;
   imageUrls?: string[];
   imageUrl?: string;
 };
@@ -43,113 +44,114 @@ const lower = (value?: string) => value?.trim().toLowerCase() ?? '';
 const getName = (item: MarketplaceItem) => item.productName?.trim() || item.name?.trim() || 'Untitled item';
 const getCategory = (item: MarketplaceItem) => item.categoryKey?.trim() || item.category?.trim() || item.marketCategory?.trim() || 'General';
 const getImage = (item: MarketplaceItem) => item.imageUrls?.[0]?.trim() || item.imageUrl?.trim() || '';
-const getBadge = (item: MarketplaceItem) => {
+const getKind = (item: MarketplaceItem) => {
   const listingType = lower(item.listingType);
-  if (listingType === 'course') return 'Course';
-  if (listingType === 'event') return 'Event';
-  if (listingType === 'service') return 'Service';
-  return lower(item.itemType) === 'service' ? 'Service' : 'Product';
+  if (['product', 'service', 'course', 'event'].includes(listingType)) return listingType;
+  return lower(item.itemType) === 'service' ? 'service' : 'product';
 };
 
-const getCta = (salesMode?: string) => {
-  const mode = lower(salesMode);
-  if (mode === 'buy_now') return 'Buy now';
-  if (mode === 'book_now') return 'Book';
-  if (mode === 'request_quote') return 'Request quote';
-  if (mode === 'register') return 'Register';
-  if (mode === 'get_ticket') return 'Get ticket';
-  return 'View details';
+const getBadge = (item: MarketplaceItem) => {
+  const kind = getKind(item);
+  if (kind === 'course') return 'Course';
+  if (kind === 'event') return 'Event';
+  if (kind === 'service') return 'Service';
+  return 'Product';
 };
 
-export const getRelatedMarketplaceItems = (
-  currentItem: RelatedMarketplaceItemsProps,
-  allItems: MarketplaceItem[],
-  options?: { limit?: number },
-) => {
-  const maxItems = options?.limit ?? currentItem.limit ?? 8;
-  const currentListingType = lower(currentItem.currentListingType);
-  const currentItemType = lower(currentItem.currentItemType);
+const getCta = (item: MarketplaceItem) => {
+  const kind = getKind(item);
+  if (kind === 'service') return 'Book service';
+  if (kind === 'course' || kind === 'event') return 'Register';
+  if (lower(item.salesMode) === 'buy_now') return 'Buy now';
+  return 'View product';
+};
 
-  return allItems
-    .map((item) => {
-      let score = 0;
-      const sameCategory = lower(getCategory(item)) === lower(currentItem.currentCategory);
-      const sameListingType = lower(item.listingType) === currentListingType;
-      const sameItemType = lower(item.itemType) === currentItemType;
-      const sameServiceKind = lower(item.serviceKind) === lower(currentItem.currentServiceKind);
-      const imageUrl = getImage(item);
-      const hasImage = Boolean(imageUrl);
-      const hasPrice = typeof item.price === 'number' && Number.isFinite(item.price);
-      const saleNeedsPrice = ['buy_now', 'register', 'book_now'].includes(lower(item.salesMode));
+const scoreItem = (item: MarketplaceItem, current: RelatedMarketplaceItemsProps) => {
+  const currentKind = lower(current.currentListingType) || lower(current.currentItemType) || 'product';
+  const itemKind = getKind(item);
+  const sameCategory = lower(getCategory(item)) === lower(current.currentCategory);
+  const sameServiceKind = lower(item.serviceKind) === lower(current.currentServiceKind);
+  const hasImage = Boolean(getImage(item));
+  const hasPrice = typeof item.price === 'number' && Number.isFinite(item.price);
+  const sameStore = item.storeId && item.storeId === current.currentStoreId;
 
-      if (item.id === currentItem.currentItemId) score -= 100;
-      if (item.marketplaceEnabled === false) score -= 100;
-      if (item.public === false) score -= 100;
-      if (!hasImage) score -= 50;
-      if (!hasPrice && saleNeedsPrice) score -= 50;
-      if (item.storeId && item.storeId === currentItem.currentStoreId) score += 50;
-      if (sameCategory) score += 40;
-      if (sameListingType) score += 35;
-      if (sameItemType) score += 30;
-      if (sameServiceKind) score += 25;
-      if (currentItem.currentPrice && hasPrice) {
-        const min = currentItem.currentPrice * 0.7;
-        const max = currentItem.currentPrice * 1.3;
-        if ((item.price ?? 0) >= min && (item.price ?? 0) <= max) score += 15;
-      }
-      if (hasImage) score += 10;
-      if (hasPrice) score += 10;
+  let score = 0;
+  if (sameStore) score += 50;
+  if (sameCategory) score += 45;
+  if (itemKind === currentKind) score += 42;
+  if (sameServiceKind) score += 20;
+  if (hasImage) score += 16;
+  if (hasPrice) score += 12;
+  if (item.marketplaceEnabled !== false) score += 8;
+  if (item.public !== false) score += 8;
+  if (item.verified) score += 5;
 
-      if (currentListingType === 'product' && lower(item.listingType) === 'product') score += 18;
-      if (currentListingType === 'service' && lower(item.listingType) === 'service') score += 18;
-      if (currentListingType === 'course' && lower(item.listingType) === 'course') score += 18;
-      if (currentListingType === 'event' && lower(item.listingType) === 'event') score += 18;
+  if (current.currentPrice && hasPrice) {
+    const min = current.currentPrice * 0.65;
+    const max = current.currentPrice * 1.35;
+    if ((item.price ?? 0) >= min && (item.price ?? 0) <= max) score += 10;
+  }
 
-      return { item, score };
-    })
-    .filter((entry) => entry.item.id !== currentItem.currentItemId && entry.score > -100)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, maxItems)
-    .map((entry) => entry.item);
+  if (currentKind === 'product' && itemKind !== 'product') score -= 30;
+  if (currentKind !== 'product' && itemKind === 'product') score -= 10;
+
+  return score;
 };
 
 export function RelatedMarketplaceItems(props: RelatedMarketplaceItemsProps) {
-  const relatedItems = useMemo(() => getRelatedMarketplaceItems(props, props.items, { limit: props.limit ?? 8 }), [props]);
+  const currentKind = lower(props.currentListingType) || lower(props.currentItemType) || 'product';
 
-  const currentType = lower(props.currentListingType);
-  const sectionTitles = {
-    primary:
-      currentType === 'service'
-        ? 'Other services from this store'
-        : currentType === 'course'
-          ? 'Other courses'
-          : currentType === 'event'
-            ? 'Other upcoming classes/events'
-            : 'Similar products',
-    secondary:
-      currentType === 'service'
-        ? 'Similar services'
-        : currentType === 'course'
-          ? 'Upcoming batches'
-          : currentType === 'event'
-            ? 'Related courses'
-            : 'More from this store',
-    tertiary:
-      currentType === 'service' ? 'You may also need' : currentType === 'course' ? 'Related training' : 'Complete your order',
-  };
+  const rankedItems = useMemo(
+    () => props.items
+      .filter((item) => item.id !== props.currentItemId)
+      .map((item) => ({ item, score: scoreItem(item, props) }))
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.item),
+    [props],
+  );
 
-  const primaryItems = relatedItems.slice(0, 4);
-  const secondaryItems = relatedItems.slice(4, 8);
+  const sections = useMemo(() => {
+    const sectionConfig = currentKind === 'product'
+      ? ['Similar products', 'More from this store', 'Customers also viewed']
+      : ['Similar services', 'More from this provider', 'Other bookable services'];
+    const used = new Set<string>();
+    const pick = (predicate: (item: MarketplaceItem) => boolean, limit: number) => {
+      const chosen: MarketplaceItem[] = [];
+      for (const item of rankedItems) {
+        if (used.has(item.id) || !predicate(item)) continue;
+        chosen.push(item);
+        used.add(item.id);
+        if (chosen.length >= limit) break;
+      }
+      return chosen;
+    };
+
+    const sameKind = (item: MarketplaceItem) => getKind(item) === currentKind;
+    const sameStore = (item: MarketplaceItem) => item.storeId && item.storeId === props.currentStoreId;
+    const sameCategory = (item: MarketplaceItem) => lower(getCategory(item)) === lower(props.currentCategory);
+
+    const primary = pick((item) => sameKind(item) && sameCategory(item), 4);
+    const secondary = pick((item) => sameStore(item), 4);
+    const tertiary = pick((item) => sameKind(item), 4);
+    const fallback = pick(() => true, props.limit ?? 8);
+
+    return [
+      { name: sectionConfig[0], items: primary },
+      { name: sectionConfig[1], items: secondary },
+      { name: sectionConfig[2], items: tertiary.length > 0 ? tertiary : fallback },
+    ].filter((section) => section.items.length > 0);
+  }, [currentKind, props.currentCategory, props.currentStoreId, props.limit, rankedItems]);
 
   useEffect(() => {
-    if (relatedItems.length === 0) return;
+    if (sections.length === 0) return;
+    const total = sections.reduce((sum, section) => sum + section.items.length, 0);
     void fetch('/api/track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventName: 'related_items_impression', payload: { currentItemId: props.currentItemId, currentStoreId: props.currentStoreId, count: relatedItems.length } }),
+      body: JSON.stringify({ eventName: 'related_items_impression', payload: { currentItemId: props.currentItemId, currentStoreId: props.currentStoreId, count: total, sections: sections.map((section) => section.name) } }),
       keepalive: true,
     }).catch(() => undefined);
-  }, [props.currentItemId, props.currentStoreId, relatedItems.length]);
+  }, [props.currentItemId, props.currentStoreId, sections]);
 
   const trackClick = (clicked: MarketplaceItem, section: string, position: number) => {
     void fetch('/api/track', {
@@ -160,42 +162,41 @@ export function RelatedMarketplaceItems(props: RelatedMarketplaceItemsProps) {
     }).catch(() => undefined);
   };
 
-  if (relatedItems.length === 0) {
-    return <section className="storeInfoCard"><h2>Explore more on Sedifex Market</h2><p>Explore more products and services on Sedifex Market.</p></section>;
+  if (sections.length === 0) {
+    return (
+      <section className="storeInfoCard relatedFallbackCard">
+        <h2>Explore more products and services</h2>
+        <p>We could not find close matches right now. Browse the marketplace to discover verified sellers.</p>
+        <div className="cardActions"><Link className="requestButton" href="/search">Browse Sedifex Market</Link></div>
+      </section>
+    );
   }
 
-  const renderCards = (title: string, sectionItems: MarketplaceItem[], offset: number) => (
-    <section className="storeInfoCard" aria-label={title}>
-      <h2>{title}</h2>
-      <div className="grid">
-        {sectionItems.map((item, index) => {
-          const imageUrl = getImage(item) || 'https://placehold.co/640x640';
-          return (
-            <article key={`${title}-${item.id}`} className="card">
-              <div className="imageWrap"><Image src={imageUrl} alt={getName(item)} width={360} height={360} unoptimized style={{ width: '100%', height: 'auto' }} /></div>
-              <p className="eyebrow">{getBadge(item)}</p>
-              <h3>{getName(item)}</h3>
-              <p>{item.storeName || 'Unknown store'} · {getCategory(item)}</p>
-              <p>{typeof item.price === 'number' ? `${(item.currency || 'GHS').toUpperCase()} ${item.price.toFixed(2)}` : 'Price unavailable'}</p>
-              <div className="cardActions">
-                <Link className="requestButton" href={getProductHref(item.id, getName(item))} onClick={() => trackClick(item, title, offset + index + 1)}>{getCta(item.salesMode)}</Link>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-    </section>
-  );
-
   return (
-    <div>
+    <div className="relatedMarketplaceRoot">
       {props.title ? <h2>{props.title}</h2> : null}
-      {renderCards(sectionTitles.primary, primaryItems, 0)}
-      {secondaryItems.length > 0 ? renderCards(sectionTitles.secondary, secondaryItems, 4) : null}
-      {relatedItems.length < 4 ? <section className="storeInfoCard"><h2>Explore more on Sedifex Market</h2></section> : null}
-      {currentType === 'product' || currentType === 'service' || currentType === 'course' ? (
-        renderCards(sectionTitles.tertiary, relatedItems.slice(0, Math.min(4, relatedItems.length)), 0)
-      ) : null}
+      {sections.map((section) => (
+        <section key={section.name} className="storeInfoCard" aria-label={section.name}>
+          <h2>{section.name}</h2>
+          <div className="relatedMarketplaceGrid">
+            {section.items.map((item, index) => {
+              const imageUrl = getImage(item) || 'https://placehold.co/640x640?text=Sedifex';
+              return (
+                <article key={`${section.name}-${item.id}`} className="relatedMarketplaceCard">
+                  <div className="relatedMarketplaceImageWrap"><Image src={imageUrl} alt={getName(item)} width={360} height={360} unoptimized className="relatedMarketplaceImage" /></div>
+                  <p className="eyebrow">{getBadge(item)}</p>
+                  <h3>{getName(item)}</h3>
+                  <p>{item.storeName || 'Unknown store'} · {getCategory(item)}</p>
+                  <p>{typeof item.price === 'number' ? `${(item.currency || 'GHS').toUpperCase()} ${item.price.toFixed(2)}` : 'Price unavailable'}</p>
+                  <div className="cardActions">
+                    <Link className="requestButton" href={getProductHref(item.id, getName(item))} onClick={() => trackClick(item, section.name, index + 1)}>{getCta(item)}</Link>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
