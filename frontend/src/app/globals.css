@@ -1825,3 +1825,7 @@ select:focus {
   .serviceBookingPanel .requestButton,
   .serviceBookingPanel .secondaryButton { width: 100%; }
 }
+
+.orderCards { display: grid; gap: 0.9rem; }
+.orderCard { display: grid; grid-template-columns: 80px 1fr; gap: 0.8rem; border: 1px solid #e2e8f0; border-radius: 0.8rem; padding: 0.8rem; background: #fff; }
+.orderThumb { width: 80px; height: 80px; object-fit: cover; border-radius: 0.5rem; border: 1px solid #e2e8f0; }
