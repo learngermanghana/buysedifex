@@ -107,7 +107,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user?.uid || !db || !ready) return;
-    const cartRef = collection(db, 'marketCustomers', user.uid, 'cart');
+    const firestore = db;
+    const cartRef = collection(firestore, 'marketCustomers', user.uid, 'cart');
     const unsubscribe = onSnapshot(cartRef, async (snapshot) => {
       const remoteItems = snapshot.docs.map((cartDoc) => normalize(cartDoc.data() as CartItem));
       const shouldMergeLocal = firestoreLoadedForUid.current !== user.uid && localLoadedItems.current.length > 0;
@@ -117,10 +118,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setItems(nextItems);
 
       if (shouldMergeLocal) {
-        const batch = writeBatch(db);
+        const batch = writeBatch(firestore);
         nextItems.forEach((item) => {
           const key = keyFor(item);
-          batch.set(doc(db, 'marketCustomers', user.uid, 'cart', docIdForCartKey(key)), {
+          batch.set(doc(firestore, 'marketCustomers', user.uid, 'cart', docIdForCartKey(key)), {
             ...item,
             cartKey: key,
             updatedAt: serverTimestamp(),
@@ -135,14 +136,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user?.uid || !db || !ready || firestoreLoadedForUid.current !== user.uid) return;
+    const firestore = db;
     if (suppressNextWrite.current) {
       suppressNextWrite.current = false;
       return;
     }
-    const batch = writeBatch(db);
+    const batch = writeBatch(firestore);
     items.forEach((item) => {
       const key = keyFor(item);
-      batch.set(doc(db, 'marketCustomers', user.uid, 'cart', docIdForCartKey(key)), {
+      batch.set(doc(firestore, 'marketCustomers', user.uid, 'cart', docIdForCartKey(key)), {
         ...item,
         cartKey: key,
         updatedAt: serverTimestamp(),
@@ -175,15 +177,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     },
     removeItem: (key) => {
       setItems((current) => current.filter((item) => keyFor(item) !== key));
-      if (user?.uid && db) void deleteDoc(doc(db, 'marketCustomers', user.uid, 'cart', docIdForCartKey(key))).catch(() => null);
+      if (user?.uid && db) {
+        const firestore = db;
+        void deleteDoc(doc(firestore, 'marketCustomers', user.uid, 'cart', docIdForCartKey(key))).catch(() => null);
+      }
     },
     updateQuantity: (key, quantity) => {
       setItems((current) => current.map((item) => keyFor(item) === key ? { ...item, quantity: Math.max(1, quantity) } : item));
     },
     clearCart: () => {
       if (user?.uid && db) {
-        const batch = writeBatch(db);
-        items.forEach((item) => batch.delete(doc(db, 'marketCustomers', user.uid, 'cart', docIdForCartKey(keyFor(item)))));
+        const firestore = db;
+        const batch = writeBatch(firestore);
+        items.forEach((item) => batch.delete(doc(firestore, 'marketCustomers', user.uid, 'cart', docIdForCartKey(keyFor(item)))));
         void batch.commit().catch(() => null);
       }
       setItems([]);
