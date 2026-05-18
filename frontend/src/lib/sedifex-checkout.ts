@@ -108,8 +108,7 @@ const getMerchantTokensJsonMap = (): Record<string, string> => {
   const map: Record<string, string> = {};
   for (const [merchantId, token] of Object.entries(parsed)) {
     if (typeof token === 'string' && token.trim()) {
-      const normalizedMerchantId = merchantId.trim();
-      if (normalizedMerchantId) map[normalizedMerchantId] = token.trim();
+      map[merchantId] = token.trim();
     }
   }
   return map;
