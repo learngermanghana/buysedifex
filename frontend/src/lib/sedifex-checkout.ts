@@ -148,28 +148,6 @@ const getCheckoutPreviewUrl = () => {
   return `${getIntegrationApiBaseUrl()}/integration/checkout/preview`;
 };
 
-const integrationFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const baseUrl = getIntegrationApiBaseUrl();
-  const url = `${baseUrl}${path}`;
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'X-Sedifex-Contract-Version': getContractVersion(),
-      ...(init?.headers ?? {}),
-    },
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(`Sedifex request failed (${response.status}) for ${path}: ${body}`);
-  }
-
-  return (await response.json()) as T;
-};
-
 const checkoutCreateFetch = async <T>(init?: RequestInit): Promise<T> => {
   const url = getCheckoutCreateUrl();
   const response = await fetch(url, {
