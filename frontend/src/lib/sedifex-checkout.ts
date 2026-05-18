@@ -91,6 +91,8 @@ const getOptionalNumberEnv = (key: string, fallback: number) => {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 };
 
+const normalizeStoreIdentifier = (value: string) => value.trim().replace(/^['"`]+|['"`]+$/g, '');
+
 const getMerchantTokensJsonMap = (): Record<string, string> => {
   const raw = process.env.SEDIFEX_MERCHANT_TOKENS_JSON?.trim();
   if (!raw) return {};
@@ -107,8 +109,9 @@ const getMerchantTokensJsonMap = (): Record<string, string> => {
 
   const map: Record<string, string> = {};
   for (const [merchantId, token] of Object.entries(parsed)) {
-    if (typeof token === 'string' && token.trim()) {
-      map[merchantId] = token.trim();
+    const normalizedMerchantId = normalizeStoreIdentifier(merchantId);
+    if (normalizedMerchantId && typeof token === 'string' && token.trim()) {
+      map[normalizedMerchantId] = token.trim();
     }
   }
   return map;
@@ -200,7 +203,7 @@ export const createCheckoutReference = (merchantId: string) =>
   `${merchantId}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
 const normalizeMerchantId = (merchantId: string) => {
-  const normalized = merchantId.trim();
+  const normalized = normalizeStoreIdentifier(merchantId);
   if (!normalized) {
     throw new Error('Checkout merchantId/store_id is missing. Ensure the product merchantId matches a Sedifex store ID.');
   }
