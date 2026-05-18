@@ -109,7 +109,8 @@ async function updateMatchingIntegrationOrders(reference: string, update: Record
 
 async function updateMarketplaceMasterOrder(reference: string, update: Record<string, unknown>, payload: PaystackWebhook) {
   if (!db || firebaseConfigError) throw new Error('Firebase is not configured.');
-  const masterRef = doc(db, 'marketplaceOrders', reference);
+  const firestore = db;
+  const masterRef = doc(firestore, 'marketplaceOrders', reference);
   const masterSnap = await getDoc(masterRef);
   if (!masterSnap.exists()) return { found: false, updatedChildren: 0 };
 
@@ -117,10 +118,10 @@ async function updateMarketplaceMasterOrder(reference: string, update: Record<st
   const merchantOrders = Array.isArray(master.merchantOrders) ? (master.merchantOrders as MerchantOrder[]) : [];
   const customerUid = typeof master.customerUid === 'string' ? master.customerUid : '';
 
-  const batch = writeBatch(db);
+  const batch = writeBatch(firestore);
   batch.set(masterRef, update, { merge: true });
-  batch.set(doc(db, 'sedifexAdmin', 'marketplace', 'orders', reference), update, { merge: true });
-  if (customerUid) batch.set(doc(db, 'marketCustomers', customerUid, 'orders', reference), update, { merge: true });
+  batch.set(doc(firestore, 'sedifexAdmin', 'marketplace', 'orders', reference), update, { merge: true });
+  if (customerUid) batch.set(doc(firestore, 'marketCustomers', customerUid, 'orders', reference), update, { merge: true });
 
   merchantOrders.forEach((merchantOrder) => {
     const merchantId = merchantOrder.merchantId || merchantOrder.storeId;
@@ -134,8 +135,8 @@ async function updateMarketplaceMasterOrder(reference: string, update: Record<st
       payment_reference: reference,
       settlementStatus: update.paymentStatus === 'success' ? 'pending_settlement' : update.paymentStatus === 'failed' ? 'payment_failed' : 'pending_payment',
     };
-    batch.set(doc(db, 'stores', merchantId, 'integrationOrders', childReference), childUpdate, { merge: true });
-    batch.set(doc(db, 'marketplaceOrders', reference, 'merchantOrders', merchantId), childUpdate, { merge: true });
+    batch.set(doc(firestore, 'stores', merchantId, 'integrationOrders', childReference), childUpdate, { merge: true });
+    batch.set(doc(firestore, 'marketplaceOrders', reference, 'merchantOrders', merchantId), childUpdate, { merge: true });
   });
 
   await batch.commit();
