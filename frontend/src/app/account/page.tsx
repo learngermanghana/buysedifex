@@ -196,27 +196,35 @@ export default function AccountPage() {
         {!sessionEmail ? <p>Sign in to view your orders and bookings.</p> : null}
         {sessionEmail && !loadingHistory && orderHistory.length === 0 ? <p>No product orders yet. Place an order to start tracking.</p> : null}
         {sessionEmail && orderHistory.length > 0 ? (
-          <div className="historyList orderCards">
+          <div className="orderList">
             {orderHistory.map((item) => (
-              <article key={item.id} className="orderCard">
-                {item.imageUrl ? <img src={item.imageUrl} alt={item.displayName ?? item.productName} className="orderThumb" /> : null}
-                <div>
-                  <strong>{item.displayName ?? item.itemName ?? item.productName}</strong>
-                  {item.storeName ? <p>{item.storeName}</p> : null}
-                  <p><span className="statusBadge pending">{item.recordType === 'service_booking' ? 'Service booking' : 'Product order'}</span> × {item.quantity}</p>
-                  {formatAmount(item.amount, item.currency) ? <p>{formatAmount(item.amount, item.currency)}</p> : null}
-                  <small>Ref: {shortRef(item.reference)} · {new Date(item.createdAt).toLocaleString()}</small>
-                  <p>
-                    Payment: <span className={`statusBadge ${statusClass(item.paymentStatus)}`}>{getCustomerStatusLabel(item.paymentStatus)}</span> · Order:{' '}
-                    <span className={`statusBadge ${statusClass(item.orderStatus)}`}>{getCustomerStatusLabel(item.orderStatus)}</span>
-                  </p>
-                  {item.bookingDate || item.bookingTime ? <small>Booking: {[item.bookingDate, item.bookingTime].filter(Boolean).join(' · ')}</small> : null}
-                  <div className="productStoreActions">
-                    {item.reference ? <Link href={`/account/orders/${encodeURIComponent(item.reference)}`}>View details</Link> : null}
-                    {item.productUrl || item.serviceUrl ? <Link href={item.productUrl ?? item.serviceUrl ?? '#'}>View item/service</Link> : null}
-                    {item.storeUrl ? <Link href={item.storeUrl}>View store</Link> : null}
-                    <Link href="/contact">Contact support</Link>
+              <article key={item.id} className={`orderRow ${item.imageUrl ? '' : 'orderRow--noImage'}`}>
+                {item.imageUrl ? <img src={item.imageUrl} alt={item.displayName ?? item.productName} className="orderRow__image" /> : null}
+                <div className="orderRow__main">
+                  <div className="orderRow__titleLine">
+                    <strong className="orderRow__title">{item.displayName ?? item.itemName ?? item.productName}</strong>
+                    {formatAmount(item.amount, item.currency) ? <span className="orderRow__amount">{formatAmount(item.amount, item.currency)}</span> : null}
                   </div>
+                  <div className="orderRow__meta">
+                    {item.storeName && item.storeName !== 'Not provided' ? <span>{item.storeName}</span> : null}
+                    <span>{item.recordType === 'service_booking' ? 'Service booking' : 'Product order'}</span>
+                    <span>Qty {item.quantity}</span>
+                    <span>{new Date(item.createdAt).toLocaleString()}</span>
+                    {item.deliveryLocation && item.deliveryLocation.trim() && item.deliveryLocation.trim().toLowerCase() !== 'not provided' ? (
+                      <span>{item.deliveryLocation.trim()}</span>
+                    ) : null}
+                  </div>
+                  <div className="orderRow__status">
+                    <span>Payment: <span className={`statusBadge ${statusClass(item.paymentStatus)}`}>{getCustomerStatusLabel(item.paymentStatus)}</span></span>
+                    <span>Order: <span className={`statusBadge ${statusClass(item.orderStatus)}`}>{getCustomerStatusLabel(item.orderStatus)}</span></span>
+                  </div>
+                  <div className="orderRow__reference">Ref: {shortRef(item.reference)}</div>
+                </div>
+                <div className="orderRow__actions">
+                  {item.reference ? <Link href={`/account/orders/${encodeURIComponent(item.reference)}`}>View details</Link> : null}
+                  {item.productUrl || item.serviceUrl ? <Link href={item.productUrl ?? item.serviceUrl ?? '#'}>View item/service</Link> : null}
+                  {item.storeUrl ? <Link href={item.storeUrl}>View store</Link> : null}
+                  <Link href="/contact">Contact support</Link>
                 </div>
               </article>
             ))}
