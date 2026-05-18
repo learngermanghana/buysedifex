@@ -127,25 +127,6 @@ const formatPrice = (price?: number, currency?: string) => {
   return `${currencyLabel} ${price.toFixed(2)}`;
 };
 
-const getContactPhone = (item: PublicProduct) => {
-  const source = item as Record<string, unknown>;
-  const candidateKeys = ['phone', 'storePhone', 'telephone', 'whatsappNumber', 'mobile'];
-
-  for (const key of candidateKeys) {
-    const value = source[key];
-    if (typeof value === 'string' && value.trim().length > 0) return value.trim();
-    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-  }
-
-  return '';
-};
-
-const buildWhatsAppMessage = (item: PublicProduct) => {
-  const productLabel = (item.productName ?? item.name)?.trim() || 'this item';
-  const storeLabel = item.storeName?.trim() || 'this shop';
-  return `Hi ${storeLabel}, I'm interested in the ${productLabel} I saw on Sedifex Market.`;
-};
-
 const getProductName = (item: PublicProduct) => (item.productName ?? item.name)?.trim() || 'Untitled item';
 const getCategory = (item: PublicProduct) =>
   resolveClosestCategoryKey({
