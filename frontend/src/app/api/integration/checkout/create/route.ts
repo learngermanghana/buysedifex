@@ -25,7 +25,7 @@ type CheckoutCreateBody = {
   cart?: CheckoutItem[];
   customer?: { name?: string; email?: string; phone?: string; uid?: string | null };
   delivery?: { location?: string; notes?: string };
-  booking?: { preferredDate?: string; preferredTime?: string; preferredBranch?: string; notes?: string };
+  booking?: { preferredDate?: string; preferredTime?: string; preferredBranch?: string; notes?: string; slotId?: string; bookingDate?: string; bookingTime?: string; branchLocationName?: string; serviceId?: string; serviceName?: string; sourceChannel?: string; recordType?: string };
 };
 
 const isServiceCart = (cart: CheckoutItem[]) => cart.some((item) => normalizeType(item) === 'SERVICE');
@@ -162,7 +162,8 @@ export async function POST(request: NextRequest) {
     const deliveryLocation = cleanText(body.delivery?.location, 300);
     const deliveryNotes = cleanText(body.delivery?.notes, 1200);
     if (cart.length === 0) return NextResponse.json({ error: 'Cart is required' }, { status: 400 });
-    if (!customerEmail) return NextResponse.json({ error: 'customer.email is required' }, { status: 400 });
+    if (!customerEmail && !customerPhone) return NextResponse.json({ error: 'customer.email or customer.phone is required' }, { status: 400 });
+    const resolvedEmail = customerEmail || `${customerPhone.replace(/[^\d]/g, '') || 'buyer'}@sedifex.local`; 
     const grouped = groupCartByMerchant(cart);
     if (!isProductOnlyCart(cart) && (hasMixedTypes(cart) || grouped.size > 1)) {
       return NextResponse.json({ error: 'Only physical products can be checked out together. Services, courses, and events must be booked separately.' }, { status: 400 });
@@ -170,11 +171,11 @@ export async function POST(request: NextRequest) {
     const merchantIds = Array.from(grouped.keys());
     if (db && !firebaseConfigError) await saveMarketplaceCustomerCopies({ db, customerUid, customer: { name: customerName, email: customerEmail, phone: customerPhone }, deliveryLocation, merchantIds });
     if (grouped.size > 1 && isProductOnlyCart(cart)) {
-      const masterCheckout = await createMasterCheckout(grouped, { customerUid, customerName, customerEmail, customerPhone, deliveryLocation, deliveryNotes });
+      const masterCheckout = await createMasterCheckout(grouped, { customerUid, customerName, customerEmail: resolvedEmail, customerPhone, deliveryLocation, deliveryNotes });
       return NextResponse.json({ ok: true, checkoutMode: 'master_multi_store', merchantCheckouts: [masterCheckout], masterCheckout });
     }
     const [merchantId, merchantCart] = Array.from(grouped.entries())[0];
-    const result = await createSingleMerchantCheckout({ merchantId, merchantCart, customerUid, customerName, customerEmail, customerPhone, deliveryLocation, deliveryNotes, booking: { preferredDate: cleanText(body.booking?.preferredDate, 40), preferredTime: cleanText(body.booking?.preferredTime, 40), preferredBranch: cleanText(body.booking?.preferredBranch, 180), notes: cleanText(body.booking?.notes, 1200) } });
+    const result = await createSingleMerchantCheckout({ merchantId, merchantCart, customerUid, customerName, customerEmail: resolvedEmail, customerPhone, deliveryLocation, deliveryNotes, booking: { preferredDate: cleanText(body.booking?.preferredDate || body.booking?.bookingDate, 40), preferredTime: cleanText(body.booking?.preferredTime || body.booking?.bookingTime, 40), preferredBranch: cleanText(body.booking?.preferredBranch || body.booking?.branchLocationName, 180), notes: cleanText(body.booking?.notes, 1200) } });
     return NextResponse.json({ ok: true, checkoutMode: 'single_merchant', merchantCheckouts: [result] });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown checkout error';

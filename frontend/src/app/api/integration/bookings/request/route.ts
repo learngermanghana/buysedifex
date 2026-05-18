@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, slots: (availability.slots ?? availability.data?.slots ?? []) as unknown[] });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to fetch availability';
-    return NextResponse.json({ ok: false, slots: [], error: message }, { status: 200 });
+    const missingEndpoint = message.includes('(404)') || message.toLowerCase().includes('not found');
+    return NextResponse.json({ ok: false, slots: [], error: missingEndpoint ? 'Booking endpoint is unavailable on Sedifex (404). Please contact support.' : message }, { status: 200 });
   }
 }
 
