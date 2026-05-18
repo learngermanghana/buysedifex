@@ -142,6 +142,12 @@ const getCheckoutCreateUrl = () => {
   return `${getIntegrationApiBaseUrl()}/integration/checkout/create`;
 };
 
+const getCheckoutPreviewUrl = () => {
+  const directUrl = process.env.SEDIFEX_INTEGRATION_CHECKOUT_PREVIEW_URL?.trim();
+  if (directUrl) return normalizeAbsoluteUrl('SEDIFEX_INTEGRATION_CHECKOUT_PREVIEW_URL', directUrl);
+  return `${getIntegrationApiBaseUrl()}/integration/checkout/preview`;
+};
+
 const integrationFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const baseUrl = getIntegrationApiBaseUrl();
   const url = `${baseUrl}${path}`;
@@ -372,16 +378,28 @@ export const previewMerchantCheckout = async (merchantId: string, items: Checkou
     delivery_address_id: null,
     items: items.map(toSedifexCheckoutItem),
   };
-  const upstreamPreview = await integrationFetch<SedifexCheckoutPreviewResponse>('/integration/checkout/preview', {
+  const previewUrl = getCheckoutPreviewUrl();
+  const upstreamPreviewResponse = await fetch(previewUrl, {
     method: 'POST',
     headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-Sedifex-Contract-Version': getContractVersion(),
       Authorization: `Bearer ${merchantToken}`,
       'x-api-key': merchantToken,
       'x-sedifex-store-id': normalizedMerchantId,
       'x-sedifex-merchant-id': normalizedMerchantId,
     },
     body: JSON.stringify(payload),
+    cache: 'no-store',
   });
+
+  if (!upstreamPreviewResponse.ok) {
+    const body = await upstreamPreviewResponse.text().catch(() => '');
+    throw new Error(`Sedifex request failed (${upstreamPreviewResponse.status}) for checkout preview: ${body}`);
+  }
+
+  const upstreamPreview = (await upstreamPreviewResponse.json()) as SedifexCheckoutPreviewResponse;
   return applyMarketplaceFeeModel(upstreamPreview, items);
 };
 
