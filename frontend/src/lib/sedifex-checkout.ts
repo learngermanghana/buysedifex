@@ -377,6 +377,8 @@ export const previewMerchantCheckout = async (merchantId: string, items: Checkou
     headers: {
       Authorization: `Bearer ${merchantToken}`,
       'x-api-key': merchantToken,
+      'x-sedifex-store-id': normalizedMerchantId,
+      'x-sedifex-merchant-id': normalizedMerchantId,
     },
     body: JSON.stringify(payload),
   });
@@ -402,6 +404,8 @@ export const createMerchantCheckout = async (
     headers: {
       Authorization: `Bearer ${merchantToken}`,
       'x-api-key': merchantToken,
+      'x-sedifex-store-id': normalizedMerchantId,
+      'x-sedifex-merchant-id': normalizedMerchantId,
     },
     body: JSON.stringify({
       store_id: normalizedMerchantId,
