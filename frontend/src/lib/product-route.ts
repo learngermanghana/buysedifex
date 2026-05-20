@@ -1,5 +1,7 @@
 const PRODUCT_ROUTE_SEPARATOR = '--';
 
+type MarketplaceListingType = 'product' | 'service' | 'course' | string | null | undefined;
+
 const normalizeProductToken = (value: string) =>
   value
     .trim()
@@ -41,5 +43,12 @@ export const extractProductIdFromRouteParam = (routeParam: string): string => {
   return decoded.slice(separatorIndex + PRODUCT_ROUTE_SEPARATOR.length).trim();
 };
 
-export const getProductHref = (productId: string, productName?: string): string =>
-  `/products/${encodeURIComponent(getProductRouteParam(productId, productName))}`;
+export const getMarketplaceItemBasePath = (listingType?: MarketplaceListingType): '/products' | '/services' | '/courses' => {
+  const normalizedType = listingType?.trim().toLowerCase();
+  if (normalizedType === 'course') return '/courses';
+  if (normalizedType === 'service' || normalizedType === 'event' || normalizedType === 'appointment' || normalizedType === 'booking') return '/services';
+  return '/products';
+};
+
+export const getProductHref = (productId: string, productName?: string, listingType?: MarketplaceListingType): string =>
+  `${getMarketplaceItemBasePath(listingType)}/${encodeURIComponent(getProductRouteParam(productId, productName))}`;
