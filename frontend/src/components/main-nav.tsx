@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const navItems = [
   { href: '/', label: 'Home', match: (pathname: string) => pathname === '/' },
@@ -16,18 +17,35 @@ const navItems = [
 
 export function MainNav() {
   const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
 
   return (
-    <nav className="mainNav" aria-label="Primary navigation">
-      {navItems.map((item) => {
-        const isActive = item.match(pathname);
+    <nav className="mainNav" aria-label="Primary navigation" data-open={isOpen ? 'true' : 'false'}>
+      <button
+        type="button"
+        className="mainNavToggle"
+        aria-expanded={isOpen}
+        aria-controls="primary-navigation-links"
+        onClick={() => setIsOpen((value) => !value)}
+      >
+        <span aria-hidden="true">☰</span>
+        <span>Menu</span>
+      </button>
+      <div className="mainNavLinks" id="primary-navigation-links">
+        {navItems.map((item) => {
+          const isActive = item.match(pathname);
 
-        return (
-          <Link key={item.label} href={item.href} className={isActive ? 'active' : undefined} aria-current={isActive ? 'page' : undefined}>
-            {item.label}
-          </Link>
-        );
-      })}
+          return (
+            <Link key={item.label} href={item.href} className={isActive ? 'active' : undefined} aria-current={isActive ? 'page' : undefined}>
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }

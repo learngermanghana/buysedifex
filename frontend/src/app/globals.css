@@ -77,7 +77,6 @@ body {
 .mainNav {
   --nav-ring: color-mix(in srgb, var(--brand-bright-indigo) 42%, white 58%);
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
   padding: 0.28rem;
@@ -85,6 +84,17 @@ body {
   border-radius: 999px;
   background: linear-gradient(160deg, #ffffff 0%, #f8fafc 100%);
   box-shadow: 0 10px 24px -24px #0f172a;
+}
+
+.mainNavToggle {
+  display: none;
+}
+
+.mainNavLinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .mainNav a {
@@ -126,12 +136,41 @@ body {
   .mainNav {
     width: 100%;
     border-radius: 0.9rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+
+  .mainNavToggle {
+    border: 1px solid #cbd5e1;
+    border-radius: 0.7rem;
+    background: #fff;
+    color: #1e293b;
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
+    gap: 0.35rem;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    width: 100%;
+    cursor: pointer;
+  }
+
+  .mainNav[data-open='false'] .mainNavLinks {
+    display: none;
+  }
+
+  .mainNav[data-open='true'] .mainNavLinks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+    width: 100%;
   }
 
   .mainNav a {
-    flex: 1 1 auto;
     text-align: center;
+    display: block;
   }
 }
 
