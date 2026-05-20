@@ -2,15 +2,13 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FirestoreError,
   QueryConstraint,
   QueryDocumentSnapshot,
   collection,
-  doc,
   documentId,
-  getDoc,
   getDocs,
   limit,
   orderBy,
@@ -19,8 +17,8 @@ import {
   where,
 } from 'firebase/firestore';
 import { db, firebaseConfigError } from '@/lib/firebase';
-import { getStoreHref } from '@/lib/store-route';
 import { getProductHref } from '@/lib/product-route';
+import { getStoreHref } from '@/lib/store-route';
 import { resolveClosestCategoryKey } from '@/lib/category-taxonomy';
 import './product-grid.css';
 
@@ -28,6 +26,17 @@ const PRIMARY_COLLECTION = 'publicListings';
 const LEGACY_COLLECTIONS = ['publicProducts', 'publicServices'] as const;
 const MARKETPLACE_COLLECTIONS = [PRIMARY_COLLECTION, ...LEGACY_COLLECTIONS] as const;
 const PLACEHOLDER_IMAGE = 'https://placehold.co/640x640/172033/ffffff?text=Sedifex+Market';
+const PAGE_SIZE = 24;
+const FULL_PAGE_QUERY_LIMIT = 360;
+const PREVIEW_QUERY_LIMIT = 48;
+const SEARCH_SCAN_LIMIT = 500;
+const SEARCH_HISTORY_KEY = 'sedifex-recent-searches';
+const MAX_HISTORY_ITEMS = 6;
+const MAX_SUGGESTIONS = 8;
+
+type ItemTypeFilter = 'all' | 'product' | 'service' | 'course';
+type SortOption = 'newest' | 'price' | 'featured';
+type PaginationItem = number | 'ellipsis';
 
 type PublicProduct = {
   id: string;
@@ -37,6 +46,7 @@ type PublicProduct = {
   description?: string;
   categoryKey?: string;
   category?: string;
+  categoryName?: string;
   imageUrls?: string[] | string;
   imageUrl?: string;
   image?: string;
@@ -53,9 +63,6 @@ type PublicProduct = {
   sku?: string;
   batchNumber?: string;
   storeName?: string;
-  storePhone?: string;
-  phone?: string;
-  telephone?: string;
   city?: string;
   storeCity?: string;
   itemType?: string;
@@ -73,34 +80,18 @@ type PublicProduct = {
   verified?: boolean | string | number;
   featuredRank?: number;
   rankingScore?: number;
-  publishedAt?: { seconds: number };
+  publishedAt?: { seconds?: number } | string;
   updatedAt?: { seconds?: number } | string;
 };
 
-type SortOption = 'newest' | 'price' | 'featured';
-type ItemTypeFilter = 'all' | 'product' | 'service' | 'course';
-type PaginationItem = number | 'ellipsis';
-
-const PAGE_SIZE = 24;
-const QUERY_LIMIT = 100;
-const FETCH_SCAN_BATCHES = 4;
-const FILTERED_FETCH_SCAN_BATCHES = 12;
-const SEARCH_SCAN_LIMIT = 300;
-const SEARCH_BATCH_SIZE = 100;
-const SEARCH_HISTORY_KEY = 'sedifex-recent-searches';
-const MAX_HISTORY_ITEMS = 6;
-const MAX_SUGGESTIONS = 8;
-
-const SYNONYM_GROUPS = [
-  ['sneakers', 'trainers', 'running shoes', 'kicks'],
-  ['tee', 'tshirt', 't-shirt', 'shirt'],
-  ['trouser', 'trousers', 'pants'],
-  ['phone', 'mobile', 'smartphone'],
-  ['laptop', 'notebook'],
-  ['fridge', 'refrigerator'],
-  ['tv', 'television'],
-  ['beauty', 'cosmetics', 'makeup'],
-];
+type ProductGridProps = {
+  itemTypeFilter?: ItemTypeFilter;
+  previewLimit?: number;
+  showToolbar?: boolean;
+  showPagination?: boolean;
+  moreHref?: string;
+  moreLabel?: string;
+};
 
 const normalizeBoolean = (value: unknown): boolean | null => {
   if (typeof value === 'boolean') return value;
@@ -116,6 +107,15 @@ const normalizeBoolean = (value: unknown): boolean | null => {
 const isTrue = (value: unknown) => normalizeBoolean(value) === true;
 const isFalse = (value: unknown) => normalizeBoolean(value) === false;
 
+const getTimestampScore = (value: PublicProduct['publishedAt'] | PublicProduct['updatedAt']) => {
+  if (!value) return 0;
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed / 1000 : 0;
+  }
+  return typeof value.seconds === 'number' ? value.seconds : 0;
+};
+
 const buildPaginationItems = (currentPage: number, totalPages: number): PaginationItem[] => {
   if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
   const pages = new Set<number>([1, totalPages, currentPage, currentPage - 1, currentPage + 1]);
@@ -124,57 +124,35 @@ const buildPaginationItems = (currentPage: number, totalPages: number): Paginati
   const sortedPages = Array.from(pages).filter((page) => page >= 1 && page <= totalPages).sort((a, b) => a - b);
   const items: PaginationItem[] = [];
   sortedPages.forEach((page, index) => {
-    const previousPage = sortedPages[index - 1];
-    if (previousPage && page - previousPage > 1) items.push('ellipsis');
+    const previous = sortedPages[index - 1];
+    if (previous && page - previous > 1) items.push('ellipsis');
     items.push(page);
   });
   return items;
 };
 
-const levenshteinDistance = (left: string, right: string) => {
-  if (left === right) return 0;
-  if (!left.length) return right.length;
-  if (!right.length) return left.length;
-
-  const dp = Array.from({ length: left.length + 1 }, (_, i) => [i]);
-  for (let j = 1; j <= right.length; j += 1) dp[0][j] = j;
-
-  for (let i = 1; i <= left.length; i += 1) {
-    for (let j = 1; j <= right.length; j += 1) {
-      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
-    }
-  }
-
-  return dp[left.length][right.length];
-};
-
-const normalizeDisplayCurrency = (currency?: string) => {
-  const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
-  return normalizedCurrency === 'USD' ? 'GHS' : normalizedCurrency;
-};
-
-const formatPrice = (price?: number, currency?: string) => {
-  if (price == null) return 'Price unavailable';
-  const displayCurrency = normalizeDisplayCurrency(currency);
-  const currencyLabel = displayCurrency === 'GHS' ? 'Cedis (GH₵)' : displayCurrency;
-  return `${currencyLabel} ${price.toFixed(2)}`;
-};
-
 const getProductName = (item: PublicProduct) => (item.productName ?? item.name)?.trim() || 'Untitled item';
+
+const resolveListingType = (item: Pick<PublicProduct, 'listingType' | 'itemType'>): Exclude<ItemTypeFilter, 'all'> => {
+  const listingType = item.listingType?.trim().toLowerCase();
+  if (listingType === 'course' || listingType === 'service' || listingType === 'product') return listingType;
+  const fallbackType = item.itemType?.trim().toLowerCase();
+  if (fallbackType === 'course') return 'course';
+  if (fallbackType === 'service') return 'service';
+  return 'product';
+};
+
+const matchesItemTypeFilter = (item: Pick<PublicProduct, 'listingType' | 'itemType'>, filter: ItemTypeFilter) => filter === 'all' || resolveListingType(item) === filter;
 
 const getCategory = (item: PublicProduct) =>
   resolveClosestCategoryKey({
-    category: item.categoryKey?.trim() || item.category?.trim(),
+    category: item.categoryKey?.trim() || item.categoryName?.trim() || item.category?.trim(),
     productName: getProductName(item),
     description: item.description,
     itemType: item.itemType,
   });
 
-const getStoreCity = (item: PublicProduct) => {
-  const rawCity = item.city ?? item.storeCity;
-  return rawCity?.trim() || 'City unavailable';
-};
+const getStoreCity = (item: PublicProduct) => (item.city ?? item.storeCity)?.trim() || 'City unavailable';
 
 const decodeImageValues = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.flatMap((entry) => decodeImageValues(entry));
@@ -192,128 +170,59 @@ const decodeImageValues = (value: unknown): string[] => {
   return [trimmed];
 };
 
-const normalizeImageCandidate = (value: string): string => {
+const normalizeImageCandidate = (value: string) => {
   const trimmed = value.trim().replace(/^['"]+|['"]+$/g, '').replace(/\\u002F/gi, '/').replace(/\\\//g, '/');
   if (!trimmed.toLowerCase().startsWith('gs://')) return trimmed;
   const withoutPrefix = trimmed.slice(5);
   const slashIndex = withoutPrefix.indexOf('/');
   if (slashIndex === -1) return '';
-  const bucket = withoutPrefix.slice(0, slashIndex);
-  const objectPath = withoutPrefix.slice(slashIndex + 1);
-  return bucket && objectPath ? `https://storage.googleapis.com/${bucket}/${objectPath}` : '';
+  return `https://storage.googleapis.com/${withoutPrefix.slice(0, slashIndex)}/${withoutPrefix.slice(slashIndex + 1)}`;
 };
 
 const isDisplayableImageUrl = (value: string) => {
-  const candidate = normalizeImageCandidate(value);
-  if (!candidate) return false;
   try {
-    const parsed = new URL(candidate);
+    const parsed = new URL(value);
     return parsed.protocol === 'http:' || parsed.protocol === 'https:';
   } catch {
     return false;
   }
 };
 
-const getDisplayImages = (item: PublicProduct): string[] => {
-  const candidates = [
-    item.imageUrls,
-    item.imageUrl,
-    item.image,
-    item.serviceImageUrls,
-    item.serviceImageUrl,
-    item.serviceImage,
-    item.thumbnailUrl,
-    item.photoUrl,
-    item.images,
-  ].flatMap((value) => decodeImageValues(value));
-  return Array.from(new Set(candidates.map(normalizeImageCandidate).filter(isDisplayableImageUrl)));
+const getDisplayImage = (item: PublicProduct) => {
+  const candidates = [item.imageUrls, item.imageUrl, item.image, item.serviceImageUrls, item.serviceImageUrl, item.serviceImage, item.thumbnailUrl, item.photoUrl, item.images]
+    .flatMap((value) => decodeImageValues(value))
+    .map(normalizeImageCandidate)
+    .filter(isDisplayableImageUrl);
+  return Array.from(new Set(candidates))[0] ?? PLACEHOLDER_IMAGE;
 };
-
-const getDisplayImage = (item: PublicProduct) => getDisplayImages(item)[0] ?? PLACEHOLDER_IMAGE;
 
 const isPublicListing = (item: PublicProduct) => {
   if (isTrue(item.deleted) || isTrue(item.isDeleted)) return false;
   if (isTrue(item.hidden) || isTrue(item.isHidden)) return false;
   if (isFalse(item.visible) || isFalse(item.isVisible)) return false;
   if (isFalse(item.isMarketplaceVisible) || isFalse(item.isPublished)) return false;
-
   const status = item.status?.trim().toLowerCase();
   if (status === 'draft' && !isTrue(item.isPublished)) return false;
-
   return true;
 };
 
 const isVerifiedStore = (value: PublicProduct['verified']) => value == null || isTrue(value);
 
-const normalizeStoreNamesByStoreId = (items: PublicProduct[]): PublicProduct[] => {
-  const canonicalNamesByStoreId = new Map<string, string>();
-  items.forEach((item) => {
-    const storeId = item.storeId?.trim();
-    const storeName = item.storeName?.trim();
-    if (storeId && storeName && !canonicalNamesByStoreId.has(storeId)) canonicalNamesByStoreId.set(storeId, storeName);
-  });
-  return items.map((item) => {
-    const storeId = item.storeId?.trim();
-    if (!storeId) return item;
-    const canonicalStoreName = canonicalNamesByStoreId.get(storeId);
-    return canonicalStoreName && canonicalStoreName !== item.storeName ? { ...item, storeName: canonicalStoreName } : item;
-  });
+const formatPrice = (price?: number, currency?: string) => {
+  if (price == null) return 'Price unavailable';
+  const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
+  const currencyLabel = normalizedCurrency === 'USD' || normalizedCurrency === 'GHS' ? 'Cedis (GH₵)' : normalizedCurrency;
+  return `${currencyLabel} ${price.toFixed(2)}`;
 };
 
-const bucketProductsByStore = (items: PublicProduct[]) => {
-  const buckets = new Map<string, PublicProduct[]>();
-  items.forEach((item) => {
-    const storeKey = item.storeId?.trim() || item.storeName?.trim() || `unknown-store-${item.id}`;
-    const bucket = buckets.get(storeKey) ?? [];
-    bucket.push(item);
-    buckets.set(storeKey, bucket);
-  });
-  return buckets;
-};
-
-const mixProductsAcrossStores = (items: PublicProduct[]) => {
-  const buckets = bucketProductsByStore(items);
-  const mixed: PublicProduct[] = [];
-  while (buckets.size > 0) {
-    for (const [storeKey, storeItems] of buckets) {
-      const nextItem = storeItems.shift();
-      if (nextItem) mixed.push(nextItem);
-      if (storeItems.length === 0) buckets.delete(storeKey);
-    }
-  }
-  return mixed;
-};
-
-const capProductsPerStore = (items: PublicProduct[], limitPerStore: number) => {
-  if (limitPerStore <= 0) return items;
-  const counts = new Map<string, number>();
-  return items.filter((item) => {
-    const storeKey = item.storeId?.trim() || item.storeName?.trim() || `unknown-store-${item.id}`;
-    const currentCount = counts.get(storeKey) ?? 0;
-    if (currentCount >= limitPerStore) return false;
-    counts.set(storeKey, currentCount + 1);
-    return true;
-  });
-};
-
-const mixProductsByCategoryThenStore = (items: PublicProduct[]) => {
-  const categoryBuckets = new Map<string, PublicProduct[]>();
-  items.forEach((item) => {
-    const categoryKey = getCategory(item) || 'uncategorized';
-    const bucket = categoryBuckets.get(categoryKey) ?? [];
-    bucket.push(item);
-    categoryBuckets.set(categoryKey, bucket);
-  });
-  return Array.from(categoryBuckets.values()).flatMap((categoryItems) => mixProductsAcrossStores(categoryItems));
-};
-
-const getTimestampScore = (value: PublicProduct['updatedAt'] | PublicProduct['publishedAt']) => {
-  if (!value) return 0;
-  if (typeof value === 'string') {
-    const parsed = Date.parse(value);
-    return Number.isFinite(parsed) ? parsed / 1000 : 0;
-  }
-  return typeof value.seconds === 'number' ? value.seconds : 0;
+const resolveCtaLabel = (item: Pick<PublicProduct, 'listingType' | 'itemType' | 'salesMode'>) => {
+  const listingType = resolveListingType(item);
+  const salesMode = item.salesMode?.trim().toLowerCase();
+  if (salesMode === 'request_quote') return 'Request quote';
+  if (listingType === 'service') return 'Book now';
+  if (listingType === 'course') return 'Register';
+  if (listingType === 'product' && salesMode === 'buy_now') return 'Buy now';
+  return listingType === 'product' ? 'View product' : 'View details';
 };
 
 const sortProducts = (items: PublicProduct[], selectedSort: SortOption) => {
@@ -328,9 +237,9 @@ const sortProducts = (items: PublicProduct[], selectedSort: SortOption) => {
       const leftScore = typeof left.rankingScore === 'number' ? left.rankingScore : Number.NEGATIVE_INFINITY;
       const rightScore = typeof right.rankingScore === 'number' ? right.rankingScore : Number.NEGATIVE_INFINITY;
       if (leftScore !== rightScore) return rightScore - leftScore;
-      const leftFeaturedRank = typeof left.featuredRank === 'number' ? left.featuredRank : Number.NEGATIVE_INFINITY;
-      const rightFeaturedRank = typeof right.featuredRank === 'number' ? right.featuredRank : Number.NEGATIVE_INFINITY;
-      if (leftFeaturedRank !== rightFeaturedRank) return rightFeaturedRank - leftFeaturedRank;
+      const leftRank = typeof left.featuredRank === 'number' ? left.featuredRank : Number.NEGATIVE_INFINITY;
+      const rightRank = typeof right.featuredRank === 'number' ? right.featuredRank : Number.NEGATIVE_INFINITY;
+      if (leftRank !== rightRank) return rightRank - leftRank;
     }
     const leftTime = getTimestampScore(left.publishedAt) || getTimestampScore(left.updatedAt);
     const rightTime = getTimestampScore(right.publishedAt) || getTimestampScore(right.updatedAt);
@@ -340,42 +249,48 @@ const sortProducts = (items: PublicProduct[], selectedSort: SortOption) => {
   return sorted;
 };
 
-type ProductGridProps = { itemTypeFilter?: ItemTypeFilter };
-
-const resolveListingType = (item: Pick<PublicProduct, 'listingType' | 'itemType'>): Exclude<ItemTypeFilter, 'all'> => {
-  const listingType = item.listingType?.trim().toLowerCase();
-  if (listingType === 'service' || listingType === 'course' || listingType === 'product') return listingType;
-  const fallbackItemType = item.itemType?.trim().toLowerCase();
-  if (fallbackItemType === 'service') return 'service';
-  if (fallbackItemType === 'course') return 'course';
-  return 'product';
+const normalizeStoreNamesByStoreId = (items: PublicProduct[]) => {
+  const names = new Map<string, string>();
+  items.forEach((item) => {
+    const storeId = item.storeId?.trim();
+    const storeName = item.storeName?.trim();
+    if (storeId && storeName && !names.has(storeId)) names.set(storeId, storeName);
+  });
+  return items.map((item) => {
+    const storeId = item.storeId?.trim();
+    const canonicalName = storeId ? names.get(storeId) : null;
+    return canonicalName && canonicalName !== item.storeName ? { ...item, storeName: canonicalName } : item;
+  });
 };
 
-const resolveCtaLabel = (item: Pick<PublicProduct, 'listingType' | 'itemType' | 'salesMode'>) => {
-  const listingType = resolveListingType(item);
-  const salesMode = item.salesMode?.trim().toLowerCase();
-  if (salesMode === 'request_quote') return 'Request quote';
-  if (listingType === 'product' && salesMode === 'buy_now') return 'Buy now';
-  if (listingType === 'service' && salesMode === 'book_now') return 'Book now';
-  if (listingType === 'course' && salesMode === 'register') return 'Register';
-  if (listingType === 'service') return 'Book now';
-  if (listingType === 'course') return 'Register';
-  return 'View details';
+const dedupeById = (items: PublicProduct[]) => Array.from(new Map(items.map((item) => [item.id, item])).values());
+
+const capProductsPerStore = (items: PublicProduct[], limitPerStore: number) => {
+  const counts = new Map<string, number>();
+  return items.filter((item) => {
+    const key = item.storeId?.trim() || item.storeName?.trim() || item.id;
+    const count = counts.get(key) ?? 0;
+    if (count >= limitPerStore) return false;
+    counts.set(key, count + 1);
+    return true;
+  });
 };
 
-const matchesItemTypeFilter = (item: Pick<PublicProduct, 'listingType' | 'itemType'>, filter: ItemTypeFilter) => {
-  if (filter === 'all') return true;
-  return resolveListingType(item) === filter;
-};
-
-export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
+export function ProductGrid({
+  itemTypeFilter = 'all',
+  previewLimit,
+  showToolbar = true,
+  showPagination = true,
+  moreHref,
+  moreLabel,
+}: ProductGridProps) {
+  const isPreview = typeof previewLimit === 'number' && previewLimit > 0;
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [cities, setCities] = useState<string[]>(['all']);
-  const [selectedCity, setSelectedCity] = useState<string>('all');
+  const [selectedCity, setSelectedCity] = useState('all');
   const [selectedSort, setSelectedSort] = useState<SortOption>('newest');
-  const [searchText, setSearchText] = useState<string>('');
+  const [searchText, setSearchText] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const storeVerifiedCacheRef = useRef<Map<string, boolean>>(new Map());
   const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [lastCollection, setLastCollection] = useState<string | null>(null);
@@ -384,31 +299,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const hasServerSideItemTypeFilter = itemTypeFilter !== 'all';
-
-  const filterByVerifiedStore = useCallback(async (items: PublicProduct[]) => {
-    if (items.length === 0 || db == null) return items;
-    const firestore: NonNullable<typeof db> = db;
-    const uniqueStoreIds = Array.from(new Set(items.map((item) => item.storeId?.trim()).filter((value): value is string => Boolean(value))));
-    const unresolvedStoreIds = uniqueStoreIds.filter((storeId) => !storeVerifiedCacheRef.current.has(storeId));
-
-    await Promise.all(unresolvedStoreIds.map(async (storeId) => {
-      try {
-        const snapshot = await getDoc(doc(firestore, 'stores', storeId));
-        const data = snapshot.exists() ? snapshot.data() as Record<string, unknown> : {};
-        const status = typeof data.status === 'string' ? data.status.trim().toLowerCase() : '';
-        const verified = isTrue(data.verified) && status !== 'inactive' && status !== 'suspended' && isFalse(data.eligibleForBuy) !== true && isTrue(data.buyOptOut) !== true;
-        storeVerifiedCacheRef.current.set(storeId, verified);
-      } catch {
-        storeVerifiedCacheRef.current.set(storeId, true);
-      }
-    }));
-
-    return items.filter((item) => {
-      const storeId = item.storeId?.trim();
-      if (!storeId) return false;
-      return storeVerifiedCacheRef.current.get(storeId) === true;
-    });
-  }, []);
 
   const buildServerFilters = useCallback((): QueryConstraint[] => {
     const filters: QueryConstraint[] = [];
@@ -426,50 +316,36 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     } catch {}
   }, []);
 
-  const searchableTerms = useMemo(() => {
-    const terms = new Set<string>();
-    products.forEach((product) => {
-      [getProductName(product), product.storeName, getCategory(product), product.description, resolveListingType(product)].forEach((term) => {
-        const normalized = term?.trim().toLowerCase();
-        if (normalized) terms.add(normalized);
-      });
+  const visibleProducts = useMemo(() => {
+    const normalizedSearch = searchText.trim().toLowerCase();
+    const filtered = normalizeStoreNamesByStoreId(products).filter((item) => {
+      if (!matchesItemTypeFilter(item, itemTypeFilter)) return false;
+      if (selectedCity !== 'all' && getStoreCity(item).toLowerCase() !== selectedCity.toLowerCase()) return false;
+      if (!normalizedSearch) return true;
+      const haystack = [getProductName(item), item.description, item.storeName, getCategory(item), item.sku, item.batchNumber, resolveListingType(item)]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedSearch);
     });
-    return Array.from(terms);
-  }, [products]);
-
-  const normalizedSearchText = searchText.trim().toLowerCase();
-
-  const expandedSearchTerms = useMemo(() => {
-    if (!normalizedSearchText) return [] as string[];
-    const expanded = new Set<string>([normalizedSearchText]);
-    SYNONYM_GROUPS.forEach((group) => {
-      if (group.some((entry) => entry.includes(normalizedSearchText) || normalizedSearchText.includes(entry))) {
-        group.forEach((entry) => expanded.add(entry));
-      }
-    });
-    searchableTerms.forEach((term) => {
-      const distance = levenshteinDistance(normalizedSearchText, term);
-      const threshold = Math.max(1, Math.floor(normalizedSearchText.length * 0.3));
-      if (distance <= threshold) expanded.add(term);
-    });
-    return Array.from(expanded);
-  }, [normalizedSearchText, searchableTerms]);
+    return sortProducts(filtered.filter(isPublicListing), selectedSort);
+  }, [itemTypeFilter, products, searchText, selectedCity, selectedSort]);
 
   const suggestions = useMemo(() => {
-    if (!normalizedSearchText) return recentSearches;
-    const synonymSuggestions = new Set<string>();
-    SYNONYM_GROUPS.forEach((group) => {
-      if (group.some((entry) => entry.includes(normalizedSearchText) || normalizedSearchText.includes(entry))) group.forEach((entry) => synonymSuggestions.add(entry));
-    });
-    const ranked = searchableTerms
-      .filter((term) => term.includes(normalizedSearchText) || levenshteinDistance(normalizedSearchText, term) <= 2)
-      .sort((a, b) => levenshteinDistance(normalizedSearchText, a) - levenshteinDistance(normalizedSearchText, b));
-    return Array.from(new Set([...ranked, ...synonymSuggestions])).slice(0, MAX_SUGGESTIONS);
-  }, [normalizedSearchText, recentSearches, searchableTerms]);
+    const normalized = searchText.trim().toLowerCase();
+    if (!normalized) return recentSearches;
+    const terms = new Set<string>();
+    visibleProducts.forEach((item) => [getProductName(item), item.storeName, getCategory(item), resolveListingType(item)].forEach((term) => {
+      const textValue = term?.trim().toLowerCase();
+      if (textValue && textValue.includes(normalized)) terms.add(textValue);
+    }));
+    return Array.from(terms).slice(0, MAX_SUGGESTIONS);
+  }, [recentSearches, searchText, visibleProducts]);
 
   const commitSearch = useCallback((value: string) => {
     const normalized = value.trim();
     setSearchText(normalized);
+    setCurrentPage(1);
     if (!normalized) return;
     setRecentSearches((current) => {
       const next = [normalized, ...current.filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(0, MAX_HISTORY_ITEMS);
@@ -478,78 +354,45 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     });
   }, []);
 
-  const visibleProducts = useMemo(() => {
-    const text = searchText.trim().toLowerCase();
-    const normalizedProducts = normalizeStoreNamesByStoreId(products);
-    const matchingProducts = normalizedProducts.filter((product) => {
-      if (!matchesItemTypeFilter(product, itemTypeFilter)) return false;
-      const cityMatches = selectedCity === 'all' || getStoreCity(product).toLowerCase() === selectedCity.toLowerCase();
-      if (!cityMatches) return false;
-      if (!text) return true;
-      const haystack = [getProductName(product), product.description, product.storeName, getCategory(product), product.sku, product.batchNumber, resolveListingType(product)]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return expandedSearchTerms.some((term) => haystack.includes(term));
-    });
-    return mixProductsByCategoryThenStore(sortProducts(matchingProducts.filter(isPublicListing), selectedSort));
-  }, [expandedSearchTerms, itemTypeFilter, products, searchText, selectedCity, selectedSort]);
-
   const fetchCollectionPage = useCallback(async (collectionName: string, cursor?: QueryDocumentSnapshot) => {
     if (!db) return { items: [] as PublicProduct[], lastDoc: null as QueryDocumentSnapshot | null, isEndReached: true };
     const filters = buildServerFilters();
+    const pageLimit = isPreview ? PREVIEW_QUERY_LIMIT : FULL_PAGE_QUERY_LIMIT;
     const orderOptions: QueryConstraint[][] =
       selectedSort === 'price'
         ? [[orderBy('price', 'asc'), orderBy(documentId(), 'asc')], [orderBy(documentId(), 'asc')]]
         : selectedSort === 'featured'
-          ? [[orderBy('rankingScore', 'desc'), orderBy('featuredRank', 'desc'), orderBy(documentId(), 'asc')], [orderBy('featuredRank', 'desc'), orderBy(documentId(), 'asc')], [orderBy(documentId(), 'asc')]]
+          ? [[orderBy('rankingScore', 'desc'), orderBy('featuredRank', 'desc'), orderBy(documentId(), 'asc')], [orderBy(documentId(), 'asc')]]
           : [[orderBy('publishedAt', 'desc')], [orderBy(documentId(), 'asc')]];
 
     for (const ordering of orderOptions) {
       try {
-        const collectedItems: PublicProduct[] = [];
-        let scanCursor = cursor;
-        let latestSnapshotDoc: QueryDocumentSnapshot | null = cursor ?? null;
-        let lastSnapshotSize = 0;
-        const maxScanBatches = hasServerSideItemTypeFilter ? FILTERED_FETCH_SCAN_BATCHES : FETCH_SCAN_BATCHES;
-
-        for (let scanIndex = 0; scanIndex < maxScanBatches; scanIndex += 1) {
-          const baseQuery = query(collection(db, collectionName), ...filters, ...ordering, limit(QUERY_LIMIT));
-          const pagedQuery = scanCursor ? query(baseQuery, startAfter(scanCursor)) : baseQuery;
-          const scanSnapshot = await getDocs(pagedQuery);
-          lastSnapshotSize = scanSnapshot.docs.length;
-          if (scanSnapshot.empty) break;
-
-          const batchItemsRaw = scanSnapshot.docs
-            .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as PublicProduct)
-            .filter((item) => matchesItemTypeFilter(item, itemTypeFilter) && isPublicListing(item));
-          const batchItems = await filterByVerifiedStore(batchItemsRaw);
-          collectedItems.push(...batchItems);
-          latestSnapshotDoc = scanSnapshot.docs.at(-1) ?? latestSnapshotDoc;
-          scanCursor = latestSnapshotDoc ?? undefined;
-          if (lastSnapshotSize < QUERY_LIMIT || collectedItems.length >= QUERY_LIMIT) break;
-        }
-
-        return { items: collectedItems.slice(0, QUERY_LIMIT), lastDoc: latestSnapshotDoc, isEndReached: lastSnapshotSize < QUERY_LIMIT };
-      } catch (queryErr) {
-        const firestoreError = queryErr as FirestoreError;
-        if (firestoreError?.code !== 'failed-precondition') throw queryErr;
+        const pageQuery = query(collection(db, collectionName), ...filters, ...ordering, limit(pageLimit), ...(cursor ? [startAfter(cursor)] : []));
+        const snapshot = await getDocs(pageQuery);
+        const items = snapshot.docs
+          .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as PublicProduct)
+          .filter((item) => matchesItemTypeFilter(item, itemTypeFilter) && isPublicListing(item));
+        return {
+          items,
+          lastDoc: snapshot.docs.at(-1) ?? cursor ?? null,
+          isEndReached: snapshot.docs.length < pageLimit,
+        };
+      } catch (error) {
+        const firestoreError = error as FirestoreError;
+        if (firestoreError?.code !== 'failed-precondition') throw error;
       }
     }
-
     throw new Error(`Unable to fetch ${collectionName} with the available indexes.`);
-  }, [buildServerFilters, filterByVerifiedStore, hasServerSideItemTypeFilter, itemTypeFilter, selectedSort]);
+  }, [buildServerFilters, isPreview, itemTypeFilter, selectedSort]);
 
   const fetchProducts = useCallback(async (cursor?: QueryDocumentSnapshot, collectionCursor?: string | null) => {
     if (!db) {
       setError(firebaseConfigError ?? 'Firebase is not configured.');
       return;
     }
-
     setIsLoading(true);
     setError(null);
     setDebugInfo(null);
-
     try {
       const startCollectionIndex = collectionCursor ? Math.max(0, MARKETPLACE_COLLECTIONS.indexOf(collectionCursor as typeof MARKETPLACE_COLLECTIONS[number])) : 0;
       let nextItems: PublicProduct[] = [];
@@ -567,12 +410,11 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         if (nextItems.length > 0 || !isEndReached) break;
       }
 
-      const deduped = Array.from(new Map(nextItems.map((item) => [item.id, item])).values());
-      const cappedItems = capProductsPerStore(mixProductsAcrossStores(deduped), 2);
-      setProducts((current) => cursor ? normalizeStoreNamesByStoreId([...current, ...cappedItems]) : normalizeStoreNamesByStoreId(cappedItems));
+      const preparedItems = isPreview ? capProductsPerStore(dedupeById(nextItems), 2) : dedupeById(nextItems);
+      setProducts((current) => cursor ? normalizeStoreNamesByStoreId(dedupeById([...current, ...preparedItems])) : normalizeStoreNamesByStoreId(preparedItems));
       setCities((current) => {
         const next = new Set(current);
-        cappedItems.forEach((item) => next.add(getStoreCity(item)));
+        preparedItems.forEach((item) => next.add(getStoreCity(item)));
         return Array.from(next).sort((a, b) => a.localeCompare(b));
       });
       setLastDoc(isEndReached ? null : nextLastDoc);
@@ -580,96 +422,76 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     } catch (err) {
       console.error('Failed to fetch products', err);
       const firestoreError = err as FirestoreError;
-      const debugDetails = {
-        operation: 'fetchProducts',
-        selectedSort,
-        firestoreCode: firestoreError?.code ?? 'unknown',
-        firestoreMessage: firestoreError?.message ?? 'No message provided',
-        firebaseConfigError: firebaseConfigError ?? null,
-      };
-      setDebugInfo(JSON.stringify(debugDetails, null, 2));
-      if (firestoreError?.code === 'permission-denied') setError('Could not load products due to Firestore rules. Allow public read access to marketplace collections.');
-      else if (firestoreError?.code === 'failed-precondition') setError('Could not load products. Deploy Firestore indexes and rules with `firebase deploy --only firestore:indexes,firestore:rules`.');
-      else setError('Could not load products. Check debug details below to see the exact Firestore error.');
+      setDebugInfo(JSON.stringify({ operation: 'fetchProducts', firestoreCode: firestoreError?.code ?? 'unknown', firestoreMessage: firestoreError?.message ?? 'No message provided' }, null, 2));
+      if (firestoreError?.code === 'permission-denied') setError('Could not load listings due to Firestore rules. Allow public read access to marketplace collections.');
+      else if (firestoreError?.code === 'failed-precondition') setError('Could not load listings. Deploy Firestore indexes and rules.');
+      else setError('Could not load listings. Check debug details below.');
     } finally {
       setIsLoading(false);
     }
-  }, [fetchCollectionPage, selectedSort]);
+  }, [fetchCollectionPage, isPreview]);
 
   const fetchProductsForSearch = useCallback(async () => {
-    if (!db) {
-      setError(firebaseConfigError ?? 'Firebase is not configured.');
-      return;
-    }
-
+    if (!db) return;
     setIsLoading(true);
     setError(null);
-    setDebugInfo(null);
-
     try {
       const filters = buildServerFilters();
       const allItems: PublicProduct[] = [];
-
       for (const collectionName of MARKETPLACE_COLLECTIONS) {
         let cursor: QueryDocumentSnapshot | undefined;
         while (allItems.length < SEARCH_SCAN_LIMIT) {
-          const batchQuery = query(collection(db, collectionName), ...filters, orderBy(documentId(), 'asc'), limit(SEARCH_BATCH_SIZE), ...(cursor ? [startAfter(cursor)] : []));
-          const snapshot = await getDocs(batchQuery);
-          const batchItemsRaw = snapshot.docs
-            .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as PublicProduct)
-            .filter((item) => matchesItemTypeFilter(item, itemTypeFilter) && isPublicListing(item));
-          const batchItems = await filterByVerifiedStore(batchItemsRaw);
-          allItems.push(...batchItems);
-          if (snapshot.docs.length < SEARCH_BATCH_SIZE) break;
+          const snapshot = await getDocs(query(collection(db, collectionName), ...filters, orderBy(documentId(), 'asc'), limit(100), ...(cursor ? [startAfter(cursor)] : [])));
+          allItems.push(...snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as PublicProduct).filter((item) => matchesItemTypeFilter(item, itemTypeFilter) && isPublicListing(item)));
+          if (snapshot.docs.length < 100) break;
           cursor = snapshot.docs.at(-1);
         }
       }
-
-      const deduped = Array.from(new Map(allItems.map((item) => [item.id, item])).values()).slice(0, SEARCH_SCAN_LIMIT);
-      setProducts(normalizeStoreNamesByStoreId(deduped));
+      const preparedItems = dedupeById(allItems).slice(0, SEARCH_SCAN_LIMIT);
+      setProducts(normalizeStoreNamesByStoreId(preparedItems));
       setLastDoc(null);
       setLastCollection(null);
       setCities((current) => {
         const next = new Set(current);
-        deduped.forEach((item) => next.add(getStoreCity(item)));
+        preparedItems.forEach((item) => next.add(getStoreCity(item)));
         return Array.from(next).sort((a, b) => a.localeCompare(b));
       });
     } catch (err) {
       console.error('Failed to fetch products for search', err);
-      setError('Could not load all products for search. Please try again.');
+      setError('Could not load all listings for search. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [buildServerFilters, filterByVerifiedStore, itemTypeFilter]);
+  }, [buildServerFilters, itemTypeFilter]);
 
   const loadedPageCount = Math.max(1, Math.ceil(visibleProducts.length / PAGE_SIZE));
-  const canFetchNextServerPage = Boolean(lastDoc && searchText.trim().length === 0);
-  const totalPages = visibleProducts.length === 0 ? 1 : loadedPageCount + (canFetchNextServerPage ? 1 : 0);
+  const canFetchNextServerPage = Boolean(lastDoc && !isPreview && searchText.trim().length === 0);
+  const totalPages = isPreview ? 1 : Math.max(1, loadedPageCount + (canFetchNextServerPage ? 1 : 0));
   const normalizedCurrentPage = Math.min(currentPage, totalPages);
   const pageStartIndex = (normalizedCurrentPage - 1) * PAGE_SIZE;
-  const paginatedProducts = visibleProducts.slice(pageStartIndex, pageStartIndex + PAGE_SIZE);
+  const paginatedProducts = isPreview
+    ? visibleProducts.slice(0, previewLimit)
+    : visibleProducts.slice(pageStartIndex, pageStartIndex + PAGE_SIZE);
   const paginationItems = buildPaginationItems(normalizedCurrentPage, totalPages);
 
   const goToPage = useCallback(async (page: number) => {
-    if (page < 1 || page > totalPages || isLoading) return;
-    if (page > loadedPageCount && canFetchNextServerPage) {
-      await fetchProducts(lastDoc ?? undefined, lastCollection);
-    }
+    if (page < 1 || page > totalPages || isLoading || isPreview) return;
+    if (page > loadedPageCount && canFetchNextServerPage) await fetchProducts(lastDoc ?? undefined, lastCollection);
     setCurrentPage(page);
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [canFetchNextServerPage, fetchProducts, isLoading, lastCollection, lastDoc, loadedPageCount, totalPages]);
+  }, [canFetchNextServerPage, fetchProducts, isLoading, isPreview, lastCollection, lastDoc, loadedPageCount, totalPages]);
 
   useEffect(() => {
     setProducts([]);
     setLastDoc(null);
     setLastCollection(null);
     setCurrentPage(1);
-    if (searchText.trim().length > 0) return;
+    if (searchText.trim()) return;
     fetchProducts();
   }, [fetchProducts, searchText]);
 
   useEffect(() => {
-    if (searchText.trim().length === 0) return;
+    if (!searchText.trim()) return;
     setProducts([]);
     setLastDoc(null);
     setLastCollection(null);
@@ -677,130 +499,102 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     fetchProductsForSearch();
   }, [fetchProductsForSearch, searchText]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [itemTypeFilter, selectedCity, selectedSort]);
+  useEffect(() => { setCurrentPage(1); }, [itemTypeFilter, selectedCity, selectedSort]);
 
   return (
-    <section className="marketplace">
+    <section className={isPreview ? 'marketplace marketplacePreview' : 'marketplace'}>
       <div className="marketplaceHeader">
         <h1>{itemTypeFilter === 'service' ? 'Services' : itemTypeFilter === 'course' ? 'Courses' : 'Products'}</h1>
-        <p>Discover verified marketplace listings from Sedifex stores. Incomplete listings still appear with safe placeholders while stores finish their setup.</p>
+        <p>{isPreview ? 'A quick preview of verified marketplace listings.' : 'Discover verified marketplace listings from Sedifex stores.'}</p>
       </div>
-      <div className="toolbar">
-        <div className="searchWrap">
-          <label htmlFor="search">Search</label>
-          <input
-            id="search"
-            type="search"
-            value={searchText}
-            onChange={(event) => { setSearchText(event.target.value); setIsSuggestionOpen(true); }}
-            onFocus={() => setIsSuggestionOpen(true)}
-            placeholder="Search by name, description, store, category, or listing type"
-            onKeyDown={(event) => { if (event.key === 'Enter') { commitSearch(searchText); setIsSuggestionOpen(false); } }}
-          />
-          {isSuggestionOpen && suggestions.length > 0 && (
-            <ul className="searchSuggestions" role="listbox" aria-label="Search suggestions">
-              {suggestions.map((suggestion) => (
-                <li key={suggestion}>
-                  <button type="button" onMouseDown={() => { commitSearch(suggestion); setIsSuggestionOpen(false); }}>{suggestion}</button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div className="sortWrap">
-          <label htmlFor="sort">Sort by</label>
-          <select id="sort" value={selectedSort} onChange={(event) => setSelectedSort(event.target.value as SortOption)}>
-            <option value="featured">Popular</option>
-            <option value="newest">Newest</option>
-            <option value="price">Cheapest</option>
-          </select>
-        </div>
-      </div>
-      <div className="toolbar">
-        <div className="sortWrap">
-          <label htmlFor="city-filter">City</label>
-          <select id="city-filter" value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>
-            {cities.map((city) => <option key={city} value={city}>{city === 'all' ? 'All cities' : city}</option>)}
-          </select>
-        </div>
-      </div>
+
+      {showToolbar && !isPreview ? (
+        <>
+          <div className="toolbar">
+            <div className="searchWrap">
+              <label htmlFor={`search-${itemTypeFilter}`}>Search</label>
+              <input
+                id={`search-${itemTypeFilter}`}
+                type="search"
+                value={searchText}
+                onChange={(event) => { setSearchText(event.target.value); setIsSuggestionOpen(true); }}
+                onFocus={() => setIsSuggestionOpen(true)}
+                placeholder="Search by name, description, store, category, or listing type"
+                onKeyDown={(event) => { if (event.key === 'Enter') { commitSearch(searchText); setIsSuggestionOpen(false); } }}
+              />
+              {isSuggestionOpen && suggestions.length > 0 ? (
+                <ul className="searchSuggestions" role="listbox" aria-label="Search suggestions">
+                  {suggestions.map((suggestion) => <li key={suggestion}><button type="button" onMouseDown={() => { commitSearch(suggestion); setIsSuggestionOpen(false); }}>{suggestion}</button></li>)}
+                </ul>
+              ) : null}
+            </div>
+            <div className="sortWrap">
+              <label htmlFor={`sort-${itemTypeFilter}`}>Sort by</label>
+              <select id={`sort-${itemTypeFilter}`} value={selectedSort} onChange={(event) => setSelectedSort(event.target.value as SortOption)}>
+                <option value="featured">Popular</option>
+                <option value="newest">Newest</option>
+                <option value="price">Cheapest</option>
+              </select>
+            </div>
+          </div>
+          <div className="toolbar">
+            <div className="sortWrap">
+              <label htmlFor={`city-filter-${itemTypeFilter}`}>City</label>
+              <select id={`city-filter-${itemTypeFilter}`} value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>
+                {cities.map((city) => <option key={city} value={city}>{city === 'all' ? 'All cities' : city}</option>)}
+              </select>
+            </div>
+          </div>
+        </>
+      ) : null}
 
       {error && <p className="error">{error}</p>}
       {debugInfo && <details className="error" open><summary>Debug details</summary><pre>{debugInfo}</pre></details>}
 
       <div className="grid">
         {isLoading && products.length === 0
-          ? Array.from({ length: 8 }).map((_, index) => (
+          ? Array.from({ length: isPreview ? Math.min(previewLimit ?? 8, 8) : 8 }).map((_, index) => (
               <article key={`skeleton-${index}`} className="card skeletonCard" aria-hidden="true">
-                <div className="skeleton skeletonImage" />
-                <div className="skeleton skeletonTitle" />
-                <div className="skeleton skeletonText" />
-                <div className="skeleton skeletonText short" />
-                <div className="skeleton skeletonButton" />
+                <div className="skeleton skeletonImage" /><div className="skeleton skeletonTitle" /><div className="skeleton skeletonText" /><div className="skeleton skeletonButton" />
               </article>
             ))
           : paginatedProducts.map((item) => {
-              const storeHref = getStoreHref(item.storeId, item.storeName);
-              const shortDescription = (item.description ?? '').split(/\n+/).map((line) => line.trim()).filter(Boolean)[0] ?? '';
               const listingType = resolveListingType(item);
               const itemHref = getProductHref(item.id, item.productName ?? item.name, listingType);
+              const storeHref = getStoreHref(item.storeId, item.storeName);
+              const shortDescription = (item.description ?? '').split(/\n+/).map((line) => line.trim()).filter(Boolean)[0] ?? '';
               return (
                 <article key={item.id} className="card">
                   <Link href={itemHref} className="imageWrap">
-                    <Image
-                      src={getDisplayImage(item)}
-                      alt={item.imageAlt?.trim() || getProductName(item)}
-                      loading="lazy"
-                      unoptimized
-                      width={360}
-                      height={360}
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
+                    <Image src={getDisplayImage(item)} alt={item.imageAlt?.trim() || getProductName(item)} loading="lazy" unoptimized width={360} height={360} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </Link>
                   <h3><Link href={itemHref}>{getProductName(item)}</Link></h3>
                   <p className="productShortDescription">{shortDescription || 'Details will be confirmed by the seller during checkout.'}</p>
                   <div className="meta">
-                    <span className="verifiedBadge" aria-label={`Listing type ${listingType}`}>{listingType}</span>
-                    <span className="storeIdentity">
-                      {storeHref ? <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link> : item.storeName ?? 'Unknown store'}
-                      {isVerifiedStore(item.verified) ? <span className="verifiedBadge" aria-label="Verified by Sedifex"><span className="verifiedPulse" aria-hidden="true" />Verified</span> : null}
-                    </span>
+                    <span className="verifiedBadge">{listingType}</span>
+                    <span className="storeIdentity">{storeHref ? <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link> : item.storeName ?? 'Unknown store'} {isVerifiedStore(item.verified) ? <span className="verifiedBadge"><span className="verifiedPulse" aria-hidden="true" />Verified</span> : null}</span>
                     <span>{getCategory(item)}</span>
                     <strong className="price">{formatPrice(item.price, item.currency)}</strong>
                   </div>
                   <p className="trustScoreCard">🛡 Order through Sedifex for receipt and payment record.</p>
-                  {typeof item.originalPrice === 'number' && typeof item.price === 'number' && item.price < item.originalPrice ? <p className="trustScoreCard">Sedifex online deal · Order through Sedifex to get this price.</p> : null}
-                  <div className="cardActions">
-                    <Link href={itemHref} className="buyNowButton" aria-label={`${resolveCtaLabel(item)} ${getProductName(item)}`}>{resolveCtaLabel(item)}</Link>
-                  </div>
+                  <div className="cardActions"><Link href={itemHref} className="buyNowButton">{resolveCtaLabel(item)}</Link></div>
                 </article>
               );
             })}
       </div>
 
-      {!isLoading && visibleProducts.length === 0 && !error && <div className="emptyState"><h3>No items found</h3><p>Try a different search term, category, or sort option.</p></div>}
+      {!isLoading && visibleProducts.length === 0 && !error ? <div className="emptyState"><h3>No items found</h3><p>Try a different search term, category, or sort option.</p></div> : null}
 
-      {visibleProducts.length > 0 ? (
+      {isPreview && moreHref ? (
+        <div className="previewMoreActions"><Link href={moreHref} className="btn btnPrimary">{moreLabel ?? 'Open more'}</Link></div>
+      ) : null}
+
+      {!isPreview && showPagination && visibleProducts.length > 0 ? (
         <nav className="marketPagination" aria-label="Marketplace pagination">
           <button type="button" className="marketPaginationButton" disabled={normalizedCurrentPage <= 1 || isLoading} onClick={() => void goToPage(normalizedCurrentPage - 1)}>‹ Previous</button>
-          {paginationItems.map((item, index) => item === 'ellipsis' ? (
-            <span key={`ellipsis-${index}`} className="marketPaginationEllipsis">…</span>
-          ) : (
-            <button
-              key={item}
-              type="button"
-              className="marketPaginationButton"
-              data-active={item === normalizedCurrentPage ? 'true' : 'false'}
-              aria-current={item === normalizedCurrentPage ? 'page' : undefined}
-              disabled={isLoading}
-              onClick={() => void goToPage(item)}
-            >
-              {item}
-            </button>
-          ))}
+          {paginationItems.map((item, index) => item === 'ellipsis'
+            ? <span key={`ellipsis-${index}`} className="marketPaginationEllipsis">…</span>
+            : <button key={item} type="button" className="marketPaginationButton" data-active={item === normalizedCurrentPage ? 'true' : 'false'} aria-current={item === normalizedCurrentPage ? 'page' : undefined} disabled={isLoading} onClick={() => void goToPage(item)}>{item}</button>)}
           <button type="button" className="marketPaginationButton" disabled={normalizedCurrentPage >= totalPages || isLoading} onClick={() => void goToPage(normalizedCurrentPage + 1)}>Next ›</button>
         </nav>
       ) : null}
