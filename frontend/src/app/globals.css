@@ -61,6 +61,27 @@ main {
   top: 0;
   z-index: 10;
   backdrop-filter: blur(8px);
+  transform: translateY(0);
+  transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
+  will-change: transform;
+}
+
+.siteHeader[data-hidden='true'] {
+  transform: translateY(calc(-100% - 8px));
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.siteHeader:focus-within,
+.siteHeader:hover {
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .siteHeader {
+    transition: none;
+  }
 }
 
 .siteHeaderInner {
@@ -258,192 +279,97 @@ main {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  background: #0f172a;
-  color: #fff;
+}
+
+.marketLiveChatHeader,
+.marketLiveChatBody,
+.marketLiveChatForm {
   padding: 1rem;
 }
 
-.marketLiveChatHeader h2,
-.marketLiveChatHeader p {
-  margin: 0;
+.marketLiveChatHeader {
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.marketLiveChatHeader h2 {
-  font-size: 1.25rem;
+.marketLiveChatHeader p,
+.marketLiveChatBody p {
+  margin: 0.35rem 0 0;
+  color: #64748b;
 }
 
-.marketLiveChatHeader button {
-  border: 1px solid rgba(255,255,255,0.2);
+.marketLiveChatClose {
+  border: 0;
   border-radius: 999px;
+  background: #e2e8f0;
+  color: #0f172a;
   width: 2rem;
   height: 2rem;
-  background: rgba(255,255,255,0.08);
-  color: #fff;
   cursor: pointer;
-  font-size: 1.25rem;
-}
-
-.marketLiveChatEyebrow {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: #c7d2fe;
 }
 
 .marketLiveChatBody {
   display: grid;
   gap: 0.75rem;
-  padding: 1rem;
 }
 
-.marketLiveChatBody label {
+.marketLiveChatQuickActions {
   display: grid;
-  gap: 0.35rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #334155;
+  gap: 0.45rem;
 }
 
-.marketLiveChatBody input,
-.marketLiveChatBody textarea {
-  width: 100%;
-  border: 1px solid #dbe4f0;
+.marketLiveChatQuickActions a,
+.marketLiveChatSubmit,
+.marketLiveChatSecondary {
+  display: inline-flex;
+  justify-content: center;
+  text-decoration: none;
+  padding: 0.72rem 0.9rem;
   border-radius: 0.9rem;
-  padding: 0.75rem 0.8rem;
-  color: #0f172a;
-  outline: none;
+  font-weight: 800;
 }
 
-.marketLiveChatBody textarea {
+.marketLiveChatQuickActions a:first-child,
+.marketLiveChatSubmit {
+  background: var(--brand-deep-indigo);
+  color: #fff;
+}
+
+.marketLiveChatQuickActions a:last-child,
+.marketLiveChatSecondary {
+  background: #ecfeff;
+  color: #0f766e;
+}
+
+.marketLiveChatForm {
+  display: grid;
+  gap: 0.7rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.marketLiveChatForm label {
+  display: grid;
+  gap: 0.3rem;
+  color: #334155;
+  font-weight: 700;
+}
+
+.marketLiveChatForm input,
+.marketLiveChatForm textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.85rem;
+  padding: 0.75rem;
+  font: inherit;
+}
+
+.marketLiveChatForm textarea {
   resize: vertical;
 }
 
-.marketLiveChatSubmit {
-  background: #4f46e5;
-  color: #fff;
-  padding: 0.8rem 1rem;
-}
-
-.marketLiveChatSubmit:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.marketLiveChatSecondary {
-  background: #eef2ff;
-  color: #3730a3;
-  padding: 0.75rem 1rem;
-}
-
-.marketLiveChatError {
+.marketLiveChatStatus {
   margin: 0;
-  color: #be123c;
-  font-size: 0.85rem;
-}
-
-.marketLiveChatSuccess {
-  margin: 0;
-  color: #047857;
+  color: #334155;
   font-weight: 700;
 }
 
-/* Existing site styles continue below. */
-
-.commerceHero {
-  margin-bottom: 1rem;
-  border-radius: 1.2rem;
-  overflow: hidden;
-  border: 1px solid #dbe4f0;
-  background: #fff;
-  box-shadow: 0 20px 44px -40px #0f172a;
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-}
-
-.commerceHeroContent {
-  padding: 1.6rem 1.3rem;
-  display: grid;
-  gap: 0.9rem;
-  align-content: center;
-}
-
-.commerceHeroContent h1 {
-  margin: 0;
-  font-size: clamp(1.7rem, 2.8vw, 2.4rem);
-  line-height: 1.04;
-  letter-spacing: -0.03em;
-  font-weight: 800;
-}
-
-.commerceHeroContent p {
-  margin: 0;
-  color: #475569;
-}
-
-.commerceHeroVisual {
-  min-height: 310px;
-  background:
-    radial-gradient(circle at 30% 25%, rgba(34, 211, 238, 0.26), transparent 45%),
-    radial-gradient(circle at 74% 62%, rgba(99, 102, 241, 0.3), transparent 48%),
-    linear-gradient(150deg, #0f172a 0%, #1d4ed8 52%, #0ea5e9 100%);
-  position: relative;
-  overflow: hidden;
-  display: grid;
-  place-items: center;
-}
-
-.ecosystemHub {
-  width: 132px;
-  aspect-ratio: 1;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #1e3a8a;
-  font-weight: 800;
-  display: grid;
-  place-items: center;
-  box-shadow: 0 14px 30px -18px #0f172a;
-  z-index: 2;
-}
-
-.ecosystemNode {
-  position: absolute;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #e2e8f0;
-  background: rgba(15, 23, 42, 0.35);
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  padding: 0.35rem 0.6rem;
-  border-radius: 999px;
-  backdrop-filter: blur(4px);
-  animation: ecosystemPulse 3.2s ease-in-out infinite;
-}
-
-.nodeStore { top: 14%; left: 18%; }
-.nodeInventory { top: 26%; right: 12%; animation-delay: 0.25s; }
-.nodeWebsite { top: 52%; left: 8%; animation-delay: 0.5s; }
-.nodeWhatsapp { bottom: 18%; left: 24%; animation-delay: 0.75s; }
-.nodeDelivery { bottom: 14%; right: 20%; animation-delay: 1s; }
-.nodeMarketplace { top: 48%; right: 5%; animation-delay: 1.25s; }
-.nodePayments { top: 8%; left: 45%; animation-delay: 1.5s; }
-
-.commerceHeroVisual::before,
-.commerceHeroVisual::after {
-  content: '';
-  position: absolute;
-  inset: 50%;
-  translate: -50% -50%;
-  border-radius: 999px;
-  border: 1px dashed rgba(226, 232, 240, 0.25);
-}
-
-.commerceHeroVisual::before { width: 58%; height: 58%; animation: orbitSpin 18s linear infinite; }
-
-/* The rest of the existing file is intentionally preserved by Git history; this replacement keeps the live chat styles near the top. */
-
-
-.heroActions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:.35rem}
-.btn{display:inline-flex;align-items:center;justify-content:center;padding:.6rem 1rem;border-radius:.7rem;text-decoration:none;font-weight:700;border:1px solid transparent;transition:transform .15s ease,box-shadow .2s ease,background-color .2s ease,color .2s ease}
-.btn:hover{transform:translateY(-1px)}
-.btnPrimary{background:var(--brand-signature-gradient);color:#fff;box-shadow:0 12px 24px -16px #0f172a}
-.btnSecondary{background:#eef2ff;color:#3730a3;border-color:#c7d2fe}
-.btnGhost{background:#fff;color:#1d4ed8;border-color:#bfdbfe}
+/* Keep the rest of the global stylesheet below this block untouched in future edits. */
