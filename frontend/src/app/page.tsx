@@ -40,20 +40,23 @@ export default function HomePage() {
       <section className="marketSectionIntro">
         <p className="eyebrow">Start shopping</p>
         <h2>Products</h2>
+        <Link href="/products">Open more products</Link>
       </section>
-      <ProductGrid itemTypeFilter="product" />
+      <ProductGrid itemTypeFilter="product" previewLimit={8} showToolbar={false} showPagination={false} moreHref="/products" moreLabel="Open more products" />
 
       <section className="marketSectionIntro">
         <p className="eyebrow">Book trusted providers</p>
         <h2>Services</h2>
+        <Link href="/services">Open more services</Link>
       </section>
-      <ProductGrid itemTypeFilter="service" />
+      <ProductGrid itemTypeFilter="service" previewLimit={8} showToolbar={false} showPagination={false} moreHref="/services" moreLabel="Open more services" />
 
       <section className="marketSectionIntro">
         <p className="eyebrow">Learn and register</p>
         <h2>Courses</h2>
+        <Link href="/courses">Open more courses</Link>
       </section>
-      <ProductGrid itemTypeFilter="course" />
+      <ProductGrid itemTypeFilter="course" previewLimit={8} showToolbar={false} showPagination={false} moreHref="/courses" moreLabel="Open more courses" />
     </main>
   );
 }
