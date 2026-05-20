@@ -18,6 +18,14 @@ const decodeRouteParam = (value: string) => {
   }
 };
 
+const currentSectionBasePath = (): '/products' | '/services' | '/courses' | null => {
+  const path = typeof globalThis.location?.pathname === 'string' ? globalThis.location.pathname : '';
+  if (path.startsWith('/services')) return '/services';
+  if (path.startsWith('/courses')) return '/courses';
+  if (path.startsWith('/products')) return '/products';
+  return null;
+};
+
 export const getProductRouteParam = (productId: string, productName?: string): string => {
   const normalizedProductId = productId.trim();
   const slug = normalizeProductToken(productName ?? '');
@@ -47,7 +55,7 @@ export const getMarketplaceItemBasePath = (listingType?: MarketplaceListingType)
   const normalizedType = listingType?.trim().toLowerCase();
   if (normalizedType === 'course') return '/courses';
   if (normalizedType === 'service' || normalizedType === 'event' || normalizedType === 'appointment' || normalizedType === 'booking') return '/services';
-  return '/products';
+  return currentSectionBasePath() ?? '/products';
 };
 
 export const getProductHref = (productId: string, productName?: string, listingType?: MarketplaceListingType): string =>
