@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AccountNavButton } from '@/components/account-nav-button';
 import { CartNavButton, CartProvider } from '@/components/cart-provider';
 import { CustomerAuthProvider } from '@/components/customer-auth-provider';
+import { LiveChatWidget } from '@/components/live-chat-widget';
 import { MainNav } from '@/components/main-nav';
 import { SiteFooter } from '@/components/site-footer';
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
@@ -77,6 +78,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="container">
               <SiteFooter />
             </div>
+            <LiveChatWidget />
           </CartProvider>
         </CustomerAuthProvider>
       </body>
