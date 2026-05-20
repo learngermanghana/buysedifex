@@ -144,6 +144,9 @@ const normalizeRouteId = (value: string): string => {
 
 const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? process.env.FIREBASE_API_KEY;
 
+const PRIMARY_COLLECTION = 'publicListings';
+const LEGACY_COLLECTIONS = ['publicProducts', 'publicServices'] as const;
+
 const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
   const fields = doc.fields ?? {};
   const imageUrls = Array.from(
@@ -189,76 +192,38 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     return null;
   }
 
-  const endpoint = new URL(
-    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/publicProducts/${encodeURIComponent(normalizedProductId)}`,
-  );
+  const buildEndpoint = (collectionName: string) => {
+    const endpoint = new URL(
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionName}/${encodeURIComponent(normalizedProductId)}`,
+    );
+    if (firebaseApiKey) endpoint.searchParams.set('key', firebaseApiKey);
+    return endpoint;
+  };
 
-  if (firebaseApiKey) {
-    endpoint.searchParams.set('key', firebaseApiKey);
+  const maskFields = [
+    'productName', 'name', 'title', 'description', 'details', 'imageUrls', 'imageUrl', 'image',
+    'serviceImageUrls', 'serviceImageUrl', 'serviceImage', 'imageAlt', 'price', 'amount', 'currency',
+    'storeName', 'businessName', 'shopName', 'categoryKey', 'category', 'sku', 'stockCount', 'stock',
+    'city', 'storeCity', 'town', 'country', 'storeCountry', 'storeId', 'waLink', 'storePhone', 'phone',
+    'telephone', 'whatsappNumber', 'verified', 'isPublished', 'isVisible', 'sourceProductId', 'itemType', 'type',
+  ];
+
+  for (const collectionName of [PRIMARY_COLLECTION, ...LEGACY_COLLECTIONS]) {
+    const endpoint = buildEndpoint(collectionName);
+    maskFields.forEach((fieldPath) => endpoint.searchParams.append('mask.fieldPaths', fieldPath));
+
+    const response = await fetch(endpoint, { next: { revalidate: 300 } });
+    if (response.status === 404) continue;
+    if (!response.ok) {
+      throw new Error(`Failed to fetch public product ${normalizedProductId}. Status: ${response.status}`);
+    }
+
+    const document = (await response.json()) as FirestoreDocument;
+    const product = productFromDocument(document);
+    if (product.imageUrls.length > 0) return product;
   }
 
-  [
-    'productName',
-    'name',
-    'title',
-    'description',
-    'details',
-    'imageUrls',
-    'imageUrl',
-    'image',
-    'serviceImageUrls',
-    'serviceImageUrl',
-    'serviceImage',
-    'imageAlt',
-    'price',
-    'amount',
-    'currency',
-    'storeName',
-    'businessName',
-    'shopName',
-    'categoryKey',
-    'category',
-    'sku',
-    'stockCount',
-    'stock',
-    'city',
-    'storeCity',
-    'town',
-    'country',
-    'storeCountry',
-    'storeId',
-    'waLink',
-    'storePhone',
-    'phone',
-    'telephone',
-    'whatsappNumber',
-    'verified',
-    'isPublished',
-    'isVisible',
-    'sourceProductId',
-    'itemType',
-    'type',
-  ].forEach((fieldPath) => endpoint.searchParams.append('mask.fieldPaths', fieldPath));
-
-  const response = await fetch(endpoint, {
-    next: { revalidate: 300 },
-  });
-
-  if (response.status === 404) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch public product ${normalizedProductId}. Status: ${response.status}`);
-  }
-
-  const document = (await response.json()) as FirestoreDocument;
-  const product = productFromDocument(document);
-  if (product.imageUrls.length === 0) {
-    return null;
-  }
-
-  return product;
+  return null;
 };
 
 
@@ -279,7 +244,7 @@ export const listPublicProductIds = async (limitCount = 200): Promise<string[]> 
     body: JSON.stringify({
       structuredQuery: {
         select: { fields: [{ fieldPath: 'publishedAt' }] },
-        from: [{ collectionId: 'publicProducts' }],
+        from: [{ collectionId: PRIMARY_COLLECTION }],
         where: {
           compositeFilter: {
             op: 'AND',

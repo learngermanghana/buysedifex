@@ -23,6 +23,9 @@ import { getStoreHref } from '@/lib/store-route';
 import { getProductHref } from '@/lib/product-route';
 import { resolveClosestCategoryKey } from '@/lib/category-taxonomy';
 
+const PRIMARY_COLLECTION = 'publicListings';
+const LEGACY_COLLECTIONS = ['publicProducts', 'publicServices'] as const;
+
 type PublicProduct = {
   id: string;
   storeId?: string;
@@ -71,6 +74,13 @@ const FETCH_SCAN_BATCHES = 4;
 const FILTERED_FETCH_SCAN_BATCHES = 12;
 const SEARCH_SCAN_LIMIT = 300;
 const SEARCH_BATCH_SIZE = 100;
+
+const getMarketplaceCollections = async (): Promise<string[]> => {
+  if (!db) return [PRIMARY_COLLECTION];
+  const primarySnapshot = await getDocs(query(collection(db, PRIMARY_COLLECTION), limit(1)));
+  if (!primarySnapshot.empty) return [PRIMARY_COLLECTION];
+  return [...LEGACY_COLLECTIONS];
+};
 
 const SEARCH_HISTORY_KEY = 'sedifex-recent-searches';
 const MAX_HISTORY_ITEMS = 6;
@@ -593,6 +603,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setDebugInfo(null);
 
     try {
+      const collectionsToQuery = await getMarketplaceCollections();
       const filters = buildServerFilters();
 
       const orderOptions: QueryConstraint[][] =
@@ -609,7 +620,8 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
       let snapshot = null;
       let cursorDoc = cursor;
 
-      for (let index = 0; index < orderOptions.length; index += 1) {
+      for (const collectionName of collectionsToQuery) {
+        for (let index = 0; index < orderOptions.length; index += 1) {
         const ordering = orderOptions[index];
         try {
           const collectedItems: PublicProduct[] = [];
@@ -620,7 +632,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
           const maxScanBatches = hasServerSideItemTypeFilter ? FILTERED_FETCH_SCAN_BATCHES : FETCH_SCAN_BATCHES;
 
           for (let scanIndex = 0; scanIndex < maxScanBatches; scanIndex += 1) {
-            const baseQuery = query(collection(db, 'publicProducts'), ...filters, ...ordering, limit(PAGE_SIZE));
+            const baseQuery = query(collection(db, collectionName), ...filters, ...ordering, limit(PAGE_SIZE));
             const pagedQuery = scanCursor ? query(baseQuery, startAfter(scanCursor)) : baseQuery;
             const scanSnapshot = await getDocs(pagedQuery);
             lastSnapshotSize = scanSnapshot.docs.length;
@@ -666,7 +678,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
             while (collectedItems.length < PAGE_SIZE && safetyCounter < fallbackScanLimit) {
               safetyCounter += 1;
-              const fallbackBaseQuery = query(collection(db, 'publicProducts'), ...filters, orderBy(documentId(), 'asc'), limit(PAGE_SIZE));
+              const fallbackBaseQuery = query(collection(db, collectionName), ...filters, orderBy(documentId(), 'asc'), limit(PAGE_SIZE));
               const fallbackPagedQuery = fallbackCursor ? query(fallbackBaseQuery, startAfter(fallbackCursor)) : fallbackBaseQuery;
               const fallbackSnapshot = await getDocs(fallbackPagedQuery);
 
@@ -723,6 +735,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         }
       }
 
+        if (snapshot) break;
+      }
+
       if (!snapshot) {
         throw new Error('Unable to fetch products with the available indexes.');
       }
@@ -752,7 +767,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
       setDebugInfo(JSON.stringify(debugDetails, null, 2));
 
       if (firestoreError?.code === 'permission-denied') {
-        setError('Could not load products due to Firestore rules. Allow public read access to publicProducts.');
+        setError('Could not load products due to Firestore rules. Allow public read access to marketplace collections.');
       } else if (firestoreError?.code === 'failed-precondition') {
         setError(
           'Could not load products. Deploy Firestore indexes and rules with `firebase deploy --only firestore:indexes,firestore:rules`.',
@@ -776,14 +791,17 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setDebugInfo(null);
 
     try {
+      const collectionsToQuery = await getMarketplaceCollections();
       const filters = buildServerFilters();
 
       const allItems: PublicProduct[] = [];
+
+      for (const collectionName of collectionsToQuery) {
       let cursor: QueryDocumentSnapshot | undefined;
 
       while (allItems.length < SEARCH_SCAN_LIMIT) {
         const batchQuery = query(
-          collection(db, 'publicProducts'),
+          collection(db, collectionName),
           ...filters,
           orderBy(documentId(), 'asc'),
           limit(SEARCH_BATCH_SIZE),
@@ -805,6 +823,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         }
 
         cursor = snapshot.docs.at(-1);
+      }
       }
 
       setProducts(allItems.slice(0, SEARCH_SCAN_LIMIT));
