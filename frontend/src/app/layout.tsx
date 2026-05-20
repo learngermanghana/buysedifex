@@ -8,6 +8,7 @@ import { SiteFooter } from '@/components/site-footer';
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
 import { baseSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 import './globals.css';
+import './marketplace-size.css';
 
 export const metadata: Metadata = {
   metadataBase: new URL(canonicalUrlForPath('/')),
