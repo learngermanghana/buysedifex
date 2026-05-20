@@ -18,6 +18,7 @@ export type PublicProductDetail = {
   isPublished?: boolean;
   sourceProductId?: string;
   itemType?: string;
+  listingType?: string;
   rankingScore?: number;
 };
 
@@ -40,39 +41,27 @@ const readString = (fields: Record<string, FirestoreValue>, keys: string[]): str
     const value = fields[key];
     if (value && 'stringValue' in value) {
       const normalized = value.stringValue.trim();
-      if (normalized.length > 0) {
-        return normalized;
-      }
+      if (normalized.length > 0) return normalized;
     }
   }
-
   return undefined;
 };
 
 const readNumber = (fields: Record<string, FirestoreValue>, keys: string[]): number | undefined => {
   for (const key of keys) {
     const value = fields[key];
-    if (value && 'doubleValue' in value && Number.isFinite(value.doubleValue)) {
-      return value.doubleValue;
-    }
-
+    if (value && 'doubleValue' in value && Number.isFinite(value.doubleValue)) return value.doubleValue;
     if (value && 'integerValue' in value) {
       const parsed = Number(value.integerValue);
-      if (Number.isFinite(parsed)) {
-        return parsed;
-      }
+      if (Number.isFinite(parsed)) return parsed;
     }
   }
-
   return undefined;
 };
 
 const readStringArray = (fields: Record<string, FirestoreValue>, key: string): string[] => {
   const value = fields[key];
-
-  if (!value) {
-    return [];
-  }
+  if (!value) return [];
 
   if ('stringValue' in value) {
     const normalized = value.stringValue.trim();
@@ -90,28 +79,20 @@ const readStringArray = (fields: Record<string, FirestoreValue>, key: string): s
     return [normalized];
   }
 
-  if (!('arrayValue' in value) || !Array.isArray(value.arrayValue.values)) {
-    return [];
-  }
-
-  return value.arrayValue.values
-    .flatMap((item) => ('stringValue' in item ? [item.stringValue.trim()] : []))
-    .filter(Boolean);
+  if (!('arrayValue' in value) || !Array.isArray(value.arrayValue.values)) return [];
+  return value.arrayValue.values.flatMap((item) => ('stringValue' in item ? [item.stringValue.trim()] : [])).filter(Boolean);
 };
 
 const readBoolean = (fields: Record<string, FirestoreValue>, keys: string[]): boolean | undefined => {
   for (const key of keys) {
     const value = fields[key];
-    if (value && 'booleanValue' in value) {
-      return value.booleanValue;
-    }
+    if (value && 'booleanValue' in value) return value.booleanValue;
     if (value && 'stringValue' in value) {
       const normalized = value.stringValue.trim().toLowerCase();
       if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
       if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
     }
   }
-
   return undefined;
 };
 
@@ -119,7 +100,6 @@ const isValidImageUrl = (value: string): boolean => {
   const normalizedValue = value.trim().toLowerCase().startsWith('gs://')
     ? value.trim().replace(/^gs:\/\//i, 'https://storage.googleapis.com/')
     : value;
-
   try {
     const parsed = new URL(normalizedValue);
     return parsed.protocol === 'http:' || parsed.protocol === 'https:';
@@ -134,6 +114,10 @@ const normalizeImageUrl = (value: string): string =>
     : value.trim();
 
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? process.env.FIREBASE_PROJECT_ID;
+const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? process.env.FIREBASE_API_KEY;
+const PRIMARY_COLLECTION = 'publicListings';
+const LEGACY_COLLECTIONS = ['publicProducts', 'publicServices'] as const;
+
 const normalizeRouteId = (value: string): string => {
   try {
     return decodeURIComponent(value).trim();
@@ -142,25 +126,16 @@ const normalizeRouteId = (value: string): string => {
   }
 };
 
-const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? process.env.FIREBASE_API_KEY;
-
-const PRIMARY_COLLECTION = 'publicListings';
-const LEGACY_COLLECTIONS = ['publicProducts', 'publicServices'] as const;
-
 const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
   const fields = doc.fields ?? {};
-  const imageUrls = Array.from(
-    new Set([
-      ...readStringArray(fields, 'imageUrls'),
-      ...readStringArray(fields, 'imageUrl'),
-      ...readStringArray(fields, 'image'),
-      ...readStringArray(fields, 'serviceImageUrls'),
-      ...readStringArray(fields, 'serviceImageUrl'),
-      ...readStringArray(fields, 'serviceImage'),
-    ]),
-  )
-    .map(normalizeImageUrl)
-    .filter(isValidImageUrl);
+  const imageUrls = Array.from(new Set([
+    ...readStringArray(fields, 'imageUrls'),
+    ...readStringArray(fields, 'imageUrl'),
+    ...readStringArray(fields, 'image'),
+    ...readStringArray(fields, 'serviceImageUrls'),
+    ...readStringArray(fields, 'serviceImageUrl'),
+    ...readStringArray(fields, 'serviceImage'),
+  ])).map(normalizeImageUrl).filter(isValidImageUrl);
 
   return {
     id: doc.name.split('/').at(-1) ?? '',
@@ -179,23 +154,20 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
     country: readString(fields, ['country', 'storeCountry']),
     waLink: readString(fields, ['waLink', 'storePhone', 'phone', 'telephone', 'whatsappNumber']),
     verified: readBoolean(fields, ['verified']),
-    isPublished: readBoolean(fields, ['isPublished', 'isVisible']),
+    isPublished: readBoolean(fields, ['isPublished', 'isVisible', 'isMarketplaceVisible']),
     sourceProductId: readString(fields, ['sourceProductId']),
     itemType: readString(fields, ['itemType', 'type']),
+    listingType: readString(fields, ['listingType']),
+    rankingScore: readNumber(fields, ['rankingScore']),
   };
 };
 
 export const getPublicProductById = async (productId: string): Promise<PublicProductDetail | null> => {
   const normalizedProductId = normalizeRouteId(productId);
-
-  if (!projectId || !normalizedProductId) {
-    return null;
-  }
+  if (!projectId || !normalizedProductId) return null;
 
   const buildEndpoint = (collectionName: string) => {
-    const endpoint = new URL(
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionName}/${encodeURIComponent(normalizedProductId)}`,
-    );
+    const endpoint = new URL(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionName}/${encodeURIComponent(normalizedProductId)}`);
     if (firebaseApiKey) endpoint.searchParams.set('key', firebaseApiKey);
     return endpoint;
   };
@@ -205,38 +177,26 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     'serviceImageUrls', 'serviceImageUrl', 'serviceImage', 'imageAlt', 'price', 'amount', 'currency',
     'storeName', 'businessName', 'shopName', 'categoryKey', 'category', 'sku', 'stockCount', 'stock',
     'city', 'storeCity', 'town', 'country', 'storeCountry', 'storeId', 'waLink', 'storePhone', 'phone',
-    'telephone', 'whatsappNumber', 'verified', 'isPublished', 'isVisible', 'sourceProductId', 'itemType', 'type',
+    'telephone', 'whatsappNumber', 'verified', 'isPublished', 'isVisible', 'isMarketplaceVisible',
+    'sourceProductId', 'itemType', 'type', 'listingType', 'rankingScore',
   ];
 
   for (const collectionName of [PRIMARY_COLLECTION, ...LEGACY_COLLECTIONS]) {
     const endpoint = buildEndpoint(collectionName);
     maskFields.forEach((fieldPath) => endpoint.searchParams.append('mask.fieldPaths', fieldPath));
-
     const response = await fetch(endpoint, { next: { revalidate: 300 } });
     if (response.status === 404) continue;
-    if (!response.ok) {
-      throw new Error(`Failed to fetch public product ${normalizedProductId}. Status: ${response.status}`);
-    }
-
-    const document = (await response.json()) as FirestoreDocument;
-    const product = productFromDocument(document);
-    if (product.imageUrls.length > 0) return product;
+    if (!response.ok) throw new Error(`Failed to fetch public product ${normalizedProductId}. Status: ${response.status}`);
+    return productFromDocument((await response.json()) as FirestoreDocument);
   }
 
   return null;
 };
 
-
 export const listPublicProductIds = async (limitCount = 200): Promise<string[]> => {
-  if (!projectId) {
-    return [];
-  }
-
+  if (!projectId) return [];
   const endpoint = new URL(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`);
-
-  if (firebaseApiKey) {
-    endpoint.searchParams.set('key', firebaseApiKey);
-  }
+  if (firebaseApiKey) endpoint.searchParams.set('key', firebaseApiKey);
 
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -249,13 +209,7 @@ export const listPublicProductIds = async (limitCount = 200): Promise<string[]> 
           compositeFilter: {
             op: 'AND',
             filters: [
-              {
-                fieldFilter: {
-                  field: { fieldPath: 'isVisible' },
-                  op: 'EQUAL',
-                  value: { booleanValue: true },
-                },
-              },
+              { fieldFilter: { field: { fieldPath: 'isVisible' }, op: 'EQUAL', value: { booleanValue: true } } },
             ],
           },
         },
@@ -266,13 +220,7 @@ export const listPublicProductIds = async (limitCount = 200): Promise<string[]> 
     next: { revalidate: 300 },
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to list public product ids. Status: ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(`Failed to list public product ids. Status: ${response.status}`);
   const rows = (await response.json()) as Array<{ document?: FirestoreDocument }>;
-
-  return rows
-    .flatMap((row) => (row.document?.name ? [row.document.name.split('/').at(-1) ?? ''] : []))
-    .filter((id) => id.length > 0);
+  return rows.flatMap((row) => (row.document?.name ? [row.document.name.split('/').at(-1) ?? ''] : [])).filter((id) => id.length > 0);
 };
