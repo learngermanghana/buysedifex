@@ -8,6 +8,7 @@
   --border-neutral: #e5e7eb;
   --text-primary: #0f172a;
   --text-muted: #475569;
+  --market-header-height: 120px;
   color-scheme: light;
   font-family: var(--font-body), Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   background: linear-gradient(170deg, #f8fafc 0%, #eef2ff 46%, #ecfeff 100%);
@@ -40,6 +41,17 @@ button {
 body {
   margin: 0;
   min-height: 100vh;
+}
+
+
+main {
+  padding-top: var(--market-header-height);
+}
+
+@media (max-width: 860px) {
+  :root {
+    --market-header-height: 156px;
+  }
 }
 
 .siteHeader {
@@ -427,3 +439,11 @@ body {
 .commerceHeroVisual::before { width: 58%; height: 58%; animation: orbitSpin 18s linear infinite; }
 
 /* The rest of the existing file is intentionally preserved by Git history; this replacement keeps the live chat styles near the top. */
+
+
+.heroActions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:.35rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:.6rem 1rem;border-radius:.7rem;text-decoration:none;font-weight:700;border:1px solid transparent;transition:transform .15s ease,box-shadow .2s ease,background-color .2s ease,color .2s ease}
+.btn:hover{transform:translateY(-1px)}
+.btnPrimary{background:var(--brand-signature-gradient);color:#fff;box-shadow:0 12px 24px -16px #0f172a}
+.btnSecondary{background:#eef2ff;color:#3730a3;border-color:#c7d2fe}
+.btnGhost{background:#fff;color:#1d4ed8;border-color:#bfdbfe}
