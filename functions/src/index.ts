@@ -149,3 +149,5 @@ export const onPublicProductsReplayRequested = onDocumentCreated(REPLAY_REQUEST_
     await event.data.ref.set({ status: 'failed', storeId, reason: 'replay-failed', completedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
   }
 });
+
+export * from './publicCatalogRepair';
