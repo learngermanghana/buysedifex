@@ -1,12 +1,9 @@
 import type { Metadata } from 'next';
 import { Inter, Sora } from 'next/font/google';
-import Image from 'next/image';
-import Link from 'next/link';
-import { AccountNavButton } from '@/components/account-nav-button';
-import { CartNavButton, CartProvider } from '@/components/cart-provider';
+import { CartProvider } from '@/components/cart-provider';
 import { CustomerAuthProvider } from '@/components/customer-auth-provider';
+import { AutoHideSiteHeader } from '@/components/auto-hide-site-header';
 import { LiveChatWidget } from '@/components/live-chat-widget';
-import { MainNav } from '@/components/main-nav';
 import { SiteFooter } from '@/components/site-footer';
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
 import { baseSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
@@ -61,19 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <CustomerAuthProvider>
           <CartProvider>
             <WebVitalsReporter />
-            <header className="siteHeader">
-              <div className="container siteHeaderInner">
-                <Link href="/" className="siteBrand" aria-label="Sedifex Market home">
-                  <Image src="/sedifex-logo.svg" alt="Sedifex logo" width={32} height={32} priority />
-                  <span>Sedifex Market</span>
-                </Link>
-                <div className="siteHeaderActions">
-                  <MainNav />
-                  <AccountNavButton />
-                  <CartNavButton />
-                </div>
-              </div>
-            </header>
+            <AutoHideSiteHeader />
             {children}
             <div className="container">
               <SiteFooter />
