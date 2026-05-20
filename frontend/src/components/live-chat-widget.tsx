@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { useCart } from './cart-provider';
 
 type ChatState = 'idle' | 'open' | 'sent';
 
@@ -8,10 +9,9 @@ function marketChatEndpoint() {
   return process.env.NEXT_PUBLIC_SEDIFEX_ADMIN_LIVE_CHAT_URL || 'https://sedifexadmin.vercel.app/api/admin/live-chat';
 }
 
-const rootStyle = {
+const rootBaseStyle = {
   position: 'fixed',
   right: '16px',
-  bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
   zIndex: 2147483647,
   display: 'grid',
   justifyItems: 'end',
@@ -85,6 +85,7 @@ const submitStyle = {
 } as const;
 
 export function LiveChatWidget() {
+  const { itemCount } = useCart();
   const [state, setState] = useState<ChatState>('idle');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -92,6 +93,10 @@ export function LiveChatWidget() {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const rootStyle = {
+    ...rootBaseStyle,
+    bottom: itemCount > 0 ? 'calc(86px + env(safe-area-inset-bottom, 0px))' : 'calc(16px + env(safe-area-inset-bottom, 0px))',
+  } as const;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
