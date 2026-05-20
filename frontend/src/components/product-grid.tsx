@@ -79,6 +79,7 @@ type PublicProduct = {
 
 type SortOption = 'newest' | 'price' | 'featured';
 type ItemTypeFilter = 'all' | 'product' | 'service' | 'course';
+type PaginationItem = number | 'ellipsis';
 
 const PAGE_SIZE = 24;
 const QUERY_LIMIT = 100;
@@ -114,6 +115,21 @@ const normalizeBoolean = (value: unknown): boolean | null => {
 
 const isTrue = (value: unknown) => normalizeBoolean(value) === true;
 const isFalse = (value: unknown) => normalizeBoolean(value) === false;
+
+const buildPaginationItems = (currentPage: number, totalPages: number): PaginationItem[] => {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  const pages = new Set<number>([1, totalPages, currentPage, currentPage - 1, currentPage + 1]);
+  if (currentPage <= 3) [2, 3, 4].forEach((page) => pages.add(page));
+  if (currentPage >= totalPages - 2) [totalPages - 3, totalPages - 2, totalPages - 1].forEach((page) => pages.add(page));
+  const sortedPages = Array.from(pages).filter((page) => page >= 1 && page <= totalPages).sort((a, b) => a - b);
+  const items: PaginationItem[] = [];
+  sortedPages.forEach((page, index) => {
+    const previousPage = sortedPages[index - 1];
+    if (previousPage && page - previousPage > 1) items.push('ellipsis');
+    items.push(page);
+  });
+  return items;
+};
 
 const levenshteinDistance = (left: string, right: string) => {
   if (left === right) return 0;
@@ -224,7 +240,6 @@ const isPublicListing = (item: PublicProduct) => {
   const status = item.status?.trim().toLowerCase();
   if (status === 'draft' && !isTrue(item.isPublished)) return false;
 
-  // Public collections can contain legacy docs without all new flags. Do not hide them unless explicitly hidden.
   return true;
 };
 
@@ -367,7 +382,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
+  const [currentPage, setCurrentPage] = useState(1);
   const hasServerSideItemTypeFilter = itemTypeFilter !== 'all';
 
   const filterByVerifiedStore = useCallback(async (items: PublicProduct[]) => {
@@ -384,7 +399,6 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         const verified = isTrue(data.verified) && status !== 'inactive' && status !== 'suspended' && isFalse(data.eligibleForBuy) !== true && isTrue(data.buyOptOut) !== true;
         storeVerifiedCacheRef.current.set(storeId, verified);
       } catch {
-        // Do not hide a public listing only because store verification could not be loaded.
         storeVerifiedCacheRef.current.set(storeId, true);
       }
     }));
@@ -628,11 +642,28 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     }
   }, [buildServerFilters, filterByVerifiedStore, itemTypeFilter]);
 
+  const loadedPageCount = Math.max(1, Math.ceil(visibleProducts.length / PAGE_SIZE));
+  const canFetchNextServerPage = Boolean(lastDoc && searchText.trim().length === 0);
+  const totalPages = visibleProducts.length === 0 ? 1 : loadedPageCount + (canFetchNextServerPage ? 1 : 0);
+  const normalizedCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (normalizedCurrentPage - 1) * PAGE_SIZE;
+  const paginatedProducts = visibleProducts.slice(pageStartIndex, pageStartIndex + PAGE_SIZE);
+  const paginationItems = buildPaginationItems(normalizedCurrentPage, totalPages);
+
+  const goToPage = useCallback(async (page: number) => {
+    if (page < 1 || page > totalPages || isLoading) return;
+    if (page > loadedPageCount && canFetchNextServerPage) {
+      await fetchProducts(lastDoc ?? undefined, lastCollection);
+    }
+    setCurrentPage(page);
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [canFetchNextServerPage, fetchProducts, isLoading, lastCollection, lastDoc, loadedPageCount, totalPages]);
+
   useEffect(() => {
     setProducts([]);
     setLastDoc(null);
     setLastCollection(null);
-    setVisibleCount(PAGE_SIZE);
+    setCurrentPage(1);
     if (searchText.trim().length > 0) return;
     fetchProducts();
   }, [fetchProducts, searchText]);
@@ -642,9 +673,13 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setProducts([]);
     setLastDoc(null);
     setLastCollection(null);
-    setVisibleCount(PAGE_SIZE);
+    setCurrentPage(1);
     fetchProductsForSearch();
   }, [fetchProductsForSearch, searchText]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemTypeFilter, selectedCity, selectedSort]);
 
   return (
     <section className="marketplace">
@@ -706,13 +741,14 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                 <div className="skeleton skeletonButton" />
               </article>
             ))
-          : visibleProducts.slice(0, visibleCount).map((item) => {
+          : paginatedProducts.map((item) => {
               const storeHref = getStoreHref(item.storeId, item.storeName);
               const shortDescription = (item.description ?? '').split(/\n+/).map((line) => line.trim()).filter(Boolean)[0] ?? '';
               const listingType = resolveListingType(item);
+              const itemHref = getProductHref(item.id, item.productName ?? item.name, listingType);
               return (
                 <article key={item.id} className="card">
-                  <Link href={getProductHref(item.id, item.productName ?? item.name)} className="imageWrap">
+                  <Link href={itemHref} className="imageWrap">
                     <Image
                       src={getDisplayImage(item)}
                       alt={item.imageAlt?.trim() || getProductName(item)}
@@ -724,7 +760,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </Link>
-                  <h3><Link href={getProductHref(item.id, item.productName ?? item.name)}>{getProductName(item)}</Link></h3>
+                  <h3><Link href={itemHref}>{getProductName(item)}</Link></h3>
                   <p className="productShortDescription">{shortDescription || 'Details will be confirmed by the seller during checkout.'}</p>
                   <div className="meta">
                     <span className="verifiedBadge" aria-label={`Listing type ${listingType}`}>{listingType}</span>
@@ -738,7 +774,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                   <p className="trustScoreCard">🛡 Order through Sedifex for receipt and payment record.</p>
                   {typeof item.originalPrice === 'number' && typeof item.price === 'number' && item.price < item.originalPrice ? <p className="trustScoreCard">Sedifex online deal · Order through Sedifex to get this price.</p> : null}
                   <div className="cardActions">
-                    <Link href={getProductHref(item.id, item.productName ?? item.name)} className="buyNowButton" aria-label={`${resolveCtaLabel(item)} ${getProductName(item)}`}>{resolveCtaLabel(item)}</Link>
+                    <Link href={itemHref} className="buyNowButton" aria-label={`${resolveCtaLabel(item)} ${getProductName(item)}`}>{resolveCtaLabel(item)}</Link>
                   </div>
                 </article>
               );
@@ -747,15 +783,27 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
 
       {!isLoading && visibleProducts.length === 0 && !error && <div className="emptyState"><h3>No items found</h3><p>Try a different search term, category, or sort option.</p></div>}
 
-      <div className="actions">
-        {visibleCount < visibleProducts.length ? (
-          <button type="button" onClick={() => setVisibleCount((current) => current + PAGE_SIZE)}>Load more</button>
-        ) : (
-          <button type="button" disabled={!lastDoc || isLoading || searchText.trim().length > 0} onClick={() => fetchProducts(lastDoc ?? undefined, lastCollection)}>
-            {isLoading && products.length > 0 ? 'Loading more...' : 'Load more products'}
-          </button>
-        )}
-      </div>
+      {visibleProducts.length > 0 ? (
+        <nav className="marketPagination" aria-label="Marketplace pagination">
+          <button type="button" className="marketPaginationButton" disabled={normalizedCurrentPage <= 1 || isLoading} onClick={() => void goToPage(normalizedCurrentPage - 1)}>‹ Previous</button>
+          {paginationItems.map((item, index) => item === 'ellipsis' ? (
+            <span key={`ellipsis-${index}`} className="marketPaginationEllipsis">…</span>
+          ) : (
+            <button
+              key={item}
+              type="button"
+              className="marketPaginationButton"
+              data-active={item === normalizedCurrentPage ? 'true' : 'false'}
+              aria-current={item === normalizedCurrentPage ? 'page' : undefined}
+              disabled={isLoading}
+              onClick={() => void goToPage(item)}
+            >
+              {item}
+            </button>
+          ))}
+          <button type="button" className="marketPaginationButton" disabled={normalizedCurrentPage >= totalPages || isLoading} onClick={() => void goToPage(normalizedCurrentPage + 1)}>Next ›</button>
+        </nav>
+      ) : null}
     </section>
   );
 }
