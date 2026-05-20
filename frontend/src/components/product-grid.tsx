@@ -27,9 +27,9 @@ const LEGACY_COLLECTIONS = ['publicProducts', 'publicServices'] as const;
 const MARKETPLACE_COLLECTIONS = [PRIMARY_COLLECTION, ...LEGACY_COLLECTIONS] as const;
 const PLACEHOLDER_IMAGE = 'https://placehold.co/640x640/172033/ffffff?text=Sedifex+Market';
 const PAGE_SIZE = 24;
-const FULL_PAGE_QUERY_LIMIT = 360;
+const FULL_PAGE_QUERY_LIMIT = 720;
 const PREVIEW_QUERY_LIMIT = 48;
-const SEARCH_SCAN_LIMIT = 500;
+const SEARCH_SCAN_LIMIT = 800;
 const SEARCH_HISTORY_KEY = 'sedifex-recent-searches';
 const MAX_HISTORY_ITEMS = 6;
 const MAX_SUGGESTIONS = 8;
@@ -265,15 +265,48 @@ const normalizeStoreNamesByStoreId = (items: PublicProduct[]) => {
 
 const dedupeById = (items: PublicProduct[]) => Array.from(new Map(items.map((item) => [item.id, item])).values());
 
+const getStoreKey = (item: PublicProduct) => item.storeId?.trim() || item.storeName?.trim() || `unknown-${item.id}`;
+
 const capProductsPerStore = (items: PublicProduct[], limitPerStore: number) => {
   const counts = new Map<string, number>();
   return items.filter((item) => {
-    const key = item.storeId?.trim() || item.storeName?.trim() || item.id;
+    const key = getStoreKey(item);
     const count = counts.get(key) ?? 0;
     if (count >= limitPerStore) return false;
     counts.set(key, count + 1);
     return true;
   });
+};
+
+const balanceProductsAcrossStores = (items: PublicProduct[]) => {
+  const buckets = new Map<string, PublicProduct[]>();
+  const storeOrder: string[] = [];
+
+  items.forEach((item) => {
+    const key = getStoreKey(item);
+    if (!buckets.has(key)) {
+      buckets.set(key, []);
+      storeOrder.push(key);
+    }
+    buckets.get(key)?.push(item);
+  });
+
+  const balanced: PublicProduct[] = [];
+  let keepGoing = true;
+
+  while (keepGoing) {
+    keepGoing = false;
+    for (const key of storeOrder) {
+      const bucket = buckets.get(key);
+      const next = bucket?.shift();
+      if (next) {
+        balanced.push(next);
+        keepGoing = true;
+      }
+    }
+  }
+
+  return balanced;
 };
 
 export function ProductGrid({
@@ -328,8 +361,9 @@ export function ProductGrid({
         .toLowerCase();
       return haystack.includes(normalizedSearch);
     });
-    return sortProducts(filtered.filter(isPublicListing), selectedSort);
-  }, [itemTypeFilter, products, searchText, selectedCity, selectedSort]);
+    const sorted = sortProducts(filtered.filter(isPublicListing), selectedSort);
+    return isPreview ? sorted : balanceProductsAcrossStores(sorted);
+  }, [isPreview, itemTypeFilter, products, searchText, selectedCity, selectedSort]);
 
   const suggestions = useMemo(() => {
     const normalized = searchText.trim().toLowerCase();
