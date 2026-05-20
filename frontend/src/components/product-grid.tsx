@@ -22,6 +22,7 @@ import { db, firebaseConfigError } from '@/lib/firebase';
 import { getStoreHref } from '@/lib/store-route';
 import { getProductHref } from '@/lib/product-route';
 import { resolveClosestCategoryKey } from '@/lib/category-taxonomy';
+import './product-grid.css';
 
 const PRIMARY_COLLECTION = 'publicListings';
 const LEGACY_COLLECTIONS = ['publicProducts', 'publicServices'] as const;
@@ -69,7 +70,8 @@ type PublicProduct = {
 type SortOption = 'newest' | 'price' | 'featured';
 type ItemTypeFilter = 'all' | 'product' | 'service' | 'course';
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 24;
+const QUERY_LIMIT = 100;
 const FETCH_SCAN_BATCHES = 4;
 const FILTERED_FETCH_SCAN_BATCHES = 12;
 const SEARCH_SCAN_LIMIT = 300;
@@ -473,6 +475,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
   const hasServerSideItemTypeFilter = itemTypeFilter !== 'all';
 
   const buildServerFilters = useCallback((): QueryConstraint[] => {
@@ -632,7 +635,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
           const maxScanBatches = hasServerSideItemTypeFilter ? FILTERED_FETCH_SCAN_BATCHES : FETCH_SCAN_BATCHES;
 
           for (let scanIndex = 0; scanIndex < maxScanBatches; scanIndex += 1) {
-            const baseQuery = query(collection(db, collectionName), ...filters, ...ordering, limit(PAGE_SIZE));
+            const baseQuery = query(collection(db, collectionName), ...filters, ...ordering, limit(QUERY_LIMIT));
             const pagedQuery = scanCursor ? query(baseQuery, startAfter(scanCursor)) : baseQuery;
             const scanSnapshot = await getDocs(pagedQuery);
             lastSnapshotSize = scanSnapshot.docs.length;
@@ -653,7 +656,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             latestSnapshotDoc = scanSnapshot.docs.at(-1) ?? latestSnapshotDoc;
             scanCursor = latestSnapshotDoc;
 
-            if (lastSnapshotSize < PAGE_SIZE || collectedItems.length >= PAGE_SIZE) {
+            if (lastSnapshotSize < QUERY_LIMIT || collectedItems.length >= QUERY_LIMIT) {
               break;
             }
           }
@@ -718,12 +721,12 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
           }
 
           snapshot = {
-            docs: collectedItems.slice(0, PAGE_SIZE).map((item) => ({
+            docs: collectedItems.slice(0, QUERY_LIMIT).map((item) => ({
               id: item.id,
               data: () => item,
             })),
             lastDoc: latestSnapshotDoc,
-            isEndReached: lastSnapshotSize < PAGE_SIZE,
+            isEndReached: lastSnapshotSize < QUERY_LIMIT,
           };
           cursorDoc = snapshot.lastDoc;
           break;
@@ -844,6 +847,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   useEffect(() => {
     setProducts([]);
     setLastDoc(null);
+    setVisibleCount(PAGE_SIZE);
     if (searchText.trim().length > 0) return;
     fetchProducts();
   }, [fetchProducts, searchText]);
@@ -852,11 +856,16 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     if (searchText.trim().length === 0) return;
     setProducts([]);
     setLastDoc(null);
+    setVisibleCount(PAGE_SIZE);
     fetchProductsForSearch();
   }, [fetchProductsForSearch, searchText]);
 
   return (
     <section className="marketplace">
+      <div className="marketplaceHeader">
+        <h1>{itemTypeFilter === 'service' ? 'Services' : itemTypeFilter === 'course' ? 'Courses' : 'Products'}</h1>
+        <p>Discover verified marketplace listings from Sedifex stores.</p>
+      </div>
       <div className="toolbar">
         <div className="searchWrap">
           <label htmlFor="search">Search</label>
@@ -929,7 +938,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                 <div className="skeleton skeletonButton" />
               </article>
             ))
-          : visibleProducts.map((item) => {
+          : visibleProducts.slice(0, visibleCount).map((item) => {
               const storeHref = getStoreHref(item.storeId, item.storeName);
               const shortDescription = (item.description ?? '')
                 .split(/\n+/)
@@ -947,15 +956,13 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                       width={360}
                       height={360}
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                      style={{ width: '100%', height: 'auto' }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </Link>
                   <h3><Link href={getProductHref(item.id, item.productName)}>{getProductName(item)}</Link></h3>
                   <p className="productShortDescription">{shortDescription}</p>
                   <div className="meta">
-                    <span className="verifiedBadge" aria-label={`Listing type ${resolveListingType(item)}`}>
-                      {resolveListingType(item)}
-                    </span>
+                    <span className="verifiedBadge" aria-label={`Listing type ${resolveListingType(item)}`}>{resolveListingType(item)}</span>
                     <span className="storeIdentity">
                       {storeHref ? (
                         <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link>
@@ -969,7 +976,8 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                         </span>
                       ) : null}
                     </span>
-                    <strong>{formatPrice(item.price, item.currency)}</strong>
+                    <span>{getCategory(item)}</span>
+                    <strong className="price">{formatPrice(item.price, item.currency)}</strong>
                   </div>
                   {isVerifiedStore(item.verified) ? <p className="trustScoreCard">🛡 Sedifex Trust+ 98%</p> : null}
                   {typeof item.originalPrice === 'number' && typeof item.price === 'number' && item.price < item.originalPrice ? (
@@ -993,13 +1001,17 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
       )}
 
       <div className="actions">
-        <button
-          type="button"
-          disabled={!lastDoc || isLoading || searchText.trim().length > 0}
-          onClick={() => fetchProducts(lastDoc ?? undefined)}
-        >
-          {isLoading && products.length > 0 ? 'Loading more...' : 'Load more products'}
-        </button>
+        {visibleCount < visibleProducts.length ? (
+          <button type="button" onClick={() => setVisibleCount((current) => current + PAGE_SIZE)}>Load more</button>
+        ) : (
+          <button
+            type="button"
+            disabled={!lastDoc || isLoading || searchText.trim().length > 0}
+            onClick={() => fetchProducts(lastDoc ?? undefined)}
+          >
+            {isLoading && products.length > 0 ? 'Loading more...' : 'Load more products'}
+          </button>
+        )}
       </div>
     </section>
   );
