@@ -9,8 +9,8 @@ import {
   QueryDocumentSnapshot,
   collection,
   doc,
-  getDoc,
   documentId,
+  getDoc,
   getDocs,
   limit,
   orderBy,
@@ -26,6 +26,8 @@ import './product-grid.css';
 
 const PRIMARY_COLLECTION = 'publicListings';
 const LEGACY_COLLECTIONS = ['publicProducts', 'publicServices'] as const;
+const MARKETPLACE_COLLECTIONS = [PRIMARY_COLLECTION, ...LEGACY_COLLECTIONS] as const;
+const PLACEHOLDER_IMAGE = 'https://placehold.co/640x640/172033/ffffff?text=Sedifex+Market';
 
 type PublicProduct = {
   id: string;
@@ -59,12 +61,20 @@ type PublicProduct = {
   itemType?: string;
   listingType?: string;
   salesMode?: string;
+  status?: string;
   isVisible?: boolean | string | number;
+  visible?: boolean | string | number;
+  isPublished?: boolean | string | number;
+  isMarketplaceVisible?: boolean | string | number;
+  hidden?: boolean | string | number;
+  isHidden?: boolean | string | number;
+  deleted?: boolean | string | number;
+  isDeleted?: boolean | string | number;
   verified?: boolean | string | number;
   featuredRank?: number;
   rankingScore?: number;
   publishedAt?: { seconds: number };
-  isPublished?: boolean | string | number;
+  updatedAt?: { seconds?: number } | string;
 };
 
 type SortOption = 'newest' | 'price' | 'featured';
@@ -76,14 +86,6 @@ const FETCH_SCAN_BATCHES = 4;
 const FILTERED_FETCH_SCAN_BATCHES = 12;
 const SEARCH_SCAN_LIMIT = 300;
 const SEARCH_BATCH_SIZE = 100;
-
-const getMarketplaceCollections = async (): Promise<string[]> => {
-  if (!db) return [PRIMARY_COLLECTION];
-  const primarySnapshot = await getDocs(query(collection(db, PRIMARY_COLLECTION), limit(1)));
-  if (!primarySnapshot.empty) return [PRIMARY_COLLECTION];
-  return [...LEGACY_COLLECTIONS];
-};
-
 const SEARCH_HISTORY_KEY = 'sedifex-recent-searches';
 const MAX_HISTORY_ITEMS = 6;
 const MAX_SUGGESTIONS = 8;
@@ -98,6 +100,20 @@ const SYNONYM_GROUPS = [
   ['tv', 'television'],
   ['beauty', 'cosmetics', 'makeup'],
 ];
+
+const normalizeBoolean = (value: unknown): boolean | null => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'published', 'visible'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'draft', 'hidden'].includes(normalized)) return false;
+  }
+  return null;
+};
+
+const isTrue = (value: unknown) => normalizeBoolean(value) === true;
+const isFalse = (value: unknown) => normalizeBoolean(value) === false;
 
 const levenshteinDistance = (left: string, right: string) => {
   if (left === right) return 0;
@@ -117,18 +133,6 @@ const levenshteinDistance = (left: string, right: string) => {
   return dp[left.length][right.length];
 };
 
-
-
-const asStoreVerified = (value: unknown) => {
-  if (value === true) return true;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    return normalized === 'true' || normalized === '1' || normalized === 'yes';
-  }
-  if (typeof value === 'number') return value === 1;
-  return false;
-};
-
 const normalizeDisplayCurrency = (currency?: string) => {
   const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
   return normalizedCurrency === 'USD' ? 'GHS' : normalizedCurrency;
@@ -142,6 +146,7 @@ const formatPrice = (price?: number, currency?: string) => {
 };
 
 const getProductName = (item: PublicProduct) => (item.productName ?? item.name)?.trim() || 'Untitled item';
+
 const getCategory = (item: PublicProduct) =>
   resolveClosestCategoryKey({
     category: item.categoryKey?.trim() || item.category?.trim(),
@@ -150,262 +155,177 @@ const getCategory = (item: PublicProduct) =>
     itemType: item.itemType,
   });
 
-
 const getStoreCity = (item: PublicProduct) => {
   const rawCity = item.city ?? item.storeCity;
   return rawCity?.trim() || 'City unavailable';
 };
 
-const asTruthyBoolean = (value: unknown): boolean => {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return value === 1;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    return normalized === 'true' || normalized === '1' || normalized === 'yes';
+const decodeImageValues = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value.flatMap((entry) => decodeImageValues(entry));
+  if (typeof value !== 'string') return [];
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.flatMap((entry) => decodeImageValues(entry));
+    } catch {
+      return [trimmed];
+    }
   }
+  return [trimmed];
+};
 
-  return false;
+const normalizeImageCandidate = (value: string): string => {
+  const trimmed = value.trim().replace(/^['"]+|['"]+$/g, '').replace(/\\u002F/gi, '/').replace(/\\\//g, '/');
+  if (!trimmed.toLowerCase().startsWith('gs://')) return trimmed;
+  const withoutPrefix = trimmed.slice(5);
+  const slashIndex = withoutPrefix.indexOf('/');
+  if (slashIndex === -1) return '';
+  const bucket = withoutPrefix.slice(0, slashIndex);
+  const objectPath = withoutPrefix.slice(slashIndex + 1);
+  return bucket && objectPath ? `https://storage.googleapis.com/${bucket}/${objectPath}` : '';
+};
+
+const isDisplayableImageUrl = (value: string) => {
+  const candidate = normalizeImageCandidate(value);
+  if (!candidate) return false;
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
 };
 
 const getDisplayImages = (item: PublicProduct): string[] => {
-  const decodeImageValues = (value: unknown): string[] => {
-    if (typeof value !== 'string') return [];
-    const trimmed = value.trim();
-    if (!trimmed) return [];
-
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim());
-        }
-      } catch {
-        return [trimmed];
-      }
-    }
-
-    return [trimmed];
-  };
-
-  const normalizeStorageUrl = (value: string): string => {
-    const trimmed = value.trim();
-    if (!trimmed.toLowerCase().startsWith('gs://')) return trimmed;
-
-    const withoutPrefix = trimmed.slice(5);
-    const slashIndex = withoutPrefix.indexOf('/');
-    if (slashIndex === -1) return '';
-    const bucket = withoutPrefix.slice(0, slashIndex);
-    const objectPath = withoutPrefix.slice(slashIndex + 1);
-    if (!bucket || !objectPath) return '';
-    return `https://storage.googleapis.com/${bucket}/${objectPath}`;
-  };
-
-  const normalizeImageCandidate = (value: string): string =>
-    normalizeStorageUrl(value)
-      .trim()
-      .replace(/^['"]+|['"]+$/g, '')
-      .replace(/\\u002F/gi, '/')
-      .replace(/\\\//g, '/');
-
-  const isDisplayableImageUrl = (value: string) => {
-    const candidate = normalizeImageCandidate(value);
-    if (!candidate) return false;
-
-    try {
-      const parsed = new URL(candidate);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
-
-  const imageListRaw = Array.isArray(item.imageUrls)
-    ? item.imageUrls
-    : typeof item.imageUrls === 'string'
-      ? [item.imageUrls]
-      : [];
-  const imageList = imageListRaw.flatMap((value) => decodeImageValues(value));
-  const serviceImageListRaw = Array.isArray(item.serviceImageUrls)
-    ? item.serviceImageUrls
-    : typeof item.serviceImageUrls === 'string'
-      ? [item.serviceImageUrls]
-      : [];
-  const serviceImageList = serviceImageListRaw.flatMap((value) => decodeImageValues(value));
-  const genericImageListRaw = Array.isArray(item.images)
-    ? item.images
-    : typeof item.images === 'string'
-      ? [item.images]
-      : [];
-  const genericImageList = genericImageListRaw.flatMap((value) => decodeImageValues(value));
-
-  const fallbackImages = [
+  const candidates = [
+    item.imageUrls,
     item.imageUrl,
     item.image,
+    item.serviceImageUrls,
     item.serviceImageUrl,
     item.serviceImage,
     item.thumbnailUrl,
     item.photoUrl,
-    ...genericImageList,
-  ]
-    .filter((value): value is string => typeof value === 'string')
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  const merged = [...imageList, ...serviceImageList, ...fallbackImages]
-    .map((value) => normalizeImageCandidate(value))
-    .filter((value) => isDisplayableImageUrl(value));
-  return Array.from(new Set(merged));
+    item.images,
+  ].flatMap((value) => decodeImageValues(value));
+  return Array.from(new Set(candidates.map(normalizeImageCandidate).filter(isDisplayableImageUrl)));
 };
 
-const hasDisplayImage = (item: PublicProduct) => getDisplayImages(item).length > 0;
-const isPublicListing = (item: PublicProduct) => asTruthyBoolean(item.isVisible) || asTruthyBoolean(item.isPublished);
+const getDisplayImage = (item: PublicProduct) => getDisplayImages(item)[0] ?? PLACEHOLDER_IMAGE;
 
-const isVerifiedStore = (value: PublicProduct['verified']) => {
-  if (value == null) return true;
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return value === 1;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    return normalized === 'true' || normalized === '1' || normalized === 'yes';
-  }
+const isPublicListing = (item: PublicProduct) => {
+  if (isTrue(item.deleted) || isTrue(item.isDeleted)) return false;
+  if (isTrue(item.hidden) || isTrue(item.isHidden)) return false;
+  if (isFalse(item.visible) || isFalse(item.isVisible)) return false;
+  if (isFalse(item.isMarketplaceVisible) || isFalse(item.isPublished)) return false;
 
-  return false;
+  const status = item.status?.trim().toLowerCase();
+  if (status === 'draft' && !isTrue(item.isPublished)) return false;
+
+  // Public collections can contain legacy docs without all new flags. Do not hide them unless explicitly hidden.
+  return true;
 };
+
+const isVerifiedStore = (value: PublicProduct['verified']) => value == null || isTrue(value);
 
 const normalizeStoreNamesByStoreId = (items: PublicProduct[]): PublicProduct[] => {
   const canonicalNamesByStoreId = new Map<string, string>();
-
   items.forEach((item) => {
     const storeId = item.storeId?.trim();
     const storeName = item.storeName?.trim();
-    if (!storeId || !storeName) return;
-    if (!canonicalNamesByStoreId.has(storeId)) {
-      canonicalNamesByStoreId.set(storeId, storeName);
-    }
+    if (storeId && storeName && !canonicalNamesByStoreId.has(storeId)) canonicalNamesByStoreId.set(storeId, storeName);
   });
-
   return items.map((item) => {
     const storeId = item.storeId?.trim();
     if (!storeId) return item;
-
     const canonicalStoreName = canonicalNamesByStoreId.get(storeId);
-    if (!canonicalStoreName || canonicalStoreName === item.storeName) return item;
-    return { ...item, storeName: canonicalStoreName };
+    return canonicalStoreName && canonicalStoreName !== item.storeName ? { ...item, storeName: canonicalStoreName } : item;
   });
 };
 
 const bucketProductsByStore = (items: PublicProduct[]) => {
   const buckets = new Map<string, PublicProduct[]>();
-
   items.forEach((item) => {
     const storeKey = item.storeId?.trim() || item.storeName?.trim() || `unknown-store-${item.id}`;
-    const bucket = buckets.get(storeKey);
-
-    if (bucket) {
-      bucket.push(item);
-    } else {
-      buckets.set(storeKey, [item]);
-    }
+    const bucket = buckets.get(storeKey) ?? [];
+    bucket.push(item);
+    buckets.set(storeKey, bucket);
   });
-
   return buckets;
 };
 
 const mixProductsAcrossStores = (items: PublicProduct[]) => {
   const buckets = bucketProductsByStore(items);
   const mixed: PublicProduct[] = [];
-
   while (buckets.size > 0) {
     for (const [storeKey, storeItems] of buckets) {
       const nextItem = storeItems.shift();
-
-      if (nextItem) {
-        mixed.push(nextItem);
-      }
-
-      if (storeItems.length === 0) {
-        buckets.delete(storeKey);
-      }
+      if (nextItem) mixed.push(nextItem);
+      if (storeItems.length === 0) buckets.delete(storeKey);
     }
   }
-
   return mixed;
 };
 
 const capProductsPerStore = (items: PublicProduct[], limitPerStore: number) => {
   if (limitPerStore <= 0) return items;
   const counts = new Map<string, number>();
-  const filtered: PublicProduct[] = [];
-
-  items.forEach((item) => {
+  return items.filter((item) => {
     const storeKey = item.storeId?.trim() || item.storeName?.trim() || `unknown-store-${item.id}`;
     const currentCount = counts.get(storeKey) ?? 0;
-    if (currentCount >= limitPerStore) return;
+    if (currentCount >= limitPerStore) return false;
     counts.set(storeKey, currentCount + 1);
-    filtered.push(item);
+    return true;
   });
-
-  return filtered;
 };
 
 const mixProductsByCategoryThenStore = (items: PublicProduct[]) => {
   const categoryBuckets = new Map<string, PublicProduct[]>();
-
   items.forEach((item) => {
     const categoryKey = getCategory(item) || 'uncategorized';
-    const bucket = categoryBuckets.get(categoryKey);
-
-    if (bucket) {
-      bucket.push(item);
-    } else {
-      categoryBuckets.set(categoryKey, [item]);
-    }
+    const bucket = categoryBuckets.get(categoryKey) ?? [];
+    bucket.push(item);
+    categoryBuckets.set(categoryKey, bucket);
   });
-
-  const mixedByCategory: PublicProduct[] = [];
-  for (const categoryItems of categoryBuckets.values()) {
-    mixedByCategory.push(...mixProductsAcrossStores(categoryItems));
-  }
-
-  return mixedByCategory;
+  return Array.from(categoryBuckets.values()).flatMap((categoryItems) => mixProductsAcrossStores(categoryItems));
 };
 
-const getPublishedAtSeconds = (item: PublicProduct) => {
-  const seconds = item.publishedAt?.seconds;
-  return typeof seconds === 'number' ? seconds : 0;
+const getTimestampScore = (value: PublicProduct['updatedAt'] | PublicProduct['publishedAt']) => {
+  if (!value) return 0;
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed / 1000 : 0;
+  }
+  return typeof value.seconds === 'number' ? value.seconds : 0;
 };
 
 const sortProducts = (items: PublicProduct[], selectedSort: SortOption) => {
   const sorted = [...items];
-
   sorted.sort((left, right) => {
     if (selectedSort === 'price') {
       const leftPrice = typeof left.price === 'number' ? left.price : Number.POSITIVE_INFINITY;
       const rightPrice = typeof right.price === 'number' ? right.price : Number.POSITIVE_INFINITY;
       if (leftPrice !== rightPrice) return leftPrice - rightPrice;
-    } else if (selectedSort === 'featured') {
+    }
+    if (selectedSort === 'featured') {
       const leftScore = typeof left.rankingScore === 'number' ? left.rankingScore : Number.NEGATIVE_INFINITY;
       const rightScore = typeof right.rankingScore === 'number' ? right.rankingScore : Number.NEGATIVE_INFINITY;
       if (leftScore !== rightScore) return rightScore - leftScore;
-
       const leftFeaturedRank = typeof left.featuredRank === 'number' ? left.featuredRank : Number.NEGATIVE_INFINITY;
       const rightFeaturedRank = typeof right.featuredRank === 'number' ? right.featuredRank : Number.NEGATIVE_INFINITY;
       if (leftFeaturedRank !== rightFeaturedRank) return rightFeaturedRank - leftFeaturedRank;
-    } else {
-      const leftPublishedAt = getPublishedAtSeconds(left);
-      const rightPublishedAt = getPublishedAtSeconds(right);
-      if (leftPublishedAt !== rightPublishedAt) return rightPublishedAt - leftPublishedAt;
     }
-
+    const leftTime = getTimestampScore(left.publishedAt) || getTimestampScore(left.updatedAt);
+    const rightTime = getTimestampScore(right.publishedAt) || getTimestampScore(right.updatedAt);
+    if (leftTime !== rightTime) return rightTime - leftTime;
     return left.id.localeCompare(right.id);
   });
-
   return sorted;
 };
 
-type ProductGridProps = {
-  itemTypeFilter?: ItemTypeFilter;
-};
+type ProductGridProps = { itemTypeFilter?: ItemTypeFilter };
 
 const resolveListingType = (item: Pick<PublicProduct, 'listingType' | 'itemType'>): Exclude<ItemTypeFilter, 'all'> => {
   const listingType = item.listingType?.trim().toLowerCase();
@@ -423,6 +343,8 @@ const resolveCtaLabel = (item: Pick<PublicProduct, 'listingType' | 'itemType' | 
   if (listingType === 'product' && salesMode === 'buy_now') return 'Buy now';
   if (listingType === 'service' && salesMode === 'book_now') return 'Book now';
   if (listingType === 'course' && salesMode === 'register') return 'Register';
+  if (listingType === 'service') return 'Book now';
+  if (listingType === 'course') return 'Register';
   return 'View details';
 };
 
@@ -439,29 +361,33 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const [searchText, setSearchText] = useState<string>('');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const storeVerifiedCacheRef = useRef<Map<string, boolean>>(new Map());
+  const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [lastCollection, setLastCollection] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
+  const hasServerSideItemTypeFilter = itemTypeFilter !== 'all';
 
   const filterByVerifiedStore = useCallback(async (items: PublicProduct[]) => {
-    if (items.length === 0) return items;
-    if (db == null) return items;
+    if (items.length === 0 || db == null) return items;
     const firestore: NonNullable<typeof db> = db;
-
-    const uniqueStoreIds = Array.from(
-      new Set(items.map((item) => item.storeId?.trim()).filter((value): value is string => Boolean(value))),
-    );
-
+    const uniqueStoreIds = Array.from(new Set(items.map((item) => item.storeId?.trim()).filter((value): value is string => Boolean(value))));
     const unresolvedStoreIds = uniqueStoreIds.filter((storeId) => !storeVerifiedCacheRef.current.has(storeId));
 
-    await Promise.all(
-      unresolvedStoreIds.map(async (storeId) => {
-        try {
-          const snapshot = await getDoc(doc(firestore, 'stores', storeId));
-          const verified = snapshot.exists() ? asStoreVerified((snapshot.data() as Record<string, unknown>).verified) : false;
-          storeVerifiedCacheRef.current.set(storeId, verified);
-        } catch {
-          storeVerifiedCacheRef.current.set(storeId, false);
-        }
-      }),
-    );
+    await Promise.all(unresolvedStoreIds.map(async (storeId) => {
+      try {
+        const snapshot = await getDoc(doc(firestore, 'stores', storeId));
+        const data = snapshot.exists() ? snapshot.data() as Record<string, unknown> : {};
+        const status = typeof data.status === 'string' ? data.status.trim().toLowerCase() : '';
+        const verified = isTrue(data.verified) && status !== 'inactive' && status !== 'suspended' && isFalse(data.eligibleForBuy) !== true && isTrue(data.buyOptOut) !== true;
+        storeVerifiedCacheRef.current.set(storeId, verified);
+      } catch {
+        // Do not hide a public listing only because store verification could not be loaded.
+        storeVerifiedCacheRef.current.set(storeId, true);
+      }
+    }));
 
     return items.filter((item) => {
       const storeId = item.storeId?.trim();
@@ -470,19 +396,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     });
   }, []);
 
-  const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
-  const hasServerSideItemTypeFilter = itemTypeFilter !== 'all';
-
   const buildServerFilters = useCallback((): QueryConstraint[] => {
     const filters: QueryConstraint[] = [];
-    if (hasServerSideItemTypeFilter) {
-      filters.push(where('listingType', '==', itemTypeFilter));
-    }
+    if (hasServerSideItemTypeFilter) filters.push(where('listingType', '==', itemTypeFilter));
     return filters;
   }, [hasServerSideItemTypeFilter, itemTypeFilter]);
 
@@ -492,11 +408,8 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
       const raw = window.localStorage.getItem(SEARCH_HISTORY_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return;
-      setRecentSearches(parsed.filter((item): item is string => typeof item === 'string').slice(0, MAX_HISTORY_ITEMS));
-    } catch {
-      // ignore malformed local storage
-    }
+      if (Array.isArray(parsed)) setRecentSearches(parsed.filter((item): item is string => typeof item === 'string').slice(0, MAX_HISTORY_ITEMS));
+    } catch {}
   }, []);
 
   const searchableTerms = useMemo(() => {
@@ -515,36 +428,28 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const expandedSearchTerms = useMemo(() => {
     if (!normalizedSearchText) return [] as string[];
     const expanded = new Set<string>([normalizedSearchText]);
-
     SYNONYM_GROUPS.forEach((group) => {
       if (group.some((entry) => entry.includes(normalizedSearchText) || normalizedSearchText.includes(entry))) {
         group.forEach((entry) => expanded.add(entry));
       }
     });
-
     searchableTerms.forEach((term) => {
       const distance = levenshteinDistance(normalizedSearchText, term);
       const threshold = Math.max(1, Math.floor(normalizedSearchText.length * 0.3));
       if (distance <= threshold) expanded.add(term);
     });
-
     return Array.from(expanded);
   }, [normalizedSearchText, searchableTerms]);
 
   const suggestions = useMemo(() => {
     if (!normalizedSearchText) return recentSearches;
-
     const synonymSuggestions = new Set<string>();
     SYNONYM_GROUPS.forEach((group) => {
-      if (group.some((entry) => entry.includes(normalizedSearchText) || normalizedSearchText.includes(entry))) {
-        group.forEach((entry) => synonymSuggestions.add(entry));
-      }
+      if (group.some((entry) => entry.includes(normalizedSearchText) || normalizedSearchText.includes(entry))) group.forEach((entry) => synonymSuggestions.add(entry));
     });
-
     const ranked = searchableTerms
       .filter((term) => term.includes(normalizedSearchText) || levenshteinDistance(normalizedSearchText, term) <= 2)
       .sort((a, b) => levenshteinDistance(normalizedSearchText, a) - levenshteinDistance(normalizedSearchText, b));
-
     return Array.from(new Set([...ranked, ...synonymSuggestions])).slice(0, MAX_SUGGESTIONS);
   }, [normalizedSearchText, recentSearches, searchableTerms]);
 
@@ -552,15 +457,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     const normalized = value.trim();
     setSearchText(normalized);
     if (!normalized) return;
-
     setRecentSearches((current) => {
-      const next = [normalized, ...current.filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(
-        0,
-        MAX_HISTORY_ITEMS,
-      );
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next));
-      }
+      const next = [normalized, ...current.filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(0, MAX_HISTORY_ITEMS);
+      if (typeof window !== 'undefined') window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next));
       return next;
     });
   }, []);
@@ -569,33 +468,65 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     const text = searchText.trim().toLowerCase();
     const normalizedProducts = normalizeStoreNamesByStoreId(products);
     const matchingProducts = normalizedProducts.filter((product) => {
-      const typeMatches = matchesItemTypeFilter(product, itemTypeFilter);
-      if (!typeMatches) return false;
+      if (!matchesItemTypeFilter(product, itemTypeFilter)) return false;
       const cityMatches = selectedCity === 'all' || getStoreCity(product).toLowerCase() === selectedCity.toLowerCase();
       if (!cityMatches) return false;
       if (!text) return true;
-      const haystack = [
-        getProductName(product),
-        product.description,
-        product.storeName,
-        getCategory(product),
-        product.sku,
-        product.batchNumber,
-        resolveListingType(product),
-      ]
+      const haystack = [getProductName(product), product.description, product.storeName, getCategory(product), product.sku, product.batchNumber, resolveListingType(product)]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
       return expandedSearchTerms.some((term) => haystack.includes(term));
     });
-
-    const imageReadyProducts = matchingProducts.filter((product) => isPublicListing(product) && hasDisplayImage(product));
-    const sortedProducts = sortProducts(imageReadyProducts, selectedSort);
-    return mixProductsByCategoryThenStore(sortedProducts);
+    return mixProductsByCategoryThenStore(sortProducts(matchingProducts.filter(isPublicListing), selectedSort));
   }, [expandedSearchTerms, itemTypeFilter, products, searchText, selectedCity, selectedSort]);
 
+  const fetchCollectionPage = useCallback(async (collectionName: string, cursor?: QueryDocumentSnapshot) => {
+    if (!db) return { items: [] as PublicProduct[], lastDoc: null as QueryDocumentSnapshot | null, isEndReached: true };
+    const filters = buildServerFilters();
+    const orderOptions: QueryConstraint[][] =
+      selectedSort === 'price'
+        ? [[orderBy('price', 'asc'), orderBy(documentId(), 'asc')], [orderBy(documentId(), 'asc')]]
+        : selectedSort === 'featured'
+          ? [[orderBy('rankingScore', 'desc'), orderBy('featuredRank', 'desc'), orderBy(documentId(), 'asc')], [orderBy('featuredRank', 'desc'), orderBy(documentId(), 'asc')], [orderBy(documentId(), 'asc')]]
+          : [[orderBy('publishedAt', 'desc')], [orderBy(documentId(), 'asc')]];
 
-  const fetchProducts = useCallback(async (cursor?: QueryDocumentSnapshot) => {
+    for (const ordering of orderOptions) {
+      try {
+        const collectedItems: PublicProduct[] = [];
+        let scanCursor = cursor;
+        let latestSnapshotDoc: QueryDocumentSnapshot | null = cursor ?? null;
+        let lastSnapshotSize = 0;
+        const maxScanBatches = hasServerSideItemTypeFilter ? FILTERED_FETCH_SCAN_BATCHES : FETCH_SCAN_BATCHES;
+
+        for (let scanIndex = 0; scanIndex < maxScanBatches; scanIndex += 1) {
+          const baseQuery = query(collection(db, collectionName), ...filters, ...ordering, limit(QUERY_LIMIT));
+          const pagedQuery = scanCursor ? query(baseQuery, startAfter(scanCursor)) : baseQuery;
+          const scanSnapshot = await getDocs(pagedQuery);
+          lastSnapshotSize = scanSnapshot.docs.length;
+          if (scanSnapshot.empty) break;
+
+          const batchItemsRaw = scanSnapshot.docs
+            .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as PublicProduct)
+            .filter((item) => matchesItemTypeFilter(item, itemTypeFilter) && isPublicListing(item));
+          const batchItems = await filterByVerifiedStore(batchItemsRaw);
+          collectedItems.push(...batchItems);
+          latestSnapshotDoc = scanSnapshot.docs.at(-1) ?? latestSnapshotDoc;
+          scanCursor = latestSnapshotDoc ?? undefined;
+          if (lastSnapshotSize < QUERY_LIMIT || collectedItems.length >= QUERY_LIMIT) break;
+        }
+
+        return { items: collectedItems.slice(0, QUERY_LIMIT), lastDoc: latestSnapshotDoc, isEndReached: lastSnapshotSize < QUERY_LIMIT };
+      } catch (queryErr) {
+        const firestoreError = queryErr as FirestoreError;
+        if (firestoreError?.code !== 'failed-precondition') throw queryErr;
+      }
+    }
+
+    throw new Error(`Unable to fetch ${collectionName} with the available indexes.`);
+  }, [buildServerFilters, filterByVerifiedStore, hasServerSideItemTypeFilter, itemTypeFilter, selectedSort]);
+
+  const fetchProducts = useCallback(async (cursor?: QueryDocumentSnapshot, collectionCursor?: string | null) => {
     if (!db) {
       setError(firebaseConfigError ?? 'Firebase is not configured.');
       return;
@@ -606,157 +537,32 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setDebugInfo(null);
 
     try {
-      const collectionsToQuery = await getMarketplaceCollections();
-      const filters = buildServerFilters();
+      const startCollectionIndex = collectionCursor ? Math.max(0, MARKETPLACE_COLLECTIONS.indexOf(collectionCursor as typeof MARKETPLACE_COLLECTIONS[number])) : 0;
+      let nextItems: PublicProduct[] = [];
+      let nextLastDoc: QueryDocumentSnapshot | null = null;
+      let nextCollection: string | null = null;
+      let isEndReached = true;
 
-      const orderOptions: QueryConstraint[][] =
-        selectedSort === 'price'
-          ? [[orderBy('price', 'asc'), orderBy(documentId(), 'asc')], [orderBy(documentId(), 'asc')]]
-          : selectedSort === 'featured'
-            ? [
-                [orderBy('rankingScore', 'desc'), orderBy('featuredRank', 'desc'), orderBy(documentId(), 'asc')],
-                [orderBy('featuredRank', 'desc'), orderBy(documentId(), 'asc')],
-                [orderBy(documentId(), 'asc')],
-              ]
-            : [[orderBy('publishedAt', 'desc')], [orderBy(documentId(), 'asc')]];
-
-      let snapshot = null;
-      let cursorDoc = cursor;
-
-      for (const collectionName of collectionsToQuery) {
-        for (let index = 0; index < orderOptions.length; index += 1) {
-        const ordering = orderOptions[index];
-        try {
-          const collectedItems: PublicProduct[] = [];
-          let scanCursor = cursor;
-          let latestSnapshotDoc: QueryDocumentSnapshot | undefined;
-          let lastSnapshotSize = 0;
-
-          const maxScanBatches = hasServerSideItemTypeFilter ? FILTERED_FETCH_SCAN_BATCHES : FETCH_SCAN_BATCHES;
-
-          for (let scanIndex = 0; scanIndex < maxScanBatches; scanIndex += 1) {
-            const baseQuery = query(collection(db, collectionName), ...filters, ...ordering, limit(QUERY_LIMIT));
-            const pagedQuery = scanCursor ? query(baseQuery, startAfter(scanCursor)) : baseQuery;
-            const scanSnapshot = await getDocs(pagedQuery);
-            lastSnapshotSize = scanSnapshot.docs.length;
-
-            if (scanSnapshot.empty) {
-              break;
-            }
-
-            const batchItemsRaw = scanSnapshot.docs
-              .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-              .filter(
-                (item) =>
-                  matchesItemTypeFilter(item, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
-              );
-
-            const batchItems = await filterByVerifiedStore(batchItemsRaw);
-            collectedItems.push(...batchItems);
-            latestSnapshotDoc = scanSnapshot.docs.at(-1) ?? latestSnapshotDoc;
-            scanCursor = latestSnapshotDoc;
-
-            if (lastSnapshotSize < QUERY_LIMIT || collectedItems.length >= QUERY_LIMIT) {
-              break;
-            }
-          }
-
-          const shouldTryFallbackForMissingPublishedAt =
-            selectedSort === 'newest' &&
-            !cursor &&
-            index === 0 &&
-            collectedItems.length === 0 &&
-            orderOptions.length > 1;
-
-          if (shouldTryFallbackForMissingPublishedAt) {
-            continue;
-          }
-
-          if (selectedSort === 'newest' && !cursor && index === 0 && collectedItems.length < PAGE_SIZE) {
-            const seenIds = new Set(collectedItems.map((item) => item.id));
-            let fallbackCursor: QueryDocumentSnapshot | undefined;
-            let safetyCounter = 0;
-
-            const fallbackScanLimit = hasServerSideItemTypeFilter ? FILTERED_FETCH_SCAN_BATCHES : FETCH_SCAN_BATCHES;
-
-            while (collectedItems.length < PAGE_SIZE && safetyCounter < fallbackScanLimit) {
-              safetyCounter += 1;
-              const fallbackBaseQuery = query(collection(db, collectionName), ...filters, orderBy(documentId(), 'asc'), limit(PAGE_SIZE));
-              const fallbackPagedQuery = fallbackCursor ? query(fallbackBaseQuery, startAfter(fallbackCursor)) : fallbackBaseQuery;
-              const fallbackSnapshot = await getDocs(fallbackPagedQuery);
-
-              if (fallbackSnapshot.empty) {
-                break;
-              }
-
-              fallbackCursor = fallbackSnapshot.docs.at(-1) ?? fallbackCursor;
-
-              const fallbackBatchRaw = fallbackSnapshot.docs
-                .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-                .filter(
-                  (item) =>
-                    !seenIds.has(item.id) &&
-                    matchesItemTypeFilter(item, itemTypeFilter) &&
-                    isPublicListing(item) &&
-                    hasDisplayImage(item),
-                );
-
-              if (fallbackBatchRaw.length === 0) {
-                if (fallbackSnapshot.docs.length < PAGE_SIZE) break;
-                continue;
-              }
-
-              const fallbackBatch = await filterByVerifiedStore(fallbackBatchRaw);
-              fallbackBatch.forEach((item) => {
-                if (!seenIds.has(item.id)) {
-                  seenIds.add(item.id);
-                  collectedItems.push(item);
-                }
-              });
-
-              if (fallbackSnapshot.docs.length < PAGE_SIZE) {
-                break;
-              }
-            }
-          }
-
-          snapshot = {
-            docs: collectedItems.slice(0, QUERY_LIMIT).map((item) => ({
-              id: item.id,
-              data: () => item,
-            })),
-            lastDoc: latestSnapshotDoc,
-            isEndReached: lastSnapshotSize < QUERY_LIMIT,
-          };
-          cursorDoc = snapshot.lastDoc;
-          break;
-        } catch (queryErr) {
-          const firestoreError = queryErr as FirestoreError;
-          if (firestoreError?.code !== 'failed-precondition') {
-            throw queryErr;
-          }
-        }
+      for (let index = startCollectionIndex; index < MARKETPLACE_COLLECTIONS.length; index += 1) {
+        const collectionName = MARKETPLACE_COLLECTIONS[index];
+        const page = await fetchCollectionPage(collectionName, index === startCollectionIndex ? cursor : undefined);
+        nextItems = page.items;
+        nextLastDoc = page.lastDoc;
+        nextCollection = collectionName;
+        isEndReached = page.isEndReached;
+        if (nextItems.length > 0 || !isEndReached) break;
       }
 
-        if (snapshot) break;
-      }
-
-      if (!snapshot) {
-        throw new Error('Unable to fetch products with the available indexes.');
-      }
-
-      const nextItemsRaw = snapshot.docs
-        .map((doc) => doc.data() as PublicProduct)
-        .filter((item) => isPublicListing(item) && hasDisplayImage(item));
-      const nextItems = capProductsPerStore(mixProductsAcrossStores(nextItemsRaw), 2);
-
-      setProducts((current) => (cursor ? [...current, ...nextItems] : nextItems));
+      const deduped = Array.from(new Map(nextItems.map((item) => [item.id, item])).values());
+      const cappedItems = capProductsPerStore(mixProductsAcrossStores(deduped), 2);
+      setProducts((current) => cursor ? normalizeStoreNamesByStoreId([...current, ...cappedItems]) : normalizeStoreNamesByStoreId(cappedItems));
       setCities((current) => {
         const next = new Set(current);
-        nextItems.forEach((item) => next.add(getStoreCity(item)));
+        cappedItems.forEach((item) => next.add(getStoreCity(item)));
         return Array.from(next).sort((a, b) => a.localeCompare(b));
       });
-      setLastDoc(snapshot.isEndReached ? null : (cursorDoc ?? null));
+      setLastDoc(isEndReached ? null : nextLastDoc);
+      setLastCollection(isEndReached ? null : nextCollection);
     } catch (err) {
       console.error('Failed to fetch products', err);
       const firestoreError = err as FirestoreError;
@@ -768,20 +574,13 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         firebaseConfigError: firebaseConfigError ?? null,
       };
       setDebugInfo(JSON.stringify(debugDetails, null, 2));
-
-      if (firestoreError?.code === 'permission-denied') {
-        setError('Could not load products due to Firestore rules. Allow public read access to marketplace collections.');
-      } else if (firestoreError?.code === 'failed-precondition') {
-        setError(
-          'Could not load products. Deploy Firestore indexes and rules with `firebase deploy --only firestore:indexes,firestore:rules`.',
-        );
-      } else {
-        setError('Could not load products. Check debug details below to see the exact Firestore error.');
-      }
+      if (firestoreError?.code === 'permission-denied') setError('Could not load products due to Firestore rules. Allow public read access to marketplace collections.');
+      else if (firestoreError?.code === 'failed-precondition') setError('Could not load products. Deploy Firestore indexes and rules with `firebase deploy --only firestore:indexes,firestore:rules`.');
+      else setError('Could not load products. Check debug details below to see the exact Firestore error.');
     } finally {
       setIsLoading(false);
     }
-  }, [buildServerFilters, filterByVerifiedStore, hasServerSideItemTypeFilter, itemTypeFilter, selectedSort]);
+  }, [fetchCollectionPage, selectedSort]);
 
   const fetchProductsForSearch = useCallback(async () => {
     if (!db) {
@@ -794,46 +593,31 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     setDebugInfo(null);
 
     try {
-      const collectionsToQuery = await getMarketplaceCollections();
       const filters = buildServerFilters();
-
       const allItems: PublicProduct[] = [];
 
-      for (const collectionName of collectionsToQuery) {
-      let cursor: QueryDocumentSnapshot | undefined;
-
-      while (allItems.length < SEARCH_SCAN_LIMIT) {
-        const batchQuery = query(
-          collection(db, collectionName),
-          ...filters,
-          orderBy(documentId(), 'asc'),
-          limit(SEARCH_BATCH_SIZE),
-          ...(cursor ? [startAfter(cursor)] : []),
-        );
-
-        const snapshot = await getDocs(batchQuery);
-        const batchItemsRaw = snapshot.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
-          .filter(
-            (item) => matchesItemTypeFilter(item, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
-          );
-
-        const batchItems = await filterByVerifiedStore(batchItemsRaw);
-        allItems.push(...batchItems);
-
-        if (snapshot.docs.length < SEARCH_BATCH_SIZE) {
-          break;
+      for (const collectionName of MARKETPLACE_COLLECTIONS) {
+        let cursor: QueryDocumentSnapshot | undefined;
+        while (allItems.length < SEARCH_SCAN_LIMIT) {
+          const batchQuery = query(collection(db, collectionName), ...filters, orderBy(documentId(), 'asc'), limit(SEARCH_BATCH_SIZE), ...(cursor ? [startAfter(cursor)] : []));
+          const snapshot = await getDocs(batchQuery);
+          const batchItemsRaw = snapshot.docs
+            .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as PublicProduct)
+            .filter((item) => matchesItemTypeFilter(item, itemTypeFilter) && isPublicListing(item));
+          const batchItems = await filterByVerifiedStore(batchItemsRaw);
+          allItems.push(...batchItems);
+          if (snapshot.docs.length < SEARCH_BATCH_SIZE) break;
+          cursor = snapshot.docs.at(-1);
         }
-
-        cursor = snapshot.docs.at(-1);
-      }
       }
 
-      setProducts(allItems.slice(0, SEARCH_SCAN_LIMIT));
+      const deduped = Array.from(new Map(allItems.map((item) => [item.id, item])).values()).slice(0, SEARCH_SCAN_LIMIT);
+      setProducts(normalizeStoreNamesByStoreId(deduped));
       setLastDoc(null);
+      setLastCollection(null);
       setCities((current) => {
         const next = new Set(current);
-        allItems.forEach((item) => next.add(getStoreCity(item)));
+        deduped.forEach((item) => next.add(getStoreCity(item)));
         return Array.from(next).sort((a, b) => a.localeCompare(b));
       });
     } catch (err) {
@@ -847,6 +631,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   useEffect(() => {
     setProducts([]);
     setLastDoc(null);
+    setLastCollection(null);
     setVisibleCount(PAGE_SIZE);
     if (searchText.trim().length > 0) return;
     fetchProducts();
@@ -856,6 +641,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     if (searchText.trim().length === 0) return;
     setProducts([]);
     setLastDoc(null);
+    setLastCollection(null);
     setVisibleCount(PAGE_SIZE);
     fetchProductsForSearch();
   }, [fetchProductsForSearch, searchText]);
@@ -864,7 +650,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     <section className="marketplace">
       <div className="marketplaceHeader">
         <h1>{itemTypeFilter === 'service' ? 'Services' : itemTypeFilter === 'course' ? 'Courses' : 'Products'}</h1>
-        <p>Discover verified marketplace listings from Sedifex stores.</p>
+        <p>Discover verified marketplace listings from Sedifex stores. Incomplete listings still appear with safe placeholders while stores finish their setup.</p>
       </div>
       <div className="toolbar">
         <div className="searchWrap">
@@ -882,21 +668,12 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             <ul className="searchSuggestions" role="listbox" aria-label="Search suggestions">
               {suggestions.map((suggestion) => (
                 <li key={suggestion}>
-                  <button
-                    type="button"
-                    onMouseDown={() => {
-                      commitSearch(suggestion);
-                      setIsSuggestionOpen(false);
-                    }}
-                  >
-                    {suggestion}
-                  </button>
+                  <button type="button" onMouseDown={() => { commitSearch(suggestion); setIsSuggestionOpen(false); }}>{suggestion}</button>
                 </li>
               ))}
             </ul>
           )}
         </div>
-
         <div className="sortWrap">
           <label htmlFor="sort">Sort by</label>
           <select id="sort" value={selectedSort} onChange={(event) => setSelectedSort(event.target.value as SortOption)}>
@@ -910,22 +687,13 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         <div className="sortWrap">
           <label htmlFor="city-filter">City</label>
           <select id="city-filter" value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>
-            {cities.map((city) => (
-              <option key={city} value={city}>
-                {city === 'all' ? 'All cities' : city}
-              </option>
-            ))}
+            {cities.map((city) => <option key={city} value={city}>{city === 'all' ? 'All cities' : city}</option>)}
           </select>
         </div>
       </div>
 
       {error && <p className="error">{error}</p>}
-      {debugInfo && (
-        <details className="error" open>
-          <summary>Debug details</summary>
-          <pre>{debugInfo}</pre>
-        </details>
-      )}
+      {debugInfo && <details className="error" open><summary>Debug details</summary><pre>{debugInfo}</pre></details>}
 
       <div className="grid">
         {isLoading && products.length === 0
@@ -940,17 +708,14 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             ))
           : visibleProducts.slice(0, visibleCount).map((item) => {
               const storeHref = getStoreHref(item.storeId, item.storeName);
-              const shortDescription = (item.description ?? '')
-                .split(/\n+/)
-                .map((line) => line.trim())
-                .filter(Boolean)[0] ?? '';
-
+              const shortDescription = (item.description ?? '').split(/\n+/).map((line) => line.trim()).filter(Boolean)[0] ?? '';
+              const listingType = resolveListingType(item);
               return (
                 <article key={item.id} className="card">
-                  <Link href={getProductHref(item.id, item.productName)} className="imageWrap">
+                  <Link href={getProductHref(item.id, item.productName ?? item.name)} className="imageWrap">
                     <Image
-                      src={getDisplayImages(item)[0] ?? 'https://placehold.co/640x640'}
-                      alt={item.imageAlt?.trim() || getProductName(item) || 'Product image'}
+                      src={getDisplayImage(item)}
+                      alt={item.imageAlt?.trim() || getProductName(item)}
                       loading="lazy"
                       unoptimized
                       width={360}
@@ -959,56 +724,34 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </Link>
-                  <h3><Link href={getProductHref(item.id, item.productName)}>{getProductName(item)}</Link></h3>
-                  <p className="productShortDescription">{shortDescription}</p>
+                  <h3><Link href={getProductHref(item.id, item.productName ?? item.name)}>{getProductName(item)}</Link></h3>
+                  <p className="productShortDescription">{shortDescription || 'Details will be confirmed by the seller during checkout.'}</p>
                   <div className="meta">
-                    <span className="verifiedBadge" aria-label={`Listing type ${resolveListingType(item)}`}>{resolveListingType(item)}</span>
+                    <span className="verifiedBadge" aria-label={`Listing type ${listingType}`}>{listingType}</span>
                     <span className="storeIdentity">
-                      {storeHref ? (
-                        <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link>
-                      ) : (
-                        item.storeName ?? 'Unknown store'
-                      )}
-                      {isVerifiedStore(item.verified) ? (
-                        <span className="verifiedBadge" aria-label="Verified by Sedifex">
-                          <span className="verifiedPulse" aria-hidden="true" />
-                          Verified by Sedifex
-                        </span>
-                      ) : null}
+                      {storeHref ? <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link> : item.storeName ?? 'Unknown store'}
+                      {isVerifiedStore(item.verified) ? <span className="verifiedBadge" aria-label="Verified by Sedifex"><span className="verifiedPulse" aria-hidden="true" />Verified</span> : null}
                     </span>
                     <span>{getCategory(item)}</span>
                     <strong className="price">{formatPrice(item.price, item.currency)}</strong>
                   </div>
-                  {isVerifiedStore(item.verified) ? <p className="trustScoreCard">🛡 Sedifex Trust+ 98%</p> : null}
-                  {typeof item.originalPrice === 'number' && typeof item.price === 'number' && item.price < item.originalPrice ? (
-                    <p className="trustScoreCard">Sedifex online deal · Order through Sedifex to get this price.</p>
-                  ) : null}
+                  <p className="trustScoreCard">🛡 Order through Sedifex for receipt and payment record.</p>
+                  {typeof item.originalPrice === 'number' && typeof item.price === 'number' && item.price < item.originalPrice ? <p className="trustScoreCard">Sedifex online deal · Order through Sedifex to get this price.</p> : null}
                   <div className="cardActions">
-                    <Link href={getProductHref(item.id, item.productName)} className="buyNowButton" aria-label={`${resolveCtaLabel(item)} ${getProductName(item)}`}>
-                      {resolveCtaLabel(item)}
-                    </Link>
+                    <Link href={getProductHref(item.id, item.productName ?? item.name)} className="buyNowButton" aria-label={`${resolveCtaLabel(item)} ${getProductName(item)}`}>{resolveCtaLabel(item)}</Link>
                   </div>
                 </article>
               );
             })}
       </div>
 
-      {!isLoading && visibleProducts.length === 0 && !error && (
-        <div className="emptyState">
-          <h3>No items found</h3>
-          <p>Try a different search term, category, or sort option.</p>
-        </div>
-      )}
+      {!isLoading && visibleProducts.length === 0 && !error && <div className="emptyState"><h3>No items found</h3><p>Try a different search term, category, or sort option.</p></div>}
 
       <div className="actions">
         {visibleCount < visibleProducts.length ? (
           <button type="button" onClick={() => setVisibleCount((current) => current + PAGE_SIZE)}>Load more</button>
         ) : (
-          <button
-            type="button"
-            disabled={!lastDoc || isLoading || searchText.trim().length > 0}
-            onClick={() => fetchProducts(lastDoc ?? undefined)}
-          >
+          <button type="button" disabled={!lastDoc || isLoading || searchText.trim().length > 0} onClick={() => fetchProducts(lastDoc ?? undefined, lastCollection)}>
             {isLoading && products.length > 0 ? 'Loading more...' : 'Load more products'}
           </button>
         )}
