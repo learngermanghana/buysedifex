@@ -53,6 +53,8 @@ type PublicProduct = {
   city?: string;
   storeCity?: string;
   itemType?: string;
+  listingType?: string;
+  salesMode?: string;
   isVisible?: boolean | string | number;
   verified?: boolean | string | number;
   featuredRank?: number;
@@ -62,7 +64,7 @@ type PublicProduct = {
 };
 
 type SortOption = 'newest' | 'price' | 'featured';
-type ItemTypeFilter = 'all' | 'product' | 'service';
+type ItemTypeFilter = 'all' | 'product' | 'service' | 'course';
 
 const PAGE_SIZE = 12;
 const FETCH_SCAN_BATCHES = 4;
@@ -393,12 +395,28 @@ type ProductGridProps = {
   itemTypeFilter?: ItemTypeFilter;
 };
 
-const matchesItemTypeFilter = (itemType: string | undefined, filter: ItemTypeFilter) => {
+const resolveListingType = (item: Pick<PublicProduct, 'listingType' | 'itemType'>): Exclude<ItemTypeFilter, 'all'> => {
+  const listingType = item.listingType?.trim().toLowerCase();
+  if (listingType === 'service' || listingType === 'course' || listingType === 'product') return listingType;
+  const fallbackItemType = item.itemType?.trim().toLowerCase();
+  if (fallbackItemType === 'service') return 'service';
+  if (fallbackItemType === 'course') return 'course';
+  return 'product';
+};
+
+const resolveCtaLabel = (item: Pick<PublicProduct, 'listingType' | 'itemType' | 'salesMode'>) => {
+  const listingType = resolveListingType(item);
+  const salesMode = item.salesMode?.trim().toLowerCase();
+  if (salesMode === 'request_quote') return 'Request quote';
+  if (listingType === 'product' && salesMode === 'buy_now') return 'Buy now';
+  if (listingType === 'service' && salesMode === 'book_now') return 'Book now';
+  if (listingType === 'course' && salesMode === 'register') return 'Register';
+  return 'View details';
+};
+
+const matchesItemTypeFilter = (item: Pick<PublicProduct, 'listingType' | 'itemType'>, filter: ItemTypeFilter) => {
   if (filter === 'all') return true;
-  const normalized = itemType?.trim().toLowerCase();
-  const isService = normalized === 'service' || normalized === 'services' || Boolean(normalized?.includes('service'));
-  if (filter === 'service') return isService;
-  return !isService;
+  return resolveListingType(item) === filter;
 };
 
 export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
@@ -450,7 +468,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const buildServerFilters = useCallback((): QueryConstraint[] => {
     const filters: QueryConstraint[] = [];
     if (hasServerSideItemTypeFilter) {
-      filters.push(where('itemType', '==', itemTypeFilter));
+      filters.push(where('listingType', '==', itemTypeFilter));
     }
     return filters;
   }, [hasServerSideItemTypeFilter, itemTypeFilter]);
@@ -471,7 +489,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
   const searchableTerms = useMemo(() => {
     const terms = new Set<string>();
     products.forEach((product) => {
-      [getProductName(product), product.storeName, getCategory(product)].forEach((term) => {
+      [getProductName(product), product.storeName, getCategory(product), product.description, resolveListingType(product)].forEach((term) => {
         const normalized = term?.trim().toLowerCase();
         if (normalized) terms.add(normalized);
       });
@@ -538,7 +556,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
     const text = searchText.trim().toLowerCase();
     const normalizedProducts = normalizeStoreNamesByStoreId(products);
     const matchingProducts = normalizedProducts.filter((product) => {
-      const typeMatches = matchesItemTypeFilter(product.itemType, itemTypeFilter);
+      const typeMatches = matchesItemTypeFilter(product, itemTypeFilter);
       if (!typeMatches) return false;
       const cityMatches = selectedCity === 'all' || getStoreCity(product).toLowerCase() === selectedCity.toLowerCase();
       if (!cityMatches) return false;
@@ -550,6 +568,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         getCategory(product),
         product.sku,
         product.batchNumber,
+        resolveListingType(product),
       ]
         .filter(Boolean)
         .join(' ')
@@ -614,7 +633,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
               .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
               .filter(
                 (item) =>
-                  matchesItemTypeFilter(item.itemType, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
+                  matchesItemTypeFilter(item, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
               );
 
             const batchItems = await filterByVerifiedStore(batchItemsRaw);
@@ -662,7 +681,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                 .filter(
                   (item) =>
                     !seenIds.has(item.id) &&
-                    matchesItemTypeFilter(item.itemType, itemTypeFilter) &&
+                    matchesItemTypeFilter(item, itemTypeFilter) &&
                     isPublicListing(item) &&
                     hasDisplayImage(item),
                 );
@@ -775,7 +794,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
         const batchItemsRaw = snapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }) as PublicProduct)
           .filter(
-            (item) => matchesItemTypeFilter(item.itemType, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
+            (item) => matchesItemTypeFilter(item, itemTypeFilter) && isPublicListing(item) && hasDisplayImage(item),
           );
 
         const batchItems = await filterByVerifiedStore(batchItemsRaw);
@@ -828,7 +847,7 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
             value={searchText}
             onChange={(event) => { setSearchText(event.target.value); setIsSuggestionOpen(true); }}
             onFocus={() => setIsSuggestionOpen(true)}
-            placeholder="Search products, services, stores, or categories"
+            placeholder="Search by name, description, store, category, or listing type"
             onKeyDown={(event) => { if (event.key === 'Enter') { commitSearch(searchText); setIsSuggestionOpen(false); } }}
           />
           {isSuggestionOpen && suggestions.length > 0 && (
@@ -915,6 +934,9 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                   <h3><Link href={getProductHref(item.id, item.productName)}>{getProductName(item)}</Link></h3>
                   <p className="productShortDescription">{shortDescription}</p>
                   <div className="meta">
+                    <span className="verifiedBadge" aria-label={`Listing type ${resolveListingType(item)}`}>
+                      {resolveListingType(item)}
+                    </span>
                     <span className="storeIdentity">
                       {storeHref ? (
                         <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link>
@@ -935,8 +957,8 @@ export function ProductGrid({ itemTypeFilter = 'all' }: ProductGridProps) {
                     <p className="trustScoreCard">Sedifex online deal · Order through Sedifex to get this price.</p>
                   ) : null}
                   <div className="cardActions">
-                    <Link href={getProductHref(item.id, item.productName)} className="buyNowButton" aria-label={`Buy ${getProductName(item)} on Sedifex`}>
-                      Buy on Sedifex
+                    <Link href={getProductHref(item.id, item.productName)} className="buyNowButton" aria-label={`${resolveCtaLabel(item)} ${getProductName(item)}`}>
+                      {resolveCtaLabel(item)}
                     </Link>
                   </div>
                 </article>
