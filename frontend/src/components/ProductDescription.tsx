@@ -19,11 +19,11 @@ export default function ProductDescription({
 }: {
   description: string;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   if (!description?.trim()) {
     return null;
   }
-
-  const [expanded, setExpanded] = useState(false);
 
   const formatted = formatDescription(description);
 
