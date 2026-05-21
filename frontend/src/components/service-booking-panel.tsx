@@ -1,5 +1,6 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
+import './service-booking-panel.css';
 
 type ListingKind = 'service' | 'course';
 type Props = {
