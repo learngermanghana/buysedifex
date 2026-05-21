@@ -131,7 +131,17 @@ const buildPaginationItems = (currentPage: number, totalPages: number): Paginati
   return items;
 };
 
-const getProductName = (item: PublicProduct) => (item.productName ?? item.name)?.trim() || 'Untitled item';
+const cleanDisplayText = (value?: string) => {
+  if (!value) return '';
+  return value
+    .replace(/\*\*/g, '')
+    .replace(/^(product\s*name|service\s*name|course\s*name|item\s*name|name|title)\s*:\s*/i, '')
+    .replace(/^[-–—:\s]+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const getProductName = (item: PublicProduct) => cleanDisplayText(item.productName ?? item.name) || 'Untitled item';
 
 const resolveListingType = (item: Pick<PublicProduct, 'listingType' | 'itemType'>): Exclude<ItemTypeFilter, 'all'> => {
   const listingType = item.listingType?.trim().toLowerCase();
@@ -208,11 +218,15 @@ const isPublicListing = (item: PublicProduct) => {
 
 const isVerifiedStore = (value: PublicProduct['verified']) => value == null || isTrue(value);
 
-const formatPrice = (price?: number, currency?: string) => {
-  if (price == null) return 'Price unavailable';
+const formatMoneyParts = (price?: number, currency?: string) => {
+  if (typeof price !== 'number' || !Number.isFinite(price)) return null;
   const normalizedCurrency = (currency ?? 'GHS').toUpperCase();
-  const currencyLabel = normalizedCurrency === 'USD' || normalizedCurrency === 'GHS' ? 'Cedis (GH₵)' : normalizedCurrency;
-  return `${currencyLabel} ${price.toFixed(2)}`;
+  const symbol = normalizedCurrency === 'GHS' || normalizedCurrency === 'GHC' ? 'GH₵' : normalizedCurrency === 'USD' ? '$' : normalizedCurrency;
+  const [major, decimal = '00'] = price.toLocaleString('en-GH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).split('.');
+  return { symbol, major, decimal };
 };
 
 const resolveCtaLabel = (item: Pick<PublicProduct, 'listingType' | 'itemType' | 'salesMode'>) => {
@@ -594,24 +608,39 @@ export function ProductGrid({
             ))
           : paginatedProducts.map((item) => {
               const listingType = resolveListingType(item);
-              const itemHref = getProductHref(item.id, item.productName ?? item.name, listingType);
+              const productName = getProductName(item);
+              const itemHref = getProductHref(item.id, productName, listingType);
               const storeHref = getStoreHref(item.storeId, item.storeName);
-              const shortDescription = (item.description ?? '').split(/\n+/).map((line) => line.trim()).filter(Boolean)[0] ?? '';
+              const shortDescription = cleanDisplayText((item.description ?? '').split(/\n+/).map((line) => line.trim()).filter(Boolean)[0] ?? '');
+              const priceParts = formatMoneyParts(item.price, item.currency);
               return (
                 <article key={item.id} className="card">
                   <Link href={itemHref} className="imageWrap">
-                    <Image src={getDisplayImage(item)} alt={item.imageAlt?.trim() || getProductName(item)} loading="lazy" unoptimized width={360} height={360} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <Image src={getDisplayImage(item)} alt={item.imageAlt?.trim() || productName} loading="lazy" unoptimized width={360} height={360} sizes="(max-width: 768px) 112px, (max-width: 1200px) 50vw, 25vw" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </Link>
-                  <h3><Link href={itemHref}>{getProductName(item)}</Link></h3>
-                  <p className="productShortDescription">{shortDescription || 'Details will be confirmed by the seller during checkout.'}</p>
-                  <div className="meta">
-                    <span className="verifiedBadge">{listingType}</span>
-                    <span className="storeIdentity">{storeHref ? <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link> : item.storeName ?? 'Unknown store'} {isVerifiedStore(item.verified) ? <span className="verifiedBadge"><span className="verifiedPulse" aria-hidden="true" />Verified</span> : null}</span>
-                    <span>{getCategory(item)}</span>
-                    <strong className="price">{formatPrice(item.price, item.currency)}</strong>
+                  <div className="cardBody">
+                    <div className="badgeRow">
+                      <span className="verifiedBadge">{listingType}</span>
+                      {isVerifiedStore(item.verified) ? <span className="verifiedBadge verifiedStoreBadge"><span className="verifiedPulse" aria-hidden="true" />Verified</span> : null}
+                    </div>
+                    <h3><Link href={itemHref}>{productName}</Link></h3>
+                    <p className="productShortDescription">{shortDescription || 'Details will be confirmed by the seller during checkout.'}</p>
+                    <div className="meta">
+                      <span className="storeIdentity">{storeHref ? <Link href={storeHref}>{item.storeName ?? 'Unknown store'}</Link> : item.storeName ?? 'Unknown store'}</span>
+                      <span className="categoryLine">{getCategory(item)}</span>
+                    </div>
+                    {priceParts ? (
+                      <div className="marketPrice" aria-label={`${priceParts.symbol} ${priceParts.major}.${priceParts.decimal}`}>
+                        <span className="marketPriceCurrency">{priceParts.symbol}</span>
+                        <span className="marketPriceMajor">{priceParts.major}</span>
+                        <span className="marketPriceDecimal">.{priceParts.decimal}</span>
+                      </div>
+                    ) : (
+                      <strong className="priceUnavailable">Price unavailable</strong>
+                    )}
+                    <p className="trustScoreCard">🛡 Receipt and payment record protected by Sedifex.</p>
+                    <div className="cardActions"><Link href={itemHref} className="buyNowButton">{resolveCtaLabel(item)}</Link></div>
                   </div>
-                  <p className="trustScoreCard">🛡 Order through Sedifex for receipt and payment record.</p>
-                  <div className="cardActions"><Link href={itemHref} className="buyNowButton">{resolveCtaLabel(item)}</Link></div>
                 </article>
               );
             })}
