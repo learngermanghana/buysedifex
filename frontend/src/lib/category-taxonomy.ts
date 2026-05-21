@@ -1,20 +1,30 @@
 const CATEGORY_CONFIG = [
   { key: 'Supplements', keywords: ['supplement', 'vitamin', 'protein', 'wellness'] },
   { key: 'Skin care', keywords: ['skin', 'skincare', 'face', 'facial', 'soap', 'cleanser', 'lotion', 'cream'] },
-  { key: 'Hair care', keywords: ['hair', 'shampoo', 'conditioner', 'wig', 'braid', 'barber'] },
-  {
-    key: 'Food & beverages',
-    keywords: ['food', 'drink', 'beverage', 'snack', 'juice', 'tea', 'coffee', 'restaurant'],
-  },
+  { key: 'Hair care', keywords: ['hair', 'shampoo', 'conditioner', 'wig', 'braid', 'barber', 'beading'] },
+  { key: 'Beauty', keywords: ['beauty', 'makeup', 'cosmetic', 'cosmetology', 'lipstick', 'perfume', 'fragrance', 'nail'] },
+  { key: 'Beauty Training', keywords: ['beauty training', 'cosmetology school', 'training', 'class', 'course', 'workshop', 'certification', 'academy'] },
+  { key: 'Fashion', keywords: ['fashion', 'cloth', 'clothing', 'dress', 'shoe', 'bag', 'wear', 'millinery', 'hat'] },
   { key: 'Groceries', keywords: ['grocery', 'rice', 'oil', 'flour', 'pantry', 'spice', 'household'] },
   { key: 'Baby care', keywords: ['baby', 'infant', 'newborn', 'diaper', 'nappy', 'formula'] },
-  { key: 'Fashion', keywords: ['fashion', 'cloth', 'clothing', 'dress', 'shoe', 'bag', 'wear'] },
-  { key: 'Beauty', keywords: ['beauty', 'makeup', 'cosmetic', 'lipstick', 'perfume', 'fragrance', 'nail'] },
+  { key: 'Professional Services', keywords: ['service', 'consultation', 'booking', 'appointment', 'repair', 'delivery'] },
 ] as const;
 
 export const CANONICAL_CATEGORY_KEYS = CATEGORY_CONFIG.map((entry) => entry.key);
 
 const normalizeText = (value?: string | null) => (value ?? '').trim().toLowerCase();
+
+const BLOCKED_CATEGORY_VALUES = new Set([
+  'food',
+  'drink',
+  'drinks',
+  'beverage',
+  'beverages',
+  'food and beverages',
+  'food & beverages',
+  'food_beverages',
+  'food_beverage',
+]);
 
 const normalizedCategoryLookup = new Map<string, string>(
   CATEGORY_CONFIG.flatMap<readonly [string, string]>(({ key, keywords }) => {
@@ -31,10 +41,12 @@ const scoreCategoryFromText = (text: string) => {
   const normalized = normalizeText(text);
   if (!normalized) return null;
 
+  const compact = normalized.replace(/[_-]+/g, ' ').replace(/\s*&\s*/g, ' and ').replace(/\s+/g, ' ').trim();
+  if (BLOCKED_CATEGORY_VALUES.has(normalized) || BLOCKED_CATEGORY_VALUES.has(compact)) return null;
+
   const direct = normalizedCategoryLookup.get(normalized);
   if (direct) return direct;
 
-  const compact = normalized.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
   const compactDirect = normalizedCategoryLookup.get(compact);
   if (compactDirect) return compactDirect;
 
@@ -65,9 +77,10 @@ export const resolveClosestCategoryKey = (input: {
   description?: string | null;
   itemType?: string | null;
 }): string => {
+  const itemType = normalizeText(input.itemType);
   return (
     normalizeCategoryKey(input.category) ??
     scoreCategoryFromText([input.productName, input.description, input.itemType].filter(Boolean).join(' ')) ??
-    'Beauty'
+    (itemType === 'course' ? 'Beauty Training' : itemType === 'service' ? 'Professional Services' : 'Beauty')
   );
 };
