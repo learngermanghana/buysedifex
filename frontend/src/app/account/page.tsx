@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
@@ -199,7 +200,16 @@ export default function AccountPage() {
           <div className="orderList">
             {orderHistory.map((item) => (
               <article key={item.id} className={`orderRow ${item.imageUrl ? '' : 'orderRow--noImage'}`}>
-                {item.imageUrl ? <img src={item.imageUrl} alt={item.displayName ?? item.productName} className="orderRow__image" /> : null}
+                {item.imageUrl ? (
+                  <Image
+                    src={item.imageUrl}
+                    alt={item.displayName ?? item.productName}
+                    className="orderRow__image"
+                    width={72}
+                    height={72}
+                    unoptimized
+                  />
+                ) : null}
                 <div className="orderRow__main">
                   <div className="orderRow__titleLine">
                     <strong className="orderRow__title">{item.displayName ?? item.itemName ?? item.productName}</strong>
