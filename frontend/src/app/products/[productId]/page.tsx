@@ -41,10 +41,37 @@ const sanitizePhoneForTel = (value?: string) => {
   return value.replace(/[^\d+]/g, '');
 };
 
+const normalizedValues = (input: { itemType?: string; listingType?: string; serviceKind?: string; salesMode?: string }) =>
+  [input.itemType, input.listingType, input.serviceKind, input.salesMode].map((v) => (v ?? '').trim().toLowerCase());
+
+const isCourseLikeItem = (input: { itemType?: string; listingType?: string; serviceKind?: string; salesMode?: string }) =>
+  normalizedValues(input).some((value) => ['course', 'class', 'training', 'registration', 'course_enrollment'].includes(value));
 
 const isServiceLikeItem = (input: { itemType?: string; listingType?: string; serviceKind?: string; salesMode?: string }) => {
-  const values = [input.itemType, input.listingType, input.serviceKind, input.salesMode].map((v) => (v ?? '').trim().toLowerCase());
-  return values.some((value) => ['service', 'course', 'event', 'appointment', 'booking'].includes(value));
+  const values = normalizedValues(input);
+  return values.some((value) => ['service', 'course', 'event', 'appointment', 'booking', 'class', 'training', 'registration', 'course_enrollment'].includes(value));
+};
+
+const buildBookingExplainer = (input: { isCourse: boolean; storeName: string; hasWebsite: boolean }) => {
+  if (input.isCourse) {
+    return {
+      title: 'How to register',
+      heading: 'Register through the school website',
+      body: `Visit ${input.storeName} website, open the registration or courses page, select this course, and complete your application or payment online. Online registrations and payments are connected to Sedifex, so the school receives your details automatically.`,
+      steps: ['Visit the school website.', 'Open Registration, Courses, or Apply.', 'Select this course.', 'Submit your application or payment online.', 'The school receives your details through Sedifex.'],
+      websiteLabel: 'Visit school website',
+      missingWebsite: 'This school has not added a website link yet. Use the Sedifex request option on this page.',
+    };
+  }
+
+  return {
+    title: 'How to book',
+    heading: 'Book through the business website',
+    body: `Visit ${input.storeName} website, open the booking or services page, select this service, and complete your booking or payment online. Online bookings and payments are connected to Sedifex, so the business receives your request automatically.`,
+    steps: ['Visit the business website.', 'Open Booking, Services, or Appointments.', 'Select this service.', 'Submit your booking or payment online.', 'The business receives your request through Sedifex.'],
+    websiteLabel: 'Visit business website',
+    missingWebsite: 'This business has not added a website link yet. Use the Sedifex request option on this page.',
+  };
 };
 
 const buildMetadataDescription = (input: {
@@ -131,6 +158,11 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const hasWebsite = Boolean(storeProfile?.websiteUrl);
   const isVerifiedStore = storeProfile?.verified ?? product.verified ?? false;
   const checkoutProductId = product.sourceProductId?.trim() || product.id;
+  const productListingType = (product as { listingType?: string }).listingType;
+  const productServiceKind = (product as { serviceKind?: string }).serviceKind;
+  const serviceLike = isServiceLikeItem({ itemType: product.itemType, listingType: productListingType, serviceKind: productServiceKind, salesMode: (product as { salesMode?: string }).salesMode });
+  const courseLike = isCourseLikeItem({ itemType: product.itemType, listingType: productListingType, serviceKind: productServiceKind, salesMode: (product as { salesMode?: string }).salesMode });
+  const bookingExplainer = serviceLike ? buildBookingExplainer({ isCourse: courseLike, storeName: resolvedStoreName, hasWebsite }) : null;
 
   const [sameStoreSameCategory, sameCategoryMarketplace, sameStoreItems, marketplaceFallback] = await Promise.all([
     listIntegrationProducts({
@@ -273,8 +305,12 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             <div className="productStats">
               <p className="productPriceLine">{priceLabel}</p>
               {hasSedifexDeal ? <p><strong>Sedifex online deal:</strong> Order through Sedifex to get this price.</p> : null}
-              <p className="productTrustMessage">Verified checkout and payment record on Sedifex.</p>
-              {availabilityLabel ? (
+              <p className="productTrustMessage">
+                {serviceLike
+                  ? `Online ${courseLike ? 'registrations' : 'bookings'} and payments are powered by Sedifex when completed through the ${courseLike ? 'school' : 'business'} website or Sedifex Market.`
+                  : 'Verified checkout and payment record on Sedifex.'}
+              </p>
+              {availabilityLabel && !serviceLike ? (
                 <p>
                   <strong>Availability:</strong> {availabilityLabel}
                 </p>
@@ -287,18 +323,36 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               ) : null}
             </div>
 
+            {bookingExplainer ? (
+              <section className="productContentSection bookingExplainerCard" aria-label={bookingExplainer.title}>
+                <p className="eyebrow">{bookingExplainer.title}</p>
+                <h2>{bookingExplainer.heading}</h2>
+                <p>{bookingExplainer.body}</p>
+                <ol>
+                  {bookingExplainer.steps.map((step) => <li key={step}>{step}</li>)}
+                </ol>
+                {hasWebsite ? (
+                  <a className="requestButton bookingExplainerButton" href={storeProfile?.websiteUrl} target="_blank" rel="noopener noreferrer">
+                    {bookingExplainer.websiteLabel}
+                  </a>
+                ) : (
+                  <p className="requestFeedback error">{bookingExplainer.missingWebsite}</p>
+                )}
+              </section>
+            ) : null}
+
             <section className="productContentSection" aria-label="About this product">
-              <h2>About this product</h2>
+              <h2>{serviceLike ? `About this ${courseLike ? 'course' : 'service'}` : 'About this product'}</h2>
               {product.description ? (
                 <FormattedDescription text={product.description} className="formattedDescription" />
               ) : (
-                <p>No description available for this product yet.</p>
+                <p>No description available for this {serviceLike ? (courseLike ? 'course' : 'service') : 'product'} yet.</p>
               )}
             </section>
           </section>
 
           <section className="productStoreCard" aria-label="Store contact details">
-            <h2>Store information</h2>
+            <h2>{courseLike ? 'School information' : serviceLike ? 'Business information' : 'Store information'}</h2>
             <p>
               <strong>Name:</strong> {resolvedStoreName}{' '}
               {isVerifiedStore ? <span className="verifiedBadge">Verified</span> : null}
@@ -306,7 +360,12 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             <p>
               <strong>Location:</strong> {resolvedLocation}
             </p>
-            <p><strong>Contact:</strong> Order through Sedifex first to unlock direct store contact details.</p>
+            <p>
+              <strong>Sedifex connection:</strong>{' '}
+              {serviceLike
+                ? `This ${courseLike ? 'school' : 'business'} can use Sedifex to manage online ${courseLike ? 'registrations' : 'bookings'}, payments, and records.`
+                : 'Order through Sedifex first to unlock direct store contact details.'}
+            </p>
 
             <div className="productStoreActions">
               {hasStorePage ? (
@@ -321,23 +380,31 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               />
               {hasWebsite ? (
                 <a href={storeProfile?.websiteUrl} target="_blank" rel="noopener noreferrer">
-                  Visit store website
+                  {courseLike ? 'Visit school website' : serviceLike ? 'Visit business website' : 'Visit store website'}
                 </a>
               ) : null}
             </div>
           </section>
 
-
-
-          <section className="productStoreCard productWhyCard" aria-label="Why order through Sedifex">
-            <h2>Why buy on Sedifex</h2>
-            <ul>
-              <li>Verified store listing</li>
-              <li>Order receipt</li>
-              <li>Payment record</li>
-              <li>Store follow-up</li>
-              <li>Sedifex support if there is an issue</li>
-            </ul>
+          <section className="productStoreCard productWhyCard" aria-label={serviceLike ? 'Why use Sedifex powered booking' : 'Why order through Sedifex'}>
+            <h2>{serviceLike ? `Why ${courseLike ? 'register' : 'book'} through a Sedifex-powered channel` : 'Why buy on Sedifex'}</h2>
+            {serviceLike ? (
+              <ul>
+                <li>Verified {courseLike ? 'school' : 'business'} listing</li>
+                <li>{courseLike ? 'Registration' : 'Booking'} and payment records when completed online</li>
+                <li>Details are communicated to the {courseLike ? 'school' : 'business'} automatically</li>
+                <li>Cleaner follow-up between customer and {courseLike ? 'school' : 'business'}</li>
+                <li>Sedifex support if the online request has an issue</li>
+              </ul>
+            ) : (
+              <ul>
+                <li>Verified store listing</li>
+                <li>Order receipt</li>
+                <li>Payment record</li>
+                <li>Store follow-up</li>
+                <li>Sedifex support if there is an issue</li>
+              </ul>
+            )}
             {storePhoneHref ? <p className="checkoutHint">Need urgent help after placing an order? Call <a href={`tel:${storePhoneHref}`}>{resolvedStorePhone}</a>.</p> : null}
           </section>
 
@@ -351,15 +418,15 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             currentItemId={product.id}
             currentStoreId={product.storeId}
             currentCategory={product.categoryKey}
-            currentListingType={(product as { listingType?: string }).listingType ?? product.itemType}
+            currentListingType={productListingType ?? product.itemType}
             currentItemType={product.itemType}
-            currentServiceKind={(product as { serviceKind?: string }).serviceKind}
+            currentServiceKind={productServiceKind}
             currentPrice={product.price}
             items={relatedPool}
           />
         </div>
 
-        {isServiceLikeItem({ itemType: product.itemType, listingType: (product as { listingType?: string }).listingType, serviceKind: (product as { serviceKind?: string }).serviceKind, salesMode: (product as { salesMode?: string }).salesMode }) ? (
+        {serviceLike ? (
           <ServiceBookingPanel
             productId={checkoutProductId}
             merchantId={product.storeId ?? ''}
@@ -367,6 +434,10 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             price={product.price}
             currency={product.currency}
             whatsappPhone={storeProfile?.storeWhatsapp ?? storeProfile?.storePhone ?? product.waLink}
+            storeName={resolvedStoreName}
+            storeWebsiteUrl={storeProfile?.websiteUrl}
+            listingType={productListingType}
+            itemType={product.itemType}
           />
         ) : (
           <ProductPurchasePanel
