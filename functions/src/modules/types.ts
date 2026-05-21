@@ -10,6 +10,14 @@ export type StoreDoc = {
   status?: string;
   eligibleForBuy?: boolean;
   buyOptOut?: boolean;
+  marketplaceApproved?: boolean | string;
+  approvedForMarketplace?: boolean | string;
+  isMarketplaceApproved?: boolean | string;
+  marketplaceApprovalStatus?: string;
+  approvalStatus?: string;
+  verificationStatus?: string;
+  googleMerchantApproved?: boolean | string;
+  googleMerchantApprovalStatus?: string;
   whatsappNumber?: string;
   storePhone?: string;
   phone?: string;
