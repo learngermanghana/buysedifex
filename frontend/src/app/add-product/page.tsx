@@ -44,6 +44,19 @@ export default function AddProductPage() {
       </section>
 
       <section>
+        <h2>Product description formatting rule (required)</h2>
+        <p>For all future products, description text must be clean and simple.</p>
+        <ul>
+          <li>Do NOT include Product Name.</li>
+          <li>Do NOT include Category.</li>
+          <li>Do NOT use markdown symbols like **, ##, or __.</li>
+          <li>Write clean paragraphs and bullet points only.</li>
+        </ul>
+        <p><strong>Bad example:</strong> <code>**Product Name:** X</code> <code>**Category:** Beauty</code></p>
+        <p><strong>Good example:</strong> This whitening cream helps reduce dark spots and smooth skin texture.</p>
+      </section>
+
+      <section>
         <h2>Submission steps</h2>
         <ol>
           <li>Send your store details and listing data to info@sedifex.com.</li>
