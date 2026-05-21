@@ -1,0 +1,123 @@
+.commentCard {
+  display: grid;
+  gap: 1rem;
+}
+
+.commentHeader {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.commentTitle {
+  margin: 0;
+}
+
+.commentCount {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #253044;
+  font-weight: 700;
+}
+
+.commentForm {
+  display: grid;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+.commentLabel {
+  color: #111827;
+  font-weight: 850;
+}
+
+.commentInputRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  align-items: end;
+}
+
+.commentTextarea {
+  width: 100%;
+  min-height: 6.25rem;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.9rem;
+  background: #f8fafc;
+  color: #111827;
+  padding: 0.85rem 0.95rem;
+  font: inherit;
+  line-height: 1.5;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.commentTextarea::placeholder {
+  color: #64748b;
+}
+
+.commentTextarea:focus {
+  outline: none;
+  border-color: #ff7a00;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.16);
+}
+
+.commentButton {
+  min-height: 3.1rem;
+  white-space: nowrap;
+}
+
+.commentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.commentItem {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: #f8fafc;
+  padding: 0.8rem 0.9rem;
+}
+
+.commentItem strong {
+  display: block;
+  color: #111827;
+  margin-bottom: 0.25rem;
+}
+
+.commentItem p {
+  margin: 0;
+  color: #334155;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.commentEmpty {
+  margin: 0;
+  color: #475569;
+}
+
+@media (max-width: 640px) {
+  .commentCard {
+    gap: 0.85rem;
+  }
+
+  .commentInputRow {
+    grid-template-columns: 1fr;
+  }
+
+  .commentTextarea {
+    min-height: 7.5rem;
+    font-size: 1rem;
+  }
+
+  .commentButton {
+    width: 100%;
+  }
+}
