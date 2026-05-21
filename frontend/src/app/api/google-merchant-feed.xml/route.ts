@@ -11,6 +11,106 @@ const MARKETPLACE_COLLECTIONS = ['publicListings', 'publicProducts', 'publicServ
 const FEED_LIMIT_PER_COLLECTION = 900;
 const PLACEHOLDER_IMAGE_HOSTS = ['placehold.co', 'placeholder.com'];
 
+const GOOGLE_MERCHANT_BLOCKED_CATEGORY_KEYWORDS = [
+  'supplement',
+  'supplements',
+  'dietary supplement',
+  'herbal supplement',
+  'medicine',
+  'medicines',
+  'medication',
+  'medications',
+  'drug',
+  'drugs',
+  'pharmacy',
+  'pharmaceutical',
+  'pharmaceuticals',
+  'prescription',
+  'otc',
+  'over the counter',
+  'vitamin',
+  'vitamins',
+  'multivitamin',
+  'herbal remedy',
+  'health supplement',
+  'wellness supplement',
+];
+
+const GOOGLE_MERCHANT_BLOCKED_TEXT_KEYWORDS = [
+  'supplement',
+  'dietary supplement',
+  'herbal supplement',
+  'medicine',
+  'medication',
+  'pharmacy',
+  'pharmaceutical',
+  'prescription',
+  'over the counter',
+  'otc',
+  'vitamin',
+  'multivitamin',
+  'immune booster',
+  'detox',
+  'slimming',
+  'weight loss',
+  'fat burner',
+  'appetite suppressant',
+  'sexual enhancement',
+  'erectile dysfunction',
+  'aphrodisiac',
+  'libido',
+  'fertility booster',
+  'hormone',
+  'steroid',
+  'testosterone',
+  'estrogen',
+  'antibiotic',
+  'antimalarial',
+  'pain killer',
+  'painkiller',
+  'pain relief',
+  'cough syrup',
+  'tablet',
+  'tablets',
+  'capsule',
+  'capsules',
+  'pill',
+  'pills',
+  'injection',
+  'injectable',
+  'iv drip',
+  'paracetamol',
+  'acetaminophen',
+  'ibuprofen',
+  'diclofenac',
+  'aspirin',
+  'tramadol',
+  'codeine',
+  'morphine',
+  'amoxicillin',
+  'azithromycin',
+  'metformin',
+  'insulin',
+  'vaccine',
+  'vaccination',
+  'viagra',
+  'sildenafil',
+  'tadalafil',
+  'antifungal',
+  'antiseptic',
+  'antibacterial',
+  'medicated cream',
+  'diabetes',
+  'hypertension',
+  'blood pressure',
+  'malaria',
+  'typhoid',
+  'infection',
+  'asthma',
+  'arthritis',
+  'ulcer treatment',
+];
+
 type PublicListing = {
   id: string;
   storeId?: string;
@@ -47,6 +147,20 @@ type PublicListing = {
   verificationStatus?: string | null;
   googleMerchantApproved?: boolean | string | number | null;
   googleMerchantApprovalStatus?: string | null;
+  googleMerchantEligible?: boolean | string | number | null;
+  excludeFromGoogleMerchant?: boolean | string | number | null;
+  googleMerchantExcluded?: boolean | string | number | null;
+  googleShoppingExcluded?: boolean | string | number | null;
+  merchantCenterExcluded?: boolean | string | number | null;
+  restrictedProduct?: boolean | string | number | null;
+  regulatedProduct?: boolean | string | number | null;
+  healthProduct?: boolean | string | number | null;
+  medicalProduct?: boolean | string | number | null;
+  pharmaceuticalProduct?: boolean | string | number | null;
+  pharmacyProduct?: boolean | string | number | null;
+  supplementProduct?: boolean | string | number | null;
+  requiresPrescription?: boolean | string | number | null;
+  ageRestricted?: boolean | string | number | null;
   eligibleForBuy?: boolean | string | number | null;
   buyOptOut?: boolean | string | number | null;
   hidden?: boolean | string | number | null;
@@ -100,6 +214,22 @@ function normalizeStatus(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase().replace(/\s+/g, '_') : '';
 }
 
+function normalizePolicyText(value: unknown): string {
+  return compactText(value)
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function includesPolicyKeyword(text: string, keywords: string[]): boolean {
+  if (!text) return false;
+  const padded = ` ${text} `;
+  return keywords.some((keyword) => padded.includes(` ${normalizePolicyText(keyword)} `));
+}
+
 function isTrue(value: unknown): boolean {
   return normalizeBoolean(value) === true;
 }
@@ -149,6 +279,47 @@ function isPublicVisible(item: PublicListing): boolean {
   if (isFalse(item.visible) || isFalse(item.isVisible)) return false;
   if (isFalse(item.isPublished) || isFalse(item.isMarketplaceVisible)) return false;
   if (normalizeStatus(item.status) === 'draft' && !isTrue(item.isPublished)) return false;
+  return true;
+}
+
+function isExplicitlyExcludedFromGoogleMerchant(item: PublicListing): boolean {
+  return [
+    item.excludeFromGoogleMerchant,
+    item.googleMerchantExcluded,
+    item.googleShoppingExcluded,
+    item.merchantCenterExcluded,
+    item.restrictedProduct,
+    item.regulatedProduct,
+    item.healthProduct,
+    item.medicalProduct,
+    item.pharmaceuticalProduct,
+    item.pharmacyProduct,
+    item.supplementProduct,
+    item.requiresPrescription,
+    item.ageRestricted,
+  ].some(isTrue) || isFalse(item.googleMerchantEligible);
+}
+
+function isMedicineOrSupplementLike(item: PublicListing): boolean {
+  const categoryText = normalizePolicyText([item.categoryKey, item.categoryName, item.category].filter(Boolean).join(' '));
+  if (includesPolicyKeyword(categoryText, GOOGLE_MERCHANT_BLOCKED_CATEGORY_KEYWORDS)) return true;
+
+  const itemText = normalizePolicyText([
+    item.productName,
+    item.name,
+    item.description,
+    item.categoryKey,
+    item.categoryName,
+    item.category,
+    item.manufacturerName,
+  ].filter(Boolean).join(' '));
+
+  return includesPolicyKeyword(itemText, GOOGLE_MERCHANT_BLOCKED_TEXT_KEYWORDS);
+}
+
+function isGoogleMerchantAllowed(item: PublicListing): boolean {
+  if (isExplicitlyExcludedFromGoogleMerchant(item)) return false;
+  if (isMedicineOrSupplementLike(item)) return false;
   return true;
 }
 
@@ -223,7 +394,7 @@ function feedItem(item: PublicListing): string | null {
   const price = typeof item.price === 'number' && Number.isFinite(item.price) ? item.price : null;
   const imageUrl = getImageUrl(item);
 
-  if (!title || !price || price <= 0 || !imageUrl) return null;
+  if (!title || !price || price <= 0 || !imageUrl || !isGoogleMerchantAllowed(item)) return null;
 
   const currency = compactText(item.currency, 'GHS').toUpperCase();
   const availability = typeof item.stockCount === 'number' && item.stockCount <= 0 ? 'out_of_stock' : 'in_stock';
@@ -265,6 +436,7 @@ async function loadListings(): Promise<PublicListing[]> {
   return Array.from(byId.values())
     .filter(isPhysicalProduct)
     .filter(isPublicVisible)
+    .filter(isGoogleMerchantAllowed)
     .sort((left, right) => getProductName(left).localeCompare(getProductName(right)));
 }
 
@@ -272,7 +444,7 @@ function buildFeed(items: PublicListing[]): string {
   const productItems = items.map(feedItem).filter((item): item is string => Boolean(item));
   const generatedAt = new Date().toISOString();
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">\n  <channel>\n    <title>Sedifex Market Approved Product Feed</title>\n    <link>${SITE_URL}</link>\n    <description>Approved physical products from verified Sedifex Market stores. Generated ${xml(generatedAt)}.</description>\n${productItems.join('\n')}\n  </channel>\n</rss>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">\n  <channel>\n    <title>Sedifex Market Approved Product Feed</title>\n    <link>${SITE_URL}</link>\n    <description>Approved physical products from verified Sedifex Market stores. Medicine, supplement, pharmacy, and other restricted healthcare-like products are excluded before feed generation. Generated ${xml(generatedAt)}.</description>\n${productItems.join('\n')}\n  </channel>\n</rss>\n`;
 }
 
 export async function GET() {
