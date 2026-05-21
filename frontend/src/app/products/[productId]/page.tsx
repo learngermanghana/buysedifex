@@ -264,24 +264,16 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               </section>
             ) : null}
             <div>
-              <p className="eyebrow">Product details</p>
               <h1>{product.productName}</h1>
               <p className="productTrustLine">
-                {isVerifiedStore ? <span className="verifiedBadge">Verified store</span> : null} 📍 {resolvedLocation} · 🚚 Delivery:
-                Discuss with seller
+                <strong>{resolvedStoreName}</strong> {isVerifiedStore ? <span className="verifiedBadge">Verified store</span> : null}
               </p>
-              {product.description ? (
-                <FormattedDescription text={product.description} className="formattedDescription" />
-              ) : (
-                <p>No description available for this product yet.</p>
-              )}
             </div>
 
             <div className="productStats">
-              <p>
-                <strong>Price:</strong> {priceLabel}
-              </p>
+              <p className="productPriceLine">{priceLabel}</p>
               {hasSedifexDeal ? <p><strong>Sedifex online deal:</strong> Order through Sedifex to get this price.</p> : null}
+              <p className="productTrustMessage">Verified checkout and payment record on Sedifex.</p>
               {availabilityLabel ? (
                 <p>
                   <strong>Availability:</strong> {availabilityLabel}
@@ -294,6 +286,15 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
                 </p>
               ) : null}
             </div>
+
+            <section className="productContentSection" aria-label="About this product">
+              <h2>About this product</h2>
+              {product.description ? (
+                <FormattedDescription text={product.description} className="formattedDescription" />
+              ) : (
+                <p>No description available for this product yet.</p>
+              )}
+            </section>
           </section>
 
           <section className="productStoreCard" aria-label="Store contact details">
@@ -328,8 +329,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
 
 
-          <section className="productStoreCard" aria-label="Why order through Sedifex">
-            <h2>Why order through Sedifex?</h2>
+          <section className="productStoreCard productWhyCard" aria-label="Why order through Sedifex">
+            <h2>Why buy on Sedifex</h2>
             <ul>
               <li>Verified store listing</li>
               <li>Order receipt</li>

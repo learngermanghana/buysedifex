@@ -439,6 +439,16 @@ main { padding-top: var(--market-header-height); }
 }
 .productStats p { margin: 0; }
 .productStats strong { color: #9a3412; }
+.productPriceLine { font-size: clamp(1.65rem, 3.2vw, 2.3rem); font-weight: 900; color: #111827; }
+.productTrustMessage { color: #334155; font-weight: 600; }
+.productContentSection {
+  display: grid;
+  gap: .65rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: .95rem;
+}
+.productContentSection h2 { margin: 0; font-size: 1.15rem; }
+.productWhyCard h2 { text-transform: none; }
 
 .verifiedBadge {
   display: inline-flex;
