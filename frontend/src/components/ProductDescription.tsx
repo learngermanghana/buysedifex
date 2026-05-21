@@ -19,6 +19,10 @@ export default function ProductDescription({
 }: {
   description: string;
 }) {
+  if (!description?.trim()) {
+    return null;
+  }
+
   const [expanded, setExpanded] = useState(false);
 
   const formatted = formatDescription(description);
@@ -37,6 +41,7 @@ export default function ProductDescription({
       <button
         className="productDescriptionToggle"
         onClick={() => setExpanded(!expanded)}
+        type="button"
       >
         {expanded ? "Show less" : "Read more"}
       </button>
