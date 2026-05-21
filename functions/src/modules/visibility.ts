@@ -1,4 +1,5 @@
 import { normalizeText, normalizeWhatsAppNumber } from './normalization';
+import { isStoreApprovedForMarketplace } from './store-approval';
 import { type NormalizedProduct, type StoreDoc } from './types';
 
 export function buildWhatsAppLink(input: {
@@ -35,12 +36,12 @@ export function getEffectiveStoreStatus(store: StoreDoc): string | null {
 }
 
 export function isStoreBuyVisible(store: StoreDoc): boolean {
-  return getEffectiveStoreStatus(store) === 'active' && store.eligibleForBuy === true && store.buyOptOut === false;
+  return getEffectiveStoreStatus(store) === 'active' && store.eligibleForBuy === true && store.buyOptOut === false && isStoreApprovedForMarketplace(store);
 }
 
 export function isVisibleProduct(product: NormalizedProduct): boolean {
   const itemType = normalizeText(product.itemType);
-  return (itemType === 'product' || itemType === 'service') && typeof product.name === 'string' && product.name.trim().length > 0;
+  return (itemType === 'product' || itemType === 'service' || itemType === 'course') && typeof product.name === 'string' && product.name.trim().length > 0;
 }
 
 export function computeVisibility(store: StoreDoc, product: NormalizedProduct): boolean {
