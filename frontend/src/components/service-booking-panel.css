@@ -1,0 +1,163 @@
+.serviceBookingPanel {
+  position: sticky;
+  top: 1rem;
+  padding: 1rem;
+  display: grid;
+  gap: .85rem;
+  background: #fff;
+  border: 1px solid #d7e0ea;
+  border-radius: 1.05rem;
+  box-shadow: 0 18px 36px -30px rgba(15,23,42,.8);
+}
+
+.serviceBookingPanel h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.officialBookingCard {
+  display: grid;
+  gap: .72rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 1rem;
+  padding: .9rem;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.officialBookingLead {
+  margin: 0;
+  color: #1e293b;
+  font-weight: 750;
+  line-height: 1.55;
+}
+
+.sedifexPoweredNote {
+  margin: 0;
+  color: #0f766e;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: .8rem;
+  padding: .65rem .75rem;
+  font-size: .9rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.bookingSteps {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: .38rem;
+  color: #334155;
+  font-size: .9rem;
+  line-height: 1.4;
+}
+
+.officialWebsiteButton,
+.fullWidthButton,
+.bookingExplainerButton {
+  width: 100%;
+  min-height: 2.8rem;
+}
+
+.bookingDivider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: .65rem;
+  color: #64748b;
+  font-size: .75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+
+.bookingDivider::before,
+.bookingDivider::after {
+  content: '';
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.leadForm {
+  display: grid;
+  gap: .7rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: .85rem;
+}
+
+.leadForm label,
+.leadForm fieldset {
+  display: grid;
+  gap: .35rem;
+  color: #334155;
+  font-size: .86rem;
+  font-weight: 800;
+}
+
+.leadForm input,
+.leadForm select,
+.leadForm textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: .8rem;
+  padding: .68rem .75rem;
+  color: #0f172a;
+  font: inherit;
+  background: #fff;
+}
+
+.leadForm textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.leadForm fieldset {
+  border: 1px solid #e2e8f0;
+  border-radius: .9rem;
+  padding: .75rem;
+  background: #f8fafc;
+}
+
+.leadForm fieldset label {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-weight: 750;
+}
+
+.leadForm fieldset input {
+  width: auto;
+}
+
+.bookingExplainerCard {
+  border-top: 0;
+  border: 1px solid #bfdbfe;
+  border-radius: 1rem;
+  padding: 1rem;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.bookingExplainerCard h2,
+.bookingExplainerCard p {
+  margin: 0;
+}
+
+.bookingExplainerCard p:not(.eyebrow) {
+  color: #334155;
+  line-height: 1.6;
+}
+
+.bookingExplainerCard ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: .38rem;
+  color: #334155;
+}
+
+@media (max-width: 1040px) {
+  .serviceBookingPanel {
+    position: static;
+  }
+}
