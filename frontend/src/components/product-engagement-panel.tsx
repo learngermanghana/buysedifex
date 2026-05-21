@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import styles from './product-engagement-panel.module.css';
 import {
   getEngagementSummary,
   listEngagementComments,
@@ -79,27 +80,38 @@ export function ProductEngagementPanel({ publicProductId, storeId, sourceProduct
   const showEmptyState = !error && comments.length === 0;
 
   return (
-    <section className="productStoreCard" aria-label="Product comments">
-      <h2>Customer comments</h2>
-      {!isPublished ? <p>This listing is not currently public. Historical comments are read-only.</p> : null}
-      <p>💬 {summary.commentsCount || comments.length} comments</p>
+    <section className={`productStoreCard ${styles.commentCard}`} aria-label="Product comments">
+      <div className={styles.commentHeader}>
+        <h2 className={styles.commentTitle}>Customer comments</h2>
+        {!isPublished ? <p>This listing is not currently public. Historical comments are read-only.</p> : null}
+        <p className={styles.commentCount}>💬 {summary.commentsCount || comments.length} comments</p>
+      </div>
 
       {canWrite ? (
-        <form className="requestForm" onSubmit={(event) => void onSubmitComment(event)}>
-          <label htmlFor="comment-text">Add comment</label>
-          <textarea id="comment-text" rows={3} value={text} onChange={(event) => setText(event.target.value)} />
-          <button className="requestButton" type="submit" disabled={loading || posting || !text.trim()}>
-            {posting ? 'Posting…' : 'Post comment'}
-          </button>
+        <form className={styles.commentForm} onSubmit={(event) => void onSubmitComment(event)}>
+          <label className={styles.commentLabel} htmlFor="comment-text">Add comment</label>
+          <div className={styles.commentInputRow}>
+            <textarea
+              className={styles.commentTextarea}
+              id="comment-text"
+              rows={4}
+              value={text}
+              placeholder="Share your question or experience with this product..."
+              onChange={(event) => setText(event.target.value)}
+            />
+            <button className={`requestButton ${styles.commentButton}`} type="submit" disabled={loading || posting || !text.trim()}>
+              {posting ? 'Posting…' : 'Post comment'}
+            </button>
+          </div>
         </form>
       ) : null}
 
       {notice ? <p className="requestFeedback success">{notice}</p> : null}
       {error ? <p className="requestFeedback error">{error}</p> : null}
-      {showEmptyState ? <p>{loading ? 'Loading comments…' : 'No comments yet.'}</p> : null}
-      <ul>
+      {showEmptyState ? <p className={styles.commentEmpty}>{loading ? 'Loading comments…' : 'No comments yet.'}</p> : null}
+      <ul className={styles.commentList}>
         {comments.map((comment) => (
-          <li key={comment.id}>
+          <li className={styles.commentItem} key={comment.id}>
             <strong>{comment.authorName ?? 'Customer'}</strong>
             <p>{comment.text}</p>
           </li>
