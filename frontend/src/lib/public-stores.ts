@@ -19,6 +19,9 @@ type FirestoreRunQueryResponse = {
   document?: FirestoreDocument;
 };
 
+const WEBSITE_FIELD_KEYS = ['websiteUrl', 'storeWebsiteUrl', 'storeWebsite', 'website', 'websiteLink', 'promoWebsiteUrl'] as const;
+const WEBSITE_MASK_FIELD_KEYS = [...WEBSITE_FIELD_KEYS];
+
 export type StoreProfile = {
   storeId: string;
   storeName: string;
@@ -73,7 +76,7 @@ const normalizeRouteId = (value: string): string => {
   }
 };
 
-const readString = (fields: Record<string, FirestoreValue>, keys: string[]): string | undefined => {
+const readString = (fields: Record<string, FirestoreValue>, keys: readonly string[]): string | undefined => {
   for (const key of keys) {
     const value = fields[key];
     if (value && 'stringValue' in value) {
@@ -187,6 +190,8 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
     .map(normalizeImageUrl)
     .filter(isValidHttpUrl);
 
+  const websiteUrl = readString(fields, WEBSITE_FIELD_KEYS);
+
   return {
     id: readString(fields, ['productId']) ?? doc.name?.split('/').at(-1) ?? '',
     productName: readString(fields, ['productName', 'name']) ?? 'Untitled item',
@@ -211,7 +216,7 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
     storeSlug: readString(fields, ['storeSlug']),
     storeLogoUrl: readString(fields, ['storeLogoUrl', 'logoUrl']),
     storeBannerUrl: readString(fields, ['storeBannerUrl', 'bannerUrl']),
-    storeWebsiteUrl: readString(fields, ['websiteUrl', 'storeWebsite', 'website']),
+    storeWebsiteUrl: websiteUrl,
     storeEmail: readString(fields, ['storeEmail', 'email', 'ownerEmail', 'contactEmail']),
     addressLine1: readString(fields, ['addressLine1', 'address']),
     verified: readBoolean(fields, ['verified']),
@@ -224,7 +229,7 @@ const productFromDocument = (doc: FirestoreDocument): StoreEnrichedProduct => {
       readString(fields, ['xUrl', 'twitterUrl']),
       readString(fields, ['tiktokUrl']),
       readString(fields, ['youtubeUrl']),
-      readString(fields, ['websiteUrl']),
+      websiteUrl,
     ].filter(isValidHttpUrl),
   };
 };
@@ -349,7 +354,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
       'storePhone',
       'whatsappNumber',
       'waLink',
-      'websiteUrl',
+      ...WEBSITE_MASK_FIELD_KEYS,
       'logoUrl',
       'storeLogoUrl',
       'bannerUrl',
@@ -392,6 +397,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
 
     const document = (await response.json()) as FirestoreDocument;
     const fields = document.fields ?? {};
+    const websiteUrl = readString(fields, WEBSITE_FIELD_KEYS);
 
     return {
       storeId: normalizedStoreId,
@@ -400,7 +406,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
       storeEmail: readString(fields, ['email', 'ownerEmail', 'contactEmail']),
       storePhone: readString(fields, ['storePhone', 'phone', 'telephone', 'whatsappNumber']),
       storeWhatsapp: readString(fields, ['waLink', 'whatsappNumber']),
-      websiteUrl: readString(fields, ['websiteUrl', 'website']),
+      websiteUrl,
       storeLogoUrl: readString(fields, ['storeLogoUrl', 'logoUrl']),
       storeBannerUrl: readString(fields, ['storeBannerUrl', 'bannerUrl']),
       city: readString(fields, ['city', 'storeCity']),
@@ -418,7 +424,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
         readString(fields, ['xUrl', 'twitterUrl']),
         readString(fields, ['tiktokUrl']),
         readString(fields, ['youtubeUrl']),
-        readString(fields, ['websiteUrl']),
+        websiteUrl,
       ].filter(isValidHttpUrl),
     };
   };
@@ -464,7 +470,7 @@ export const getStoreProfileById = async (storeId: string): Promise<StoreProfile
         { fieldPath: 'twitterUrl' },
         { fieldPath: 'tiktokUrl' },
         { fieldPath: 'youtubeUrl' },
-        { fieldPath: 'websiteUrl' },
+        ...WEBSITE_MASK_FIELD_KEYS.map((fieldPath) => ({ fieldPath })),
         { fieldPath: 'email' },
         { fieldPath: 'ownerEmail' },
         { fieldPath: 'publishedAt' },
