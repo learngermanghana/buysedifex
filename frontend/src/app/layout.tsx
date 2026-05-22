@@ -4,6 +4,7 @@ import { CartProvider } from '@/components/cart-provider';
 import { CustomerAuthProvider } from '@/components/customer-auth-provider';
 import { AutoHideSiteHeader } from '@/components/auto-hide-site-header';
 import { LiveChatWidget } from '@/components/live-chat-widget';
+import { MarketplaceTrustCopyEnhancer } from '@/components/marketplace-trust-copy-enhancer';
 import { SiteFooter } from '@/components/site-footer';
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
 import { baseSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <CustomerAuthProvider>
           <CartProvider>
             <WebVitalsReporter />
+            <MarketplaceTrustCopyEnhancer />
             <AutoHideSiteHeader />
             {children}
             <div className="container">
