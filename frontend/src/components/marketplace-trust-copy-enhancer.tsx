@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 
 const copyReplacements = new Map([
   ['View product', 'View product & buy'],
+  ['Buy on Sedifex', 'Buy now'],
+  ['Checkout with Paystack', 'Buy now - Checkout with Paystack'],
   ['Details will be confirmed by the seller during checkout.', 'Open the product page to review full details, seller information, and checkout options.'],
   ['Price unavailable', 'Price shown on product page'],
 ]);
@@ -17,7 +19,7 @@ function replaceNodeText(node: Element) {
 
 export function MarketplaceTrustCopyEnhancer() {
   useEffect(() => {
-    const selector = '.buyNowButton, .productShortDescription, .priceUnavailable';
+    const selector = '.buyNowButton, .requestButton, .cartCheckoutForm button, .productShortDescription, .priceUnavailable, .productPriceLine';
 
     const updateCopy = () => {
       document.querySelectorAll(selector).forEach(replaceNodeText);
