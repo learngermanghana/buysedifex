@@ -1,12 +1,12 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
 import { useCart } from './cart-provider';
 
-type ChatState = 'idle' | 'open' | 'sent';
+const WHATSAPP_PHONE_NUMBER = '233595054266';
+const WHATSAPP_MESSAGE = 'Hello Sedifex Market, I need help.';
 
-function marketChatEndpoint() {
-  return process.env.NEXT_PUBLIC_SEDIFEX_ADMIN_LIVE_CHAT_URL || 'https://sedifexadmin.vercel.app/api/admin/live-chat';
+function whatsappChatUrl() {
+  return `https://wa.me/${WHATSAPP_PHONE_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
 }
 
 const rootBaseStyle = {
@@ -15,170 +15,60 @@ const rootBaseStyle = {
   zIndex: 2147483647,
   display: 'grid',
   justifyItems: 'end',
-  gap: '12px',
   pointerEvents: 'none',
 } as const;
 
 const buttonStyle = {
   pointerEvents: 'auto',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '10px',
   border: 0,
   cursor: 'pointer',
   borderRadius: '999px',
   padding: '14px 18px',
-  background: 'linear-gradient(120deg, #4338ca 0%, #6366f1 52%, #10b981 100%)',
+  background: '#25D366',
   color: '#fff',
-  fontWeight: 800,
+  fontWeight: 900,
+  fontSize: '15px',
+  lineHeight: 1,
+  textDecoration: 'none',
   boxShadow: '0 22px 45px -22px rgba(15,23,42,0.9)',
 } as const;
 
-const panelStyle = {
-  pointerEvents: 'auto',
-  width: 'min(360px, calc(100vw - 32px))',
-  overflow: 'hidden',
-  border: '1px solid #dbe4f0',
-  borderRadius: '22px',
-  background: '#fff',
-  boxShadow: '0 24px 80px -34px rgba(15,23,42,0.9)',
-} as const;
-
-const headerStyle = {
-  display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'space-between',
-  gap: '16px',
-  background: '#0f172a',
-  color: '#fff',
-  padding: '16px',
-} as const;
-
-const bodyStyle = {
-  display: 'grid',
-  gap: '12px',
-  padding: '16px',
-} as const;
-
-const inputStyle = {
-  width: '100%',
-  border: '1px solid #dbe4f0',
-  borderRadius: '14px',
-  padding: '12px 13px',
-  color: '#0f172a',
-  outline: 'none',
-} as const;
-
-const labelStyle = {
-  display: 'grid',
-  gap: '6px',
-  fontSize: '13px',
-  fontWeight: 700,
-  color: '#334155',
-} as const;
-
-const submitStyle = {
-  border: 0,
-  cursor: 'pointer',
-  borderRadius: '999px',
-  padding: '13px 16px',
-  background: '#4f46e5',
-  color: '#fff',
-  fontWeight: 800,
+const iconStyle = {
+  width: 22,
+  height: 22,
+  flex: '0 0 auto',
+  display: 'block',
 } as const;
 
 export function LiveChatWidget() {
   const { itemCount } = useCart();
-  const [state, setState] = useState<ChatState>('idle');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [message, setMessage] = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState('');
   const rootStyle = {
     ...rootBaseStyle,
     bottom: itemCount > 0 ? 'calc(86px + env(safe-area-inset-bottom, 0px))' : 'calc(16px + env(safe-area-inset-bottom, 0px))',
   } as const;
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError('');
-    if (!message.trim()) {
-      setError('Please type your message first.');
-      return;
-    }
-
-    try {
-      setSending(true);
-      const response = await fetch(marketChatEndpoint(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sender: 'customer',
-          source: 'sedifex_market',
-          customerName: name.trim() || 'Website visitor',
-          customerPhone: phone.trim(),
-          customerEmail: email.trim(),
-          text: message.trim(),
-          pageUrl: window.location.href,
-          storeId: 'sedifex-market',
-          storeName: 'Sedifex Market',
-        }),
-      });
-      const data = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
-      if (!response.ok || !data?.ok) throw new Error(data?.error || 'Unable to send message.');
-      setState('sent');
-      setMessage('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to send message.');
-    } finally {
-      setSending(false);
-    }
-  }
-
   return (
     <div className="marketLiveChat" style={rootStyle} aria-live="polite">
-      {state === 'open' || state === 'sent' ? (
-        <div className="marketLiveChatPanel" style={panelStyle} role="dialog" aria-label="Sedifex Market live chat">
-          <div className="marketLiveChatHeader" style={headerStyle}>
-            <div>
-              <p style={{ margin: 0, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#c7d2fe' }}>Sedifex Market</p>
-              <h2 style={{ margin: 0, marginTop: 4, fontSize: 20 }}>Need help?</h2>
-            </div>
-            <button type="button" onClick={() => setState('idle')} aria-label="Close chat" style={{ width: 32, height: 32, borderRadius: 999, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 20 }}>×</button>
-          </div>
-
-          {state === 'sent' ? (
-            <div className="marketLiveChatBody" style={bodyStyle}>
-              <p style={{ margin: 0, color: '#047857', fontWeight: 800 }}>Thanks. Your message has been sent to Sedifex support.</p>
-              <button type="button" style={{ ...submitStyle, background: '#eef2ff', color: '#3730a3' }} onClick={() => setState('open')}>Send another message</button>
-            </div>
-          ) : (
-            <form onSubmit={submit} className="marketLiveChatBody" style={bodyStyle}>
-              <label style={labelStyle}>
-                <span>Name</span>
-                <input style={inputStyle} value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" />
-              </label>
-              <label style={labelStyle}>
-                <span>Phone / WhatsApp</span>
-                <input style={inputStyle} value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="020 000 0000" />
-              </label>
-              <label style={labelStyle}>
-                <span>Email</span>
-                <input style={inputStyle} type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
-              </label>
-              <label style={labelStyle}>
-                <span>Message</span>
-                <textarea style={{ ...inputStyle, resize: 'vertical' }} value={message} onChange={(event) => setMessage(event.target.value)} rows={4} placeholder="How can we help you?" />
-              </label>
-              {error ? <p style={{ margin: 0, color: '#be123c', fontSize: 13 }}>{error}</p> : null}
-              <button type="submit" style={{ ...submitStyle, opacity: sending ? 0.6 : 1 }} disabled={sending}>{sending ? 'Sending...' : 'Send message'}</button>
-            </form>
-          )}
-        </div>
-      ) : null}
-
-      <button type="button" className="marketLiveChatButton" style={buttonStyle} onClick={() => setState(state === 'idle' ? 'open' : 'idle')}>
-        Chat with us
-      </button>
+      <a
+        className="marketLiveChatButton"
+        style={buttonStyle}
+        href={whatsappChatUrl()}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Chat with Sedifex Market on WhatsApp"
+        title="Chat with Sedifex Market on WhatsApp"
+      >
+        <svg style={iconStyle} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <path
+            fill="currentColor"
+            d="M16.04 3C9.4 3 4 8.32 4 14.86c0 2.24.65 4.42 1.87 6.3L4 29l8.02-1.83a12.3 12.3 0 0 0 4.02.67C22.68 27.84 28 22.52 28 15.98 28 9.42 22.68 3 16.04 3Zm0 22.7c-1.28 0-2.53-.22-3.72-.67l-.43-.16-4.75 1.08 1.12-4.6-.28-.47a9.88 9.88 0 0 1-1.6-5.4c0-5.35 4.36-9.7 9.72-9.7 5.35 0 9.7 4.35 9.7 9.7 0 5.36-4.36 9.72-9.76 9.72Zm5.34-7.27c-.3-.15-1.74-.86-2-.95-.27-.1-.47-.15-.67.15-.2.29-.77.95-.95 1.15-.17.2-.35.22-.65.07-.29-.14-1.23-.45-2.34-1.43a8.73 8.73 0 0 1-1.62-2c-.17-.3-.02-.46.13-.6.13-.13.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.6-.92-2.2-.24-.58-.49-.5-.67-.5h-.57c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.87 1.22 3.07c.15.2 2.1 3.2 5.1 4.49.71.3 1.27.49 1.7.62.72.23 1.37.2 1.88.12.57-.08 1.74-.71 1.99-1.4.24-.68.24-1.27.17-1.4-.07-.13-.27-.2-.57-.35Z"
+          />
+        </svg>
+        WhatsApp us
+      </a>
     </div>
   );
 }
