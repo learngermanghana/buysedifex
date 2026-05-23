@@ -3,13 +3,13 @@ import Link from 'next/link';
 import { getStoreProfileById, listPublicStoreIds } from '@/lib/public-stores';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 
-const title = 'Browse local stores on Sedifex';
-const description = 'Discover verified stores, view their products, and contact them directly on Sedifex.';
+const title = 'Browse trusted businesses on Sedifex';
+const description = 'Discover verified businesses offering products, services, courses, bookings, and checkout options on Sedifex.';
 
 export const metadata: Metadata = {
   title,
   description,
-  keywords: buildSeoKeywords('ghana stores directory', 'verified local stores ghana'),
+  keywords: buildSeoKeywords('ghana businesses directory', 'verified local businesses ghana', 'services courses products ghana'),
   alternates: { canonical: canonicalUrlForPath('/stores') },
   openGraph: {
     type: 'website',
@@ -35,9 +35,9 @@ export default async function StoresIndexPage() {
   return (
     <main className="container infoPage">
       <section>
-        <p className="eyebrow">Stores</p>
-        <h1>Find trusted local stores</h1>
-        <p>Explore store pages with product listings, location, and contact details.</p>
+        <p className="eyebrow">Businesses</p>
+        <h1>Find trusted businesses on Sedifex</h1>
+        <p>Explore verified businesses offering products, services, courses, bookings, and checkout options.</p>
       </section>
 
       <section>
