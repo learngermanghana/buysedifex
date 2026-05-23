@@ -371,6 +371,95 @@ main { padding-top: var(--market-header-height); }
 .marketSectionIntro h2 { margin: 0; color: #fff; font-size: clamp(1.35rem, 2vw, 1.8rem); }
 .marketSectionIntro .eyebrow { color: #ffbd3d; }
 
+.businessesPage { display: grid; gap: 1rem; }
+.businessesHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, .7fr);
+  gap: 1rem;
+  align-items: stretch;
+  border-radius: 1.3rem;
+  padding: clamp(1.2rem, 3vw, 2rem);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 189, 61, .45), transparent 32%),
+    linear-gradient(135deg, #ffffff 0%, #fff7ed 45%, #e0f2fe 100%);
+  border: 1px solid rgba(255,122,0,.2);
+  box-shadow: 0 24px 60px -42px rgba(15,23,42,.9);
+}
+.businessesHero h1 { margin: .35rem 0 .7rem; font-size: clamp(2.2rem, 5vw, 4.4rem); max-width: 780px; }
+.businessesHero p:not(.eyebrow) { margin: 0; color: #334155; font-size: 1.04rem; max-width: 740px; line-height: 1.55; }
+.businessesHeroStats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem;
+}
+.businessesHeroStats div {
+  display: grid;
+  align-content: center;
+  gap: .25rem;
+  border-radius: 1rem;
+  padding: 1rem;
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(15,23,42,.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.85);
+}
+.businessesHeroStats strong { font-size: clamp(1.75rem, 4vw, 2.5rem); color: #111827; line-height: 1; }
+.businessesHeroStats span { color: #475569; font-weight: 850; font-size: .88rem; text-transform: capitalize; }
+.businessesToolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: #fff;
+  border: 1px solid #d7e0ea;
+  box-shadow: 0 16px 42px -38px rgba(15,23,42,.8);
+}
+.businessesToolbar h2,
+.businessesToolbar p { margin: 0; }
+.businessesToolbar p { margin-top: .25rem; color: #475569; }
+.businessesToolbarLinks { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; }
+.businessesToolbarLinks a {
+  display: inline-flex;
+  text-decoration: none;
+  color: #312e81;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: .55rem .8rem;
+  font-weight: 900;
+}
+.businessGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+.businessCard {
+  display: grid;
+  overflow: hidden;
+  border-radius: 1.2rem;
+  background: #fff;
+  border: 1px solid #d7e0ea;
+  box-shadow: 0 22px 52px -42px rgba(15,23,42,.9);
+}
+.businessCardMedia { position: relative; height: 180px; overflow: hidden; background: linear-gradient(135deg, #172033, #25344f); }
+.businessCardMedia img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.businessCardPlaceholder { width: 100%; height: 100%; display: grid; place-items: center; color: #ffbd3d; font-size: 4rem; font-weight: 950; }
+.businessCardVerified { position: absolute; top: .75rem; right: .75rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 999px; padding: .35rem .65rem; font-size: .75rem; font-weight: 950; }
+.businessCardBody { display: grid; gap: .8rem; padding: 1rem; }
+.businessCardTitleRow { display: flex; align-items: center; gap: .75rem; }
+.businessCardLogo { width: 52px; height: 52px; border-radius: 999px; object-fit: cover; border: 1px solid #e2e8f0; background: #fff; flex: 0 0 auto; }
+.businessCardTitleRow h2 { margin: 0; font-size: 1.22rem; }
+.businessCardTitleRow p { margin: .25rem 0 0; color: #64748b; font-weight: 700; }
+.businessCardBadges { display: flex; gap: .4rem; flex-wrap: wrap; }
+.businessCardBadges span { border-radius: 999px; padding: .32rem .55rem; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: .76rem; font-weight: 950; }
+.businessCardStats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin: 0; }
+.businessCardStats div { padding: .65rem; border-radius: .8rem; background: #f8fafc; border: 1px solid #e2e8f0; }
+.businessCardStats dt { margin: 0 0 .2rem; color: #64748b; font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
+.businessCardStats dd { margin: 0; font-size: 1.25rem; color: #111827; font-weight: 950; }
+.businessCardThumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .45rem; }
+.businessCardThumbs img { width: 100%; aspect-ratio: 1.2; object-fit: cover; border-radius: .65rem; background: #f1f5f9; }
+.businessCardActions { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .15rem; }
+.businessEmptyState { display: grid; gap: .65rem; justify-items: start; padding: 1.2rem; background: #fff; border: 1px solid #d7e0ea; border-radius: 1rem; }
+.businessEmptyState h2,
+.businessEmptyState p { margin: 0; }
+
 .productDetailPage {
   background: linear-gradient(180deg, #fff3d6 0, #eef4fb 230px, #eef4fb 100%);
   padding-bottom: 2rem;
@@ -550,7 +639,8 @@ main { padding-top: var(--market-header-height); }
 
 @media (max-width: 1040px) {
   .commerceHero,
-  .productDetailContent { grid-template-columns: 1fr; }
+  .productDetailContent,
+  .businessesHero { grid-template-columns: 1fr; }
   .productCartPanel { position: static; }
   .relatedMarketplaceGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -566,6 +656,8 @@ main { padding-top: var(--market-header-height); }
   .cartNavButton { width: 100%; }
   .commerceHero { border-radius: 0 0 1rem 1rem; }
   .commerceHeroVisual { min-height: 220px; }
+  .businessesToolbar { align-items: flex-start; flex-direction: column; }
+  .businessesToolbarLinks { justify-content: flex-start; }
 }
 
 @media (max-width: 640px) {
@@ -573,6 +665,9 @@ main { padding-top: var(--market-header-height); }
   .commerceHeroContent h1 { font-size: 2rem; }
   .commerceHeroVisual { display: none; }
   .relatedMarketplaceGrid { grid-template-columns: 1fr; }
+  .businessesHeroStats { grid-template-columns: 1fr; }
+  .businessCardStats { grid-template-columns: 1fr; }
+  .businessCardActions .btn { width: 100%; }
   .mobileProductBar { display: grid; position: fixed; left: .75rem; right: .75rem; bottom: .75rem; z-index: 75; grid-template-columns: 1fr auto auto; gap: .45rem; align-items: center; background: #111827; color: #fff; border-radius: 1rem; padding: .6rem; box-shadow: 0 20px 50px -25px rgba(15,23,42,.95); }
   .mobileProductBar button { border: 0; border-radius: .7rem; padding: .55rem .7rem; font-weight: 900; }
   .mobileProductBar button:first-of-type { background: #ff7a00; color: #fff; }
