@@ -29,6 +29,11 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
   const isServiceLike = normalizedType === 'service' || normalizedType === 'course' || normalizedType === 'event';
   const fulfillmentOptions = useMemo(() => getFulfillmentOptions(), []);
   const primaryDelivery = fulfillmentOptions[0];
+  const deliveryPromiseTitle = primaryDelivery?.available
+    ? '🚚 Delivery before 4:00 PM'
+    : '🚚 Tomorrow delivery after 4:00 PM cutoff';
+  const deliveryPromiseHelper =
+    primaryDelivery?.helper ?? 'Choose delivery or store pickup at checkout after adding this product to cart.';
 
   const addItem = (openAfterAdd = false) => {
     cart.addItem({ productId, merchantId, productName, itemName: productName, quantity, type: 'PRODUCT', price: price ?? null, currency, imageUrl, storeName });
@@ -39,6 +44,14 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
 
   return (
     <aside className="productCartPanel" aria-label={isServiceLike ? 'Service booking options' : 'Product cart options'}>
+      <style>{`
+        @media (max-width: 1040px) {
+          .productDetailMainColumn { display: contents; }
+          .productDetailMainColumn > * { order: 3; }
+          .productDetailMainColumn > .productSummaryCard { order: 1; }
+          .productCartPanel { order: 2; }
+        }
+      `}</style>
       <p className="eyebrow">Secure checkout</p>
       <h3>{isServiceLike ? 'Book this service or class' : 'Buy this product'}</h3>
       <p className="productCartPrice">{formatMoney(price, currency)}</p>
@@ -46,9 +59,9 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
 
       {!isServiceLike ? (
         <div className="fulfillmentPromise" style={{ border: '1px solid #dbeafe', background: '#eff6ff', borderRadius: 16, padding: 12, display: 'grid', gap: 8, margin: '12px 0' }}>
-          <strong>Delivery & pickup</strong>
-          <span>{primaryDelivery.available ? 'Same-day delivery available before 4:00 PM.' : 'Same-day delivery is closed now; delivery moves to tomorrow.'}</span>
-          <span>Store pickup is also available after Sedifex checkout.</span>
+          <strong>{deliveryPromiseTitle}</strong>
+          <span>{deliveryPromiseHelper}</span>
+          <span>🏬 Store pickup is also available after Sedifex checkout.</span>
         </div>
       ) : null}
 
