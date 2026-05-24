@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, firebaseConfigError } from '@/lib/firebase';
 import {
@@ -78,6 +78,7 @@ async function createSingleMerchantCheckout(input: {
   const recordType = cartIsServiceBooking ? 'service_booking' : 'product_order';
   const subaccountCode = paymentRouting?.paystackSubaccountCode ?? paymentRouting?.subaccountCode ?? null;
   const checkoutPayload = checkout as { authorizationUrl?: string; checkoutUrl?: string; bookingId?: string; orderId?: string; payment_reference?: string; payment_status?: string; order_status?: string; pricing_snapshot?: SedifexCheckoutPreviewResponse };
+  const checkoutUrl = checkoutPayload.authorizationUrl ?? checkoutPayload.checkoutUrl ?? null;
   const firstNames = readFirstItemName(input.merchantCart);
   const enrichedItems = input.merchantCart.map((item) => {
     const named = item as CheckoutItem & { itemName?: string; productName?: string; serviceName?: string };
@@ -126,21 +127,31 @@ async function createSingleMerchantCheckout(input: {
     source: 'sedifex_market',
     syncStatus: 'pending',
     syncRequestedAt: new Date().toISOString(),
+    checkoutUrl,
     createdAt: new Date().toISOString(),
     createdAtServer: serverTimestamp(),
   };
   let recordId: string | undefined;
   if (db && !firebaseConfigError) {
     const batch = writeBatch(db);
-    const createdRecord = doc(collection(db, collectionName));
-    batch.set(createdRecord, checkoutRecord);
-    batch.set(doc(db, 'sedifexAdmin', 'marketplace', 'orders', reference), { ...checkoutRecord, checkoutUrl: checkoutPayload.authorizationUrl ?? checkoutPayload.checkoutUrl ?? null }, { merge: true });
-    if (input.customerUid) batch.set(doc(db, 'marketCustomers', input.customerUid, 'orders', reference), { ...checkoutRecord, checkoutUrl: checkoutPayload.authorizationUrl ?? checkoutPayload.checkoutUrl ?? null }, { merge: true });
+
+    // Product orders are already written by Sedifex backend /integration/checkout/create
+    // into integrationOrders/{reference} and stores/{storeId}/integrationOrders/{reference}.
+    // Do not also add a random integrationOrders document here, otherwise the dashboard
+    // shows duplicate pending-payment orders whenever checkout is initialized.
+    if (cartIsServiceBooking) {
+      const createdRecord = doc(collection(db, collectionName));
+      batch.set(createdRecord, checkoutRecord);
+      recordId = createdRecord.id;
+    } else {
+      recordId = checkoutPayload.orderId ?? reference;
+    }
+
+    batch.set(doc(db, 'sedifexAdmin', 'marketplace', 'orders', reference), { ...checkoutRecord, checkoutUrl }, { merge: true });
+    if (input.customerUid) batch.set(doc(db, 'marketCustomers', input.customerUid, 'orders', reference), { ...checkoutRecord, checkoutUrl }, { merge: true });
     await batch.commit();
-    recordId = createdRecord.id;
-  } else if (db) {
-    const createdRecord = await addDoc(collection(db, collectionName), checkoutRecord);
-    recordId = createdRecord.id;
+  } else {
+    recordId = checkoutPayload.orderId ?? reference;
   }
   return {
     merchantId: input.merchantId,
@@ -152,7 +163,7 @@ async function createSingleMerchantCheckout(input: {
     payment_reference: checkoutPayload.payment_reference ?? reference,
     payment_status: 'pending',
     order_status: checkoutPayload.order_status ?? 'pending_payment',
-    checkoutUrl: checkoutPayload.authorizationUrl ?? checkoutPayload.checkoutUrl,
+    checkoutUrl: checkoutUrl ?? undefined,
     preview: checkoutPayload.pricing_snapshot ?? preview,
     paystackSplit: subaccountCode ? { enabled: true, subaccount: subaccountCode } : { enabled: false },
   };
