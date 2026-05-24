@@ -12,6 +12,7 @@ import { getStoreProfileById } from '@/lib/public-stores';
 import { getStoreHref, getStoreRouteId } from '@/lib/store-route';
 import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 import { extractProductIdFromRouteParam, getProductHref } from '@/lib/product-route';
+import { getFulfillmentOptions } from '@/lib/fulfillment-options';
 import { listIntegrationProducts } from '@/lib/sedifex-integration-api';
 import { RelatedMarketplaceItems } from '@/components/related-marketplace-items';
 
@@ -271,6 +272,12 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const priceLabel = product.price == null ? 'Price unavailable' : `${currencyLabel} ${product.price.toFixed(2)}`;
   const availabilityLabel =
     typeof product.stockCount === 'number' ? (product.stockCount > 0 ? 'In stock' : 'Out of stock') : undefined;
+  const fulfillmentOptions = serviceLike ? [] : getFulfillmentOptions();
+  const sameDayFulfillment = fulfillmentOptions[0];
+  const deliveryBadgeText = sameDayFulfillment?.available ? 'Same-day delivery before 4:00 PM' : 'Delivery tomorrow after 4:00 PM';
+  const deliveryHelperText = sameDayFulfillment?.available
+    ? 'Order and pay now, then choose same-day delivery at checkout where the store can deliver.'
+    : 'Same-day delivery is closed for today. Choose tomorrow delivery or store pickup at checkout.';
 
   return (
     <main className="productDetailPage">
@@ -304,6 +311,23 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
             <div className="productStats">
               <p className="productPriceLine">{priceLabel}</p>
+              {!serviceLike ? (
+                <div
+                  aria-label="Delivery and pickup options"
+                  style={{
+                    border: '1px solid #bfdbfe',
+                    background: 'linear-gradient(135deg, #eff6ff, #f0fdf4)',
+                    borderRadius: 18,
+                    padding: '12px 14px',
+                    display: 'grid',
+                    gap: 8,
+                  }}
+                >
+                  <strong style={{ color: '#0f172a' }}>🚚 {deliveryBadgeText}</strong>
+                  <span style={{ color: '#334155' }}>🏬 Store pickup available after checkout confirmation.</span>
+                  <small style={{ color: '#64748b', lineHeight: 1.55 }}>{deliveryHelperText}</small>
+                </div>
+              ) : null}
               {hasSedifexDeal ? <p><strong>Sedifex online deal:</strong> Order through Sedifex to get this price.</p> : null}
               <p className="productTrustMessage">
                 {serviceLike
@@ -385,6 +409,33 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               ) : null}
             </div>
           </section>
+
+          {!serviceLike ? (
+            <section
+              className="productStoreCard"
+              aria-label="Verified store trust details"
+              style={{
+                border: '1px solid #bbf7d0',
+                background: 'linear-gradient(135deg, #f0fdf4, #ffffff)',
+              }}
+            >
+              <p className="eyebrow">Verified Store</p>
+              <h2>Buy with a Sedifex order record</h2>
+              <p>
+                Pay safely through Sedifex first. After payment, you receive an order record, receipt, and store follow-up details.
+              </p>
+              <ul>
+                <li>{isVerifiedStore ? 'Verified store listing' : 'Store listed on Sedifex Market'}</li>
+                <li>Store location shown: {resolvedLocation}</li>
+                <li>Secure Paystack checkout</li>
+                <li>Sedifex payment and order record</li>
+                <li>Receipt after payment</li>
+              </ul>
+              <p className="checkoutHint">
+                If there is an issue, Sedifex can help trace the store, order, and payment record.
+              </p>
+            </section>
+          ) : null}
 
           <section className="productStoreCard productWhyCard" aria-label={serviceLike ? 'Why use Sedifex powered booking' : 'Why order through Sedifex'}>
             <h2>{serviceLike ? `Why ${courseLike ? 'register' : 'book'} through a Sedifex-powered channel` : 'Why buy on Sedifex'}</h2>
