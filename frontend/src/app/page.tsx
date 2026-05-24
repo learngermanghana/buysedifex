@@ -7,14 +7,6 @@ import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/
 const title = 'Sedifex Market';
 const description = 'Shop products from trusted local stores in Ghana with clear seller details, secure checkout, support, delivery, and return policy information.';
 
-const categoryLinks = [
-  { href: '/products', label: 'Products', sub: 'Shop items' },
-  { href: '/category/beauty', label: 'Beauty', sub: 'Skincare & makeup' },
-  { href: '/services', label: 'Services', sub: 'Book providers' },
-  { href: '/courses', label: 'Courses', sub: 'Learn skills' },
-  { href: '/businesses', label: 'Stores', sub: 'Verified sellers' },
-];
-
 const trustItems = [
   { title: 'Delivery before 4PM', text: 'Same-day where available. Otherwise next-day or pickup.' },
   { title: 'Secure checkout', text: 'Receipts and order records stay on Sedifex.' },
@@ -52,15 +44,6 @@ export default function HomePage() {
           <div className="salesBurst"><span>Fresh</span><strong>Deals</strong></div>
         </div>
       </section>
-
-      <nav className="marketCategoryRail" aria-label="Shop categories">
-        {categoryLinks.map((item) => (
-          <Link key={item.href} href={item.href}>
-            <strong>{item.label}</strong>
-            <span>{item.sub}</span>
-          </Link>
-        ))}
-      </nav>
 
       <section className="marketTrustStrip" aria-label="Why shop with Sedifex Market">
         {trustItems.map((item) => (
