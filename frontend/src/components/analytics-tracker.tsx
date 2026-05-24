@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 
 type AnalyticsEventName =
@@ -165,7 +165,7 @@ function inferPageEvent(pathname: string): AnalyticsEventName {
   return 'page_view';
 }
 
-export function AnalyticsTracker() {
+function AnalyticsTrackerInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const lastPageKey = useRef('');
@@ -211,4 +211,12 @@ export function AnalyticsTracker() {
   }, []);
 
   return null;
+}
+
+export function AnalyticsTracker() {
+  return (
+    <Suspense fallback={null}>
+      <AnalyticsTrackerInner />
+    </Suspense>
+  );
 }
