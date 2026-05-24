@@ -7,6 +7,21 @@ import { buildSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/
 const title = 'Sedifex Market';
 const description = 'Shop products from trusted local stores in Ghana with clear seller details, secure checkout, support, delivery, and return policy information.';
 
+const categoryLinks = [
+  { href: '/products', label: 'Products', sub: 'Shop items' },
+  { href: '/category/beauty', label: 'Beauty', sub: 'Skincare & makeup' },
+  { href: '/services', label: 'Services', sub: 'Book providers' },
+  { href: '/courses', label: 'Courses', sub: 'Learn skills' },
+  { href: '/businesses', label: 'Stores', sub: 'Verified sellers' },
+];
+
+const trustItems = [
+  { title: 'Delivery before 4PM', text: 'Same-day where available. Otherwise next-day or pickup.' },
+  { title: 'Secure checkout', text: 'Receipts and order records stay on Sedifex.' },
+  { title: 'Verified Ghana stores', text: 'Know the seller before you pay.' },
+  { title: 'Human support', text: 'Contact Sedifex by WhatsApp, phone, or email.' },
+];
+
 export const metadata: Metadata = {
   title,
   description,
@@ -23,7 +38,7 @@ export default function HomePage() {
         <div className="commerceHeroContent">
           <p className="eyebrow">Sedifex Market Deals</p>
           <h1>Shop trusted Ghana stores with bright deals and secure checkout.</h1>
-          <p>Find products from verified sellers. View the product details, add to cart, pay securely, and keep your order record on Sedifex.</p>
+          <p>Find products from verified sellers. View product details, delivery options, seller information, and pay with a clear Sedifex receipt.</p>
           <div className="heroActions">
             <Link href="/products" className="btn btnPrimary">Shop Products</Link>
             <Link href="/services" className="btn btnSecondary">Book Services</Link>
@@ -36,6 +51,24 @@ export default function HomePage() {
           <span className="dealChip dealChipBottom">Ghana marketplace</span>
           <div className="salesBurst"><span>Fresh</span><strong>Deals</strong></div>
         </div>
+      </section>
+
+      <nav className="marketCategoryRail" aria-label="Shop categories">
+        {categoryLinks.map((item) => (
+          <Link key={item.href} href={item.href}>
+            <strong>{item.label}</strong>
+            <span>{item.sub}</span>
+          </Link>
+        ))}
+      </nav>
+
+      <section className="marketTrustStrip" aria-label="Why shop with Sedifex Market">
+        {trustItems.map((item) => (
+          <div key={item.title}>
+            <strong>{item.title}</strong>
+            <span>{item.text}</span>
+          </div>
+        ))}
       </section>
 
       <HomeAdFlash />
