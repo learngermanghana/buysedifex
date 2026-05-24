@@ -87,7 +87,7 @@ const adFlashStyles = `
     min-width: 100%;
     min-height: clamp(270px, 36vw, 430px);
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(280px, .78fr);
+    grid-template-columns: minmax(0, 1fr) minmax(280px, .9fr);
     gap: clamp(1rem, 3vw, 2rem);
     align-items: stretch;
     padding: clamp(1rem, 3vw, 2rem);
@@ -107,7 +107,7 @@ const adFlashStyles = `
     position: absolute;
     inset: 0;
     z-index: -1;
-    opacity: .22;
+    opacity: .16;
     background: linear-gradient(120deg, transparent 0 40%, rgba(255,255,255,.72) 48%, transparent 58%);
     transform: translateX(-80%);
     animation: sedifexAdShine 4.8s ease-in-out infinite;
@@ -177,17 +177,35 @@ const adFlashStyles = `
     min-height: 260px;
     border-radius: 1.1rem;
     overflow: hidden;
-    background-size: cover;
-    background-position: center;
+    background: rgba(255,255,255,.06);
     border: 1px solid rgba(255,255,255,.18);
     box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 22px 45px -32px rgba(0,0,0,.9);
   }
 
-  .homeAdVisual::before {
+  .homeAdVisual[data-has-image='true'] {
+    background: #0f172a;
+  }
+
+  .homeAdVisual[data-has-image='false'] {
+    background-size: cover;
+    background-position: center;
+  }
+
+  .homeAdVisual[data-has-image='false']::before {
     content: '';
     position: absolute;
     inset: 0;
     background: linear-gradient(180deg, transparent 0 46%, rgba(15,23,42,.92) 100%);
+  }
+
+  .homeAdImage {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 260px;
+    object-fit: contain;
+    object-position: center;
+    background: #0f172a;
   }
 
   .homeAdBadge {
@@ -201,15 +219,20 @@ const adFlashStyles = `
     gap: .75rem;
     color: #fff;
     font-weight: 950;
+    pointer-events: none;
   }
 
   .homeAdBadge span {
     display: inline-flex;
     border-radius: 999px;
     padding: .5rem .7rem;
-    background: rgba(255,255,255,.14);
+    background: rgba(15,23,42,.7);
     border: 1px solid rgba(255,255,255,.18);
     backdrop-filter: blur(10px);
+  }
+
+  .homeAdVisual[data-has-image='true'] .homeAdBadge {
+    opacity: .96;
   }
 
   .homeAdDots {
@@ -238,7 +261,7 @@ const adFlashStyles = `
 
   @keyframes sedifexAdShine {
     0%, 52% { transform: translateX(-85%); opacity: 0; }
-    64% { opacity: .24; }
+    64% { opacity: .18; }
     100% { transform: translateX(85%); opacity: 0; }
   }
 
@@ -248,7 +271,8 @@ const adFlashStyles = `
       min-height: auto;
     }
 
-    .homeAdVisual {
+    .homeAdVisual,
+    .homeAdImage {
       min-height: 190px;
       order: -1;
     }
@@ -355,31 +379,34 @@ export function HomeAdFlash() {
         ))}
       </div>
       <div className="homeAdTrack" style={{ transform: `translateX(-${Math.min(activeIndex, renderedSlides.length - 1) * 100}%)` }}>
-        {renderedSlides.map((slide, index) => (
-          <article key={`${slide.title}-${index}`} className="homeAdSlide" style={{ background: `linear-gradient(135deg, ${slide.accent}22, transparent 42%)` }}>
-            <div className="homeAdCopy">
-              <p className="eyebrow">{slide.eyebrow}</p>
-              <h2>{slide.title}</h2>
-              <p>{slide.text}</p>
-              <div className="homeAdActions">
-                <Link href={slide.href} className="homeAdPrimary" onClick={() => trackAdvertClick(slide)}>{slide.cta}</Link>
-                <Link href="/contact" className="homeAdSecondary">Advertise product</Link>
+        {renderedSlides.map((slide, index) => {
+          const hasImage = Boolean(slide.image);
+          return (
+            <article key={`${slide.title}-${index}`} className="homeAdSlide" style={{ background: `linear-gradient(135deg, ${slide.accent}22, transparent 42%)` }}>
+              <div className="homeAdCopy">
+                <p className="eyebrow">{slide.eyebrow}</p>
+                <h2>{slide.title}</h2>
+                <p>{slide.text}</p>
+                <div className="homeAdActions">
+                  <Link href={slide.href} className="homeAdPrimary" onClick={() => trackAdvertClick(slide)}>{slide.cta}</Link>
+                  <Link href="/contact" className="homeAdSecondary">Advertise product</Link>
+                </div>
               </div>
-            </div>
-            <div
-              className="homeAdVisual"
-              style={{
-                backgroundImage: `linear-gradient(135deg, ${slide.accent}d9, rgba(15,23,42,.62))${slide.image ? `, url('${slide.image}')` : ''}`,
-              }}
-              aria-label={`${slide.eyebrow} advert image area`}
-            >
-              <div className="homeAdBadge">
-                <span>{slide.badge}</span>
-                <span>{slide.sponsoredBy ? `By ${slide.sponsoredBy}` : activeSlide?.id ? 'Sponsored' : 'Sedifex Market'}</span>
+              <div
+                className="homeAdVisual"
+                data-has-image={hasImage}
+                style={!hasImage ? { backgroundImage: `linear-gradient(135deg, ${slide.accent}d9, rgba(15,23,42,.62))` } : undefined}
+                aria-label={`${slide.eyebrow} advert image area`}
+              >
+                {hasImage ? <img src={slide.image} alt={slide.title} className="homeAdImage" loading="lazy" /> : null}
+                <div className="homeAdBadge">
+                  <span>{slide.badge}</span>
+                  <span>{slide.sponsoredBy ? `By ${slide.sponsoredBy}` : activeSlide?.id ? 'Sponsored' : 'Sedifex Market'}</span>
+                </div>
               </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </div>
     </section>
   );
