@@ -7,6 +7,7 @@ import { LiveChatWidget } from '@/components/live-chat-widget';
 import { MarketplaceTrustCopyEnhancer } from '@/components/marketplace-trust-copy-enhancer';
 import { SiteFooter } from '@/components/site-footer';
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
+import { AnalyticsTracker } from '@/components/analytics-tracker';
 import { baseSeoKeywords, canonicalUrlForPath, defaultSocialImageUrl } from '@/lib/seo';
 import './globals.css';
 import './marketplace-size.css';
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${inter.variable} ${sora.variable}`}>
         <CustomerAuthProvider>
           <CartProvider>
+            <AnalyticsTracker />
             <WebVitalsReporter />
             <MarketplaceTrustCopyEnhancer />
             <AutoHideSiteHeader />
