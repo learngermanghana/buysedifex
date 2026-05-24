@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { collection, documentId, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db, firebaseConfigError } from '@/lib/firebase';
+import { getFulfillmentOptions } from '@/lib/fulfillment-options';
 import { getProductHref } from '@/lib/product-route';
 import { getStoreHref } from '@/lib/store-route';
 import { resolveClosestCategoryKey } from '@/lib/category-taxonomy';
@@ -117,7 +118,7 @@ const decodeImageValues = (value: unknown): string[] => {
 const normalizeImageUrl = (value: string): string => {
   const trimmed = value
     .trim()
-    .replace(/^['"]+|['"]+$/g, '')
+    .replace(/^[']+|[']+$/g, '')
     .replace(/\\u002F/gi, '/')
     .replace(/\\\//g, '/');
   if (!trimmed.toLowerCase().startsWith('gs://')) return trimmed;
@@ -293,6 +294,12 @@ export function HomeProductGrid() {
   const [visibleLimit, setVisibleLimit] = useState(INITIAL_VISIBLE_COUNT);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const fulfillmentOptions = useMemo(() => getFulfillmentOptions(), []);
+  const primaryDelivery = fulfillmentOptions[0];
+  const homeDeliveryLabel = primaryDelivery?.available ? 'Delivery before 4 PM today' : 'Delivery tomorrow';
+  const homeDeliveryHelper = primaryDelivery?.available
+    ? 'Order and pay before 4:00 PM for same-day delivery where the store can deliver. Pickup is also available.'
+    : 'Same-day delivery is closed for today. Choose tomorrow delivery or store pickup at checkout.';
 
   useEffect(() => {
     let active = true;
@@ -453,6 +460,7 @@ export function HomeProductGrid() {
                     </span>
                     <strong>{formatPrice(item.price, item.currency)}</strong>
                   </div>
+                  <p className="deliveryInfoCard" title={homeDeliveryHelper}>🚚 {homeDeliveryLabel} • 🏬 Pickup available</p>
                   {isVerifiedStore() ? <p className="trustScoreCard">🛡 Sedifex Trust+ 98%</p> : null}
                   <div className="cardActions">
                     <Link href={getProductHref(item.id, item.productName)} className="buyNowButton" aria-label={`Buy ${getProductName(item)} now`}>Buy now</Link>
