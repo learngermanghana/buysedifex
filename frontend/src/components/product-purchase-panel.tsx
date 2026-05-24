@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { getFulfillmentOptions } from '@/lib/fulfillment-options';
 import { useCart } from './cart-provider';
 
 type ProductPurchasePanelProps = {
@@ -26,11 +27,13 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
   const [message, setMessage] = useState('');
   const normalizedType = itemType?.trim().toLowerCase();
   const isServiceLike = normalizedType === 'service' || normalizedType === 'course' || normalizedType === 'event';
+  const fulfillmentOptions = useMemo(() => getFulfillmentOptions(), []);
+  const primaryDelivery = fulfillmentOptions[0];
 
   const addItem = (openAfterAdd = false) => {
     cart.addItem({ productId, merchantId, productName, itemName: productName, quantity, type: 'PRODUCT', price: price ?? null, currency, imageUrl, storeName });
-    setMessage('Product added.');
-    window.setTimeout(() => setMessage(''), 1800);
+    setMessage('Product added. Choose delivery or pickup in the cart.');
+    window.setTimeout(() => setMessage(''), 2200);
     if (openAfterAdd) cart.openCart();
   };
 
@@ -39,7 +42,15 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
       <p className="eyebrow">Secure checkout</p>
       <h3>{isServiceLike ? 'Book this service or class' : 'Buy this product'}</h3>
       <p className="productCartPrice">{formatMoney(price, currency)}</p>
-      <p className="checkoutHint">{isServiceLike ? 'Services and classes can be booked here with date, time, and registration details.' : 'Add this product to cart, continue shopping, or checkout when ready.'}</p>
+      <p className="checkoutHint">{isServiceLike ? 'Services and classes can be booked here with date, time, and registration details.' : 'Add this product to cart, choose same-day delivery, tomorrow delivery, or store pickup, then pay securely.'}</p>
+
+      {!isServiceLike ? (
+        <div className="fulfillmentPromise" style={{ border: '1px solid #dbeafe', background: '#eff6ff', borderRadius: 16, padding: 12, display: 'grid', gap: 8, margin: '12px 0' }}>
+          <strong>Delivery & pickup</strong>
+          <span>{primaryDelivery.available ? 'Same-day delivery available before 4:00 PM.' : 'Same-day delivery is closed now; delivery moves to tomorrow.'}</span>
+          <span>Store pickup is also available after Sedifex checkout.</span>
+        </div>
+      ) : null}
 
       {isServiceLike ? (
         <a className="requestButton" href="#service-booking-form">Book this service</a>
@@ -56,7 +67,7 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
         </>
       )}
 
-      {message ? <p className="requestFeedback success">{message} Open the cart to complete checkout.</p> : null}
+      {message ? <p className="requestFeedback success">{message}</p> : null}
       <p className="checkoutHint">Payment is confirmed after Paystack verification.</p>
     </aside>
   );
