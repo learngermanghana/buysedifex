@@ -13,6 +13,11 @@ type ProductPurchasePanelProps = {
   price?: number | null;
   currency?: string;
   imageUrl?: string;
+  deliveryOrigin?: string;
+  pickupAvailable?: boolean;
+  deliveryAvailable?: boolean;
+  sameDayDeliveryAvailable?: boolean;
+  sameDayCutoffTime?: string;
 };
 
 const formatMoney = (value?: number | null, currency = 'GHS') => {
@@ -21,7 +26,21 @@ const formatMoney = (value?: number | null, currency = 'GHS') => {
   return `${displayCurrency === 'GHS' ? 'GH₵' : displayCurrency} ${value.toFixed(2)}`;
 };
 
-export function ProductPurchasePanel({ productId, merchantId, productName, storeName, itemType, price, currency = 'GHS', imageUrl }: ProductPurchasePanelProps) {
+export function ProductPurchasePanel({
+  productId,
+  merchantId,
+  productName,
+  storeName,
+  itemType,
+  price,
+  currency = 'GHS',
+  imageUrl,
+  deliveryOrigin,
+  pickupAvailable,
+  deliveryAvailable,
+  sameDayDeliveryAvailable,
+  sameDayCutoffTime,
+}: ProductPurchasePanelProps) {
   const cart = useCart();
   const [quantity, setQuantity] = useState(1);
   const [message, setMessage] = useState('');
@@ -29,16 +48,20 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
   const isServiceLike = normalizedType === 'service' || normalizedType === 'course' || normalizedType === 'event';
   const fulfillmentOptions = useMemo(() => getFulfillmentOptions(), []);
   const primaryDelivery = fulfillmentOptions[0];
-  const deliveryPromiseTitle = primaryDelivery?.available
-    ? '🚚 Delivery before 4:00 PM'
-    : '🚚 Tomorrow delivery after 4:00 PM cutoff';
-  const deliveryPromiseHelper =
-    primaryDelivery?.helper ?? 'Choose delivery or store pickup at checkout after adding this product to cart.';
+  const cutoffLabel = sameDayCutoffTime || '4:00 PM';
+  const deliveryPromiseTitle = sameDayDeliveryAvailable === false
+    ? '🚚 Delivery fee confirmed before dispatch'
+    : primaryDelivery?.available
+      ? `🚚 Same-day delivery before ${cutoffLabel}`
+      : `🚚 Tomorrow delivery after ${cutoffLabel} cutoff`;
+  const deliveryPromiseHelper = deliveryOrigin
+    ? `This item ships from ${deliveryOrigin}. Delivery fee depends on your area and will be shown or confirmed before dispatch.`
+    : 'Delivery fee depends on your location. Sedifex support may confirm the fee before dispatch.';
 
   const addItem = (openAfterAdd = false) => {
-    cart.addItem({ productId, merchantId, productName, itemName: productName, quantity, type: 'PRODUCT', price: price ?? null, currency, imageUrl, storeName });
-    setMessage('Product added. Choose delivery or pickup in the cart.');
-    window.setTimeout(() => setMessage(''), 2200);
+    cart.addItem({ productId, merchantId, productName, itemName: productName, quantity, type: 'PRODUCT', price: price ?? null, currency, imageUrl, storeName, deliveryOrigin });
+    setMessage('Product added. Review delivery origin and choose delivery or pickup in the cart.');
+    window.setTimeout(() => setMessage(''), 2600);
     if (openAfterAdd) cart.openCart();
   };
 
@@ -55,13 +78,16 @@ export function ProductPurchasePanel({ productId, merchantId, productName, store
       <p className="eyebrow">Secure checkout</p>
       <h3>{isServiceLike ? 'Book this service or class' : 'Buy this product'}</h3>
       <p className="productCartPrice">{formatMoney(price, currency)}</p>
-      <p className="checkoutHint">{isServiceLike ? 'Services and classes can be booked here with date, time, and registration details.' : 'Add this product to cart, choose same-day delivery, tomorrow delivery, or store pickup, then pay securely.'}</p>
+      <p className="checkoutHint">{isServiceLike ? 'Services and classes can be booked here with date, time, and registration details.' : 'Add this product to cart, review where the store ships from, then choose delivery or pickup before paying.'}</p>
 
       {!isServiceLike ? (
         <div className="fulfillmentPromise" style={{ border: '1px solid #dbeafe', background: '#eff6ff', borderRadius: 16, padding: 12, display: 'grid', gap: 8, margin: '12px 0' }}>
           <strong>{deliveryPromiseTitle}</strong>
+          {deliveryOrigin ? <span>📍 Ships from: <strong>{deliveryOrigin}</strong></span> : <span>📍 Store delivery origin will be confirmed by Sedifex support.</span>}
           <span>{deliveryPromiseHelper}</span>
-          <span>🏬 Store pickup is also available after Sedifex checkout.</span>
+          {pickupAvailable !== false ? <span>🏬 Store pickup is available after Sedifex checkout confirmation.</span> : null}
+          {deliveryAvailable === false ? <span>⚠️ This seller may not support direct delivery. Sedifex will confirm pickup or courier options.</span> : null}
+          <span style={{ color: '#475569', fontSize: 12 }}>If delivery fee is confirmed manually and you do not accept it, you may cancel for a refund before dispatch.</span>
         </div>
       ) : null}
 
