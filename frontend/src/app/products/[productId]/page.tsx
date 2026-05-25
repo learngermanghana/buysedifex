@@ -22,11 +22,13 @@ type ProductPageProps = {
 
 const buildLocation = (city?: string, country?: string) => {
   const parts = [city, country].filter(Boolean);
-  if (parts.length === 0) {
-    return '';
-  }
-
+  if (parts.length === 0) return '';
   return ` in ${parts.join(', ')}`;
+};
+
+const buildLocationLabel = (...values: Array<string | undefined | null>) => {
+  const parts = values.map((value) => value?.trim()).filter((value): value is string => Boolean(value));
+  return Array.from(new Set(parts)).join(', ');
 };
 
 const normalizeDisplayCurrency = (currency?: string) => {
@@ -35,10 +37,7 @@ const normalizeDisplayCurrency = (currency?: string) => {
 };
 
 const sanitizePhoneForTel = (value?: string) => {
-  if (!value) {
-    return '';
-  }
-
+  if (!value) return '';
   return value.replace(/[^\d+]/g, '');
 };
 
@@ -91,7 +90,6 @@ const buildMetadataDescription = (input: {
   const displayCurrency = normalizeDisplayCurrency(input.currency);
   const currencyLabel = displayCurrency === 'GHS' ? 'Cedis (GH₵)' : displayCurrency;
   const priceText = input.price == null ? 'Price unavailable' : `${currencyLabel} ${input.price}`;
-
   return `Buy ${input.productName} from verified store ${input.storeName}${location}. Price: ${priceText}. Secure checkout on Sedifex Market.`;
 };
 
@@ -111,8 +109,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   const canonicalUrl = canonicalUrlForPath(canonicalPath);
   const title = `${product.productName}${buildLocation(product.city)} | ${product.storeName} | Sedifex Market`;
   const description = buildMetadataDescription(product);
-  const socialImages =
-    product.imageUrls.length > 0 ? product.imageUrls.map((url) => ({ url })) : [{ url: defaultSocialImageUrl() }];
+  const socialImages = product.imageUrls.length > 0 ? product.imageUrls.map((url) => ({ url })) : [{ url: defaultSocialImageUrl() }];
 
   return {
     title,
@@ -123,20 +120,8 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       product.categoryKey ? `${product.categoryKey.toLowerCase()} ghana` : 'buy products online ghana',
     ),
     alternates: { canonical: canonicalUrl },
-    openGraph: {
-      type: 'website',
-      url: canonicalUrl,
-      title,
-      description,
-      siteName: 'Sedifex Market',
-      images: socialImages,
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-      images: socialImages.map((image) => image.url),
-    },
+    openGraph: { type: 'website', url: canonicalUrl, title, description, siteName: 'Sedifex Market', images: socialImages },
+    twitter: { card: 'summary_large_image', title, description, images: socialImages.map((image) => image.url) },
   };
 }
 
@@ -144,15 +129,22 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const normalizedProductId = extractProductIdFromRouteParam(params.productId);
   const product = await getPublicProductById(normalizedProductId);
 
-  if (!product) {
-    notFound();
-  }
+  if (!product) notFound();
 
   const storeProfile = product.storeId ? await getStoreProfileById(product.storeId) : null;
   const resolvedStoreName = storeProfile?.storeName ?? product.storeName;
-  const resolvedLocation =
-    [storeProfile?.city ?? product.city, storeProfile?.country ?? product.country].filter(Boolean).join(', ') ||
-    'Location unavailable';
+  const publicLocation = buildLocationLabel(
+    storeProfile?.area,
+    product.publicLocationArea ?? product.area,
+    storeProfile?.city ?? product.publicLocationCity ?? product.city,
+    storeProfile?.country ?? product.publicLocationCountry ?? product.country,
+  ) || 'Location unavailable';
+  const deliveryOrigin = buildLocationLabel(
+    product.deliveryOriginArea ?? product.publicLocationArea ?? storeProfile?.area ?? product.area,
+    product.deliveryOriginCity ?? product.publicLocationCity ?? storeProfile?.city ?? product.city,
+    product.deliveryOriginCountry ?? product.publicLocationCountry ?? storeProfile?.country ?? product.country,
+  ) || publicLocation;
+  const pickupLocation = product.pickupAddress || storeProfile?.addressLine1 || publicLocation;
   const originalPrice = typeof (product as { originalPrice?: number }).originalPrice === 'number' ? (product as { originalPrice?: number }).originalPrice : null;
   const hasSedifexDeal = originalPrice != null && product.price != null && product.price < originalPrice;
   const resolvedStoreId = getStoreRouteId(storeProfile?.storeId ?? product.storeId, resolvedStoreName);
@@ -168,67 +160,36 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const bookingExplainer = serviceLike ? buildBookingExplainer({ isCourse: courseLike, storeName: resolvedStoreName, hasWebsite }) : null;
 
   const [sameStoreSameCategory, sameCategoryMarketplace, sameStoreItems, marketplaceFallback] = await Promise.all([
-    listIntegrationProducts({
-      storeId: product.storeId,
-      categoryKey: product.categoryKey,
-      pageSize: 12,
-      sort: 'latest',
-    }).catch(() => ({ items: [] })),
-    listIntegrationProducts({
-      categoryKey: product.categoryKey,
-      pageSize: 24,
-      sort: 'store-diverse',
-    }).catch(() => ({ items: [] })),
-    listIntegrationProducts({
-      storeId: product.storeId,
-      pageSize: 24,
-      sort: 'latest',
-    }).catch(() => ({ items: [] })),
-    listIntegrationProducts({
-      page: 1,
-      pageSize: 60,
-      sort: 'store-diverse',
-    }).catch(() => ({ items: [] })),
+    listIntegrationProducts({ storeId: product.storeId, categoryKey: product.categoryKey, pageSize: 12, sort: 'latest' }).catch(() => ({ items: [] })),
+    listIntegrationProducts({ categoryKey: product.categoryKey, pageSize: 24, sort: 'store-diverse' }).catch(() => ({ items: [] })),
+    listIntegrationProducts({ storeId: product.storeId, pageSize: 24, sort: 'latest' }).catch(() => ({ items: [] })),
+    listIntegrationProducts({ page: 1, pageSize: 60, sort: 'store-diverse' }).catch(() => ({ items: [] })),
   ]);
 
-  const relatedPool = Array.from(
-    new Map(
-      [
-        ...sameStoreSameCategory.items,
-        ...sameCategoryMarketplace.items,
-        ...sameStoreItems.items,
-        ...marketplaceFallback.items,
-      ]
-        .filter((item) => item.id && item.id !== product.id)
-        .map((item) => [item.id, item]),
-    ).values(),
-  ).map((item) => ({
-    id: item.id,
-    storeId: item.storeId,
-    storeName: item.storeName,
-    productName: item.productName,
-    categoryKey: item.categoryKey,
-    itemType: (item as { itemType?: string }).itemType,
-    price: item.price,
-    currency: item.currency,
-    imageUrls: item.imageUrls,
-    listingType: (item as { listingType?: string }).listingType,
-    serviceKind: (item as { serviceKind?: string }).serviceKind,
-    salesMode: (item as { salesMode?: string }).salesMode,
-    marketplaceEnabled: (item as { marketplaceEnabled?: boolean }).marketplaceEnabled,
-    public: (item as { public?: boolean }).public,
-  }));
+  const relatedPool = Array.from(new Map([...sameStoreSameCategory.items, ...sameCategoryMarketplace.items, ...sameStoreItems.items, ...marketplaceFallback.items]
+    .filter((item) => item.id && item.id !== product.id)
+    .map((item) => [item.id, item])).values()).map((item) => ({
+      id: item.id,
+      storeId: item.storeId,
+      storeName: item.storeName,
+      productName: item.productName,
+      categoryKey: item.categoryKey,
+      itemType: (item as { itemType?: string }).itemType,
+      price: item.price,
+      currency: item.currency,
+      imageUrls: item.imageUrls,
+      listingType: (item as { listingType?: string }).listingType,
+      serviceKind: (item as { serviceKind?: string }).serviceKind,
+      salesMode: (item as { salesMode?: string }).salesMode,
+      marketplaceEnabled: (item as { marketplaceEnabled?: boolean }).marketplaceEnabled,
+      public: (item as { public?: boolean }).public,
+    }));
 
   const productPath = getProductHref(product.id, product.productName);
   const productUrl = canonicalUrlForPath(productPath);
-  const sedifexWhatsAppText = encodeURIComponent(
-    `Hello Sedifex, I want to order ${product.productName} from ${resolvedStoreName}. Product link: ${productUrl}`,
-  );
+  const sedifexWhatsAppText = encodeURIComponent(`Hello Sedifex, I want to order ${product.productName} from ${resolvedStoreName}. Product link: ${productUrl}`);
   const storeUrl = storeHref ? canonicalUrlForPath(storeHref) : undefined;
-  const availability =
-    typeof product.stockCount === 'number' && product.stockCount <= 0
-      ? 'https://schema.org/OutOfStock'
-      : 'https://schema.org/InStock';
+  const availability = typeof product.stockCount === 'number' && product.stockCount <= 0 ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock';
   const jsonLd = [
     {
       '@context': 'https://schema.org',
@@ -238,15 +199,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       description: product.description,
       ...(product.imageUrls.length > 0 ? { image: product.imageUrls } : {}),
       ...(product.sku ? { sku: product.sku } : {}),
-      brand: {
-        '@type': 'Brand',
-        name: resolvedStoreName,
-      },
-      seller: {
-        '@type': 'Organization',
-        name: resolvedStoreName,
-        ...(storeUrl ? { url: storeUrl } : {}),
-      },
+      brand: { '@type': 'Brand', name: resolvedStoreName },
+      seller: { '@type': 'Organization', name: resolvedStoreName, ...(storeUrl ? { url: storeUrl } : {}) },
       ...(product.categoryKey ? { category: product.categoryKey } : {}),
       offers: {
         '@type': 'Offer',
@@ -255,10 +209,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         ...(product.price != null ? { price: product.price.toFixed(2) } : {}),
         availability,
         itemCondition: 'https://schema.org/NewCondition',
-        seller: {
-          '@type': 'Organization',
-          name: resolvedStoreName,
-        },
+        seller: { '@type': 'Organization', name: resolvedStoreName },
       },
     },
     {
@@ -275,14 +226,14 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const displayCurrency = normalizeDisplayCurrency(product.currency);
   const currencyLabel = displayCurrency === 'GHS' ? 'Cedis (GH₵)' : displayCurrency;
   const priceLabel = product.price == null ? 'Price unavailable' : `${currencyLabel} ${product.price.toFixed(2)}`;
-  const availabilityLabel =
-    typeof product.stockCount === 'number' ? (product.stockCount > 0 ? 'In stock' : 'Out of stock') : undefined;
+  const availabilityLabel = typeof product.stockCount === 'number' ? (product.stockCount > 0 ? 'In stock' : 'Out of stock') : undefined;
   const fulfillmentOptions = serviceLike ? [] : getFulfillmentOptions();
   const sameDayFulfillment = fulfillmentOptions[0];
-  const deliveryBadgeText = sameDayFulfillment?.available ? 'Same-day delivery before 4:00 PM' : 'Delivery tomorrow after 4:00 PM';
-  const deliveryHelperText = sameDayFulfillment?.available
-    ? 'Order and pay now, then choose same-day delivery at checkout where the store can deliver.'
-    : 'Same-day delivery is closed for today. Choose tomorrow delivery or store pickup at checkout.';
+  const cutoffLabel = product.sameDayCutoffTime || '4:00 PM';
+  const deliveryBadgeText = product.sameDayDeliveryAvailable === false ? 'Delivery fee confirmed before dispatch' : sameDayFulfillment?.available ? `Same-day delivery before ${cutoffLabel}` : `Delivery tomorrow after ${cutoffLabel}`;
+  const deliveryHelperText = deliveryOrigin !== 'Location unavailable'
+    ? `This item ships from ${deliveryOrigin}. Delivery fee depends on your area and will be shown or confirmed before dispatch.`
+    : 'Delivery fee depends on your location and may be confirmed manually by Sedifex support before dispatch.';
 
   return (
     <main className="productDetailPage">
@@ -293,63 +244,30 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             {product.imageUrls.length > 0 ? (
               <section className="productImageGrid" aria-label="Product images">
                 {product.imageUrls.map((imageUrl) => (
-                  <Image
-                    key={imageUrl}
-                    src={imageUrl}
-                    alt={product.imageAlt?.trim() || `${product.productName} at ${resolvedStoreName}`}
-                    loading="lazy"
-                    unoptimized
-                    className="productDetailImage"
-                    width={480}
-                    height={480}
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                  />
+                  <Image key={imageUrl} src={imageUrl} alt={product.imageAlt?.trim() || `${product.productName} at ${resolvedStoreName}`} loading="lazy" unoptimized className="productDetailImage" width={480} height={480} sizes="(max-width: 768px) 100vw, 33vw" />
                 ))}
               </section>
             ) : null}
             <div>
               <h1>{product.productName}</h1>
-              <p className="productTrustLine">
-                <strong>{resolvedStoreName}</strong> {isVerifiedStore ? <span className="verifiedBadge">Verified store</span> : null}
-              </p>
+              <p className="productTrustLine"><strong>{resolvedStoreName}</strong> {isVerifiedStore ? <span className="verifiedBadge">Verified store</span> : null}</p>
             </div>
 
             <div className="productStats">
               <p className="productPriceLine">{priceLabel}</p>
               {!serviceLike ? (
-                <div
-                  aria-label="Delivery and pickup options"
-                  style={{
-                    border: '1px solid #bfdbfe',
-                    background: 'linear-gradient(135deg, #eff6ff, #f0fdf4)',
-                    borderRadius: 18,
-                    padding: '12px 14px',
-                    display: 'grid',
-                    gap: 8,
-                  }}
-                >
+                <div aria-label="Delivery and pickup options" style={{ border: '1px solid #bfdbfe', background: 'linear-gradient(135deg, #eff6ff, #f0fdf4)', borderRadius: 18, padding: '12px 14px', display: 'grid', gap: 8 }}>
                   <strong style={{ color: '#0f172a' }}>🚚 {deliveryBadgeText}</strong>
-                  <span style={{ color: '#334155' }}>🏬 Store pickup available after checkout confirmation.</span>
+                  <span style={{ color: '#334155' }}>📍 Ships from: <strong>{deliveryOrigin}</strong></span>
+                  <span style={{ color: '#334155' }}>🏬 Pickup area: {pickupLocation}</span>
                   <small style={{ color: '#64748b', lineHeight: 1.55 }}>{deliveryHelperText}</small>
+                  <small style={{ color: '#64748b', lineHeight: 1.55 }}>If delivery fee is confirmed manually and you do not accept it, you may cancel for a refund before dispatch.</small>
                 </div>
               ) : null}
               {hasSedifexDeal ? <p><strong>Sedifex online deal:</strong> Order through Sedifex to get this price.</p> : null}
-              <p className="productTrustMessage">
-                {serviceLike
-                  ? `Online ${courseLike ? 'registrations' : 'bookings'} and payments are powered by Sedifex when completed through the ${courseLike ? 'school' : 'business'} website or Sedifex Market.`
-                  : 'Verified checkout and payment record on Sedifex.'}
-              </p>
-              {availabilityLabel && !serviceLike ? (
-                <p>
-                  <strong>Availability:</strong> {availabilityLabel}
-                </p>
-              ) : null}
-              {product.categoryKey ? (
-                <p>
-                  <strong>Category:</strong>{' '}
-                  <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link>
-                </p>
-              ) : null}
+              <p className="productTrustMessage">{serviceLike ? `Online ${courseLike ? 'registrations' : 'bookings'} and payments are powered by Sedifex when completed through the ${courseLike ? 'school' : 'business'} website or Sedifex Market.` : 'Verified checkout and payment record on Sedifex.'}</p>
+              {availabilityLabel && !serviceLike ? <p><strong>Availability:</strong> {availabilityLabel}</p> : null}
+              {product.categoryKey ? <p><strong>Category:</strong> <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link></p> : null}
             </div>
 
             {bookingExplainer ? (
@@ -357,53 +275,25 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
                 <p className="eyebrow">{bookingExplainer.title}</p>
                 <h2>{bookingExplainer.heading}</h2>
                 <p>{bookingExplainer.body}</p>
-                <ol>
-                  {bookingExplainer.steps.map((step) => <li key={step}>{step}</li>)}
-                </ol>
-                {hasWebsite ? (
-                  <a className="requestButton bookingExplainerButton" href={storeProfile?.websiteUrl} target="_blank" rel="noopener noreferrer">
-                    {bookingExplainer.websiteLabel}
-                  </a>
-                ) : (
-                  <p className="requestFeedback error">{bookingExplainer.missingWebsite}</p>
-                )}
+                <ol>{bookingExplainer.steps.map((step) => <li key={step}>{step}</li>)}</ol>
+                {hasWebsite ? <a className="requestButton bookingExplainerButton" href={storeProfile?.websiteUrl} target="_blank" rel="noopener noreferrer">{bookingExplainer.websiteLabel}</a> : <p className="requestFeedback error">{bookingExplainer.missingWebsite}</p>}
               </section>
             ) : null}
 
             <section className="productContentSection" aria-label="About this product">
               <h2>{serviceLike ? `About this ${courseLike ? 'course' : 'service'}` : 'About this product'}</h2>
-              {product.description ? (
-                <FormattedDescription text={product.description} className="formattedDescription" />
-              ) : (
-                <p>No description available for this {serviceLike ? (courseLike ? 'course' : 'service') : 'product'} yet.</p>
-              )}
+              {product.description ? <FormattedDescription text={product.description} className="formattedDescription" /> : <p>No description available for this {serviceLike ? (courseLike ? 'course' : 'service') : 'product'} yet.</p>}
             </section>
           </section>
 
           {!serviceLike ? (
-            <section
-              className="productStoreCard"
-              aria-label="Sedifex call to order"
-              style={{
-                border: '1px solid #fed7aa',
-                background: 'linear-gradient(135deg, #fff7ed, #ffffff)',
-              }}
-            >
+            <section className="productStoreCard" aria-label="Sedifex call to order" style={{ border: '1px solid #fed7aa', background: 'linear-gradient(135deg, #fff7ed, #ffffff)' }}>
               <p className="eyebrow">Call to order</p>
               <h2>Need help placing this order?</h2>
-              <p>
-                Call or WhatsApp Sedifex on <strong>{SEDIFEX_CALL_TO_ORDER_PHONE}</strong>. We will help you place this order on Sedifex Market, confirm delivery or pickup, and keep the order record on Sedifex.
-              </p>
+              <p>Call or WhatsApp Sedifex on <strong>{SEDIFEX_CALL_TO_ORDER_PHONE}</strong>. We will help you place this order on Sedifex Market, confirm delivery or pickup, and keep the order record on Sedifex.</p>
               <div className="productStoreActions">
                 <a className="requestButton" href={`tel:${SEDIFEX_CALL_TO_ORDER_TEL}`}>Call Sedifex</a>
-                <a
-                  className="secondaryButton"
-                  href={`https://wa.me/${SEDIFEX_CALL_TO_ORDER_WHATSAPP}?text=${sedifexWhatsAppText}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  WhatsApp Sedifex
-                </a>
+                <a className="secondaryButton" href={`https://wa.me/${SEDIFEX_CALL_TO_ORDER_WHATSAPP}?text=${sedifexWhatsAppText}`} target="_blank" rel="noopener noreferrer">WhatsApp Sedifex</a>
               </div>
               <p className="checkoutHint">Store phone numbers are not shown before Sedifex checkout so the sale stays inside Sedifex Market.</p>
             </section>
@@ -411,130 +301,53 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
           <section className="productStoreCard" aria-label="Store contact details">
             <h2>{courseLike ? 'School information' : serviceLike ? 'Business information' : 'Store information'}</h2>
-            <p>
-              <strong>Name:</strong> {resolvedStoreName}{' '}
-              {isVerifiedStore ? <span className="verifiedBadge">Verified</span> : null}
-            </p>
-            <p>
-              <strong>Location:</strong> {resolvedLocation}
-            </p>
-            <p>
-              <strong>Sedifex connection:</strong>{' '}
-              {serviceLike
-                ? `This ${courseLike ? 'school' : 'business'} can use Sedifex to manage online ${courseLike ? 'registrations' : 'bookings'}, payments, and records.`
-                : 'Customers can order through Sedifex Market or use the Sedifex call-to-order number for help placing the order.'}
-            </p>
-
+            <p><strong>Name:</strong> {resolvedStoreName} {isVerifiedStore ? <span className="verifiedBadge">Verified</span> : null}</p>
+            <p><strong>Store area:</strong> {publicLocation}</p>
+            {!serviceLike ? <p><strong>Delivery from:</strong> {deliveryOrigin}</p> : null}
+            {!serviceLike ? <p><strong>Pickup area:</strong> {pickupLocation}</p> : null}
+            <p><strong>Sedifex connection:</strong> {serviceLike ? `This ${courseLike ? 'school' : 'business'} can use Sedifex to manage online ${courseLike ? 'registrations' : 'bookings'}, payments, and records.` : 'Customers can order through Sedifex Market or use the Sedifex call-to-order number for help placing the order.'}</p>
             <div className="productStoreActions">
-              {hasStorePage ? (
-                <Link href={storeHref ?? '#'}>View store details</Link>
-              ) : null}
-              <ShareButton
-                className="secondaryButton"
-                url={getProductHref(product.id, product.productName)}
-                title={product.productName || 'Product on Sedifex'}
-                text={`Check out ${product.productName || 'this product'} on Sedifex.`}
-                label="Share product"
-              />
-              {hasWebsite ? (
-                <a href={storeProfile?.websiteUrl} target="_blank" rel="noopener noreferrer">
-                  {courseLike ? 'Visit school website' : serviceLike ? 'Visit business website' : 'Visit store website'}
-                </a>
-              ) : null}
+              {hasStorePage ? <Link href={storeHref ?? '#'}>View store details</Link> : null}
+              <ShareButton className="secondaryButton" url={getProductHref(product.id, product.productName)} title={product.productName || 'Product on Sedifex'} text={`Check out ${product.productName || 'this product'} on Sedifex.`} label="Share product" />
+              {hasWebsite ? <a href={storeProfile?.websiteUrl} target="_blank" rel="noopener noreferrer">{courseLike ? 'Visit school website' : serviceLike ? 'Visit business website' : 'Visit store website'}</a> : null}
             </div>
           </section>
 
           {!serviceLike ? (
-            <section
-              className="productStoreCard"
-              aria-label="Verified store trust details"
-              style={{
-                border: '1px solid #bbf7d0',
-                background: 'linear-gradient(135deg, #f0fdf4, #ffffff)',
-              }}
-            >
+            <section className="productStoreCard" aria-label="Verified store trust details" style={{ border: '1px solid #bbf7d0', background: 'linear-gradient(135deg, #f0fdf4, #ffffff)' }}>
               <p className="eyebrow">Verified Store</p>
               <h2>Buy with a Sedifex order record</h2>
-              <p>
-                Pay safely through Sedifex first. After payment, you receive an order record, receipt, and store follow-up details.
-              </p>
+              <p>Pay safely through Sedifex first. After payment, you receive an order record, receipt, and store follow-up details.</p>
               <ul>
                 <li>{isVerifiedStore ? 'Verified store listing' : 'Store listed on Sedifex Market'}</li>
-                <li>Store location shown: {resolvedLocation}</li>
+                <li>Store area shown: {publicLocation}</li>
+                <li>Delivery origin shown: {deliveryOrigin}</li>
                 <li>Secure Paystack checkout</li>
                 <li>Sedifex payment and order record</li>
                 <li>Receipt after payment</li>
               </ul>
-              <p className="checkoutHint">
-                If there is an issue, Sedifex can help trace the store, order, and payment record.
-              </p>
+              <p className="checkoutHint">If there is an issue, Sedifex can help trace the store, order, and payment record.</p>
             </section>
           ) : null}
 
           <section className="productStoreCard productWhyCard" aria-label={serviceLike ? 'Why use Sedifex powered booking' : 'Why order through Sedifex'}>
             <h2>{serviceLike ? `Why ${courseLike ? 'register' : 'book'} through a Sedifex-powered channel` : 'Why buy on Sedifex'}</h2>
             {serviceLike ? (
-              <ul>
-                <li>Verified {courseLike ? 'school' : 'business'} listing</li>
-                <li>{courseLike ? 'Registration' : 'Booking'} and payment records when completed online</li>
-                <li>Details are communicated to the {courseLike ? 'school' : 'business'} automatically</li>
-                <li>Cleaner follow-up between customer and {courseLike ? 'school' : 'business'}</li>
-                <li>Sedifex support if the online request has an issue</li>
-              </ul>
+              <ul><li>Verified {courseLike ? 'school' : 'business'} listing</li><li>{courseLike ? 'Registration' : 'Booking'} and payment records when completed online</li><li>Details are communicated to the {courseLike ? 'school' : 'business'} automatically</li><li>Cleaner follow-up between customer and {courseLike ? 'school' : 'business'}</li><li>Sedifex support if the online request has an issue</li></ul>
             ) : (
-              <ul>
-                <li>Verified store listing</li>
-                <li>Order receipt</li>
-                <li>Payment record</li>
-                <li>Store follow-up</li>
-                <li>Sedifex support if there is an issue</li>
-              </ul>
+              <ul><li>Verified store listing</li><li>Order receipt</li><li>Payment record</li><li>Store follow-up</li><li>Sedifex support if there is an issue</li></ul>
             )}
             <p className="checkoutHint">Need urgent help after placing an order? Call Sedifex on <a href={`tel:${SEDIFEX_CALL_TO_ORDER_TEL}`}>{SEDIFEX_CALL_TO_ORDER_PHONE}</a>.</p>
           </section>
 
-          <ProductEngagementPanel
-            publicProductId={product.id}
-            storeId={product.storeId}
-            sourceProductId={product.sourceProductId}
-            isPublished={product.isPublished}
-          />
-          <RelatedMarketplaceItems
-            currentItemId={product.id}
-            currentStoreId={product.storeId}
-            currentCategory={product.categoryKey}
-            currentListingType={productListingType ?? product.itemType}
-            currentItemType={product.itemType}
-            currentServiceKind={productServiceKind}
-            currentPrice={product.price}
-            items={relatedPool}
-          />
+          <ProductEngagementPanel publicProductId={product.id} storeId={product.storeId} sourceProductId={product.sourceProductId} isPublished={product.isPublished} />
+          <RelatedMarketplaceItems currentItemId={product.id} currentStoreId={product.storeId} currentCategory={product.categoryKey} currentListingType={productListingType ?? product.itemType} currentItemType={product.itemType} currentServiceKind={productServiceKind} currentPrice={product.price} items={relatedPool} />
         </div>
 
         {serviceLike ? (
-          <ServiceBookingPanel
-            productId={checkoutProductId}
-            merchantId={product.storeId ?? ''}
-            productName={product.productName}
-            price={product.price}
-            currency={product.currency}
-            whatsappPhone={storeProfile?.storeWhatsapp ?? storeProfile?.storePhone ?? product.waLink}
-            storeName={resolvedStoreName}
-            storeWebsiteUrl={storeProfile?.websiteUrl}
-            listingType={productListingType}
-            itemType={product.itemType}
-          />
+          <ServiceBookingPanel productId={checkoutProductId} merchantId={product.storeId ?? ''} productName={product.productName} price={product.price} currency={product.currency} whatsappPhone={storeProfile?.storeWhatsapp ?? storeProfile?.storePhone ?? product.waLink} storeName={resolvedStoreName} storeWebsiteUrl={storeProfile?.websiteUrl} listingType={productListingType} itemType={product.itemType} />
         ) : (
-          <ProductPurchasePanel
-            productId={checkoutProductId}
-            merchantId={product.storeId ?? ''}
-            productName={product.productName}
-            storeName={resolvedStoreName}
-            itemType={product.itemType}
-            price={product.price}
-            currency={product.currency}
-            imageUrl={product.imageUrls[0]}
-          />
+          <ProductPurchasePanel productId={checkoutProductId} merchantId={product.storeId ?? ''} productName={product.productName} storeName={resolvedStoreName} itemType={product.itemType} price={product.price} currency={product.currency} imageUrl={product.imageUrls[0]} deliveryOrigin={deliveryOrigin} pickupAvailable={product.pickupAvailable} deliveryAvailable={product.deliveryAvailable} sameDayDeliveryAvailable={product.sameDayDeliveryAvailable} sameDayCutoffTime={product.sameDayCutoffTime} />
         )}
       </div>
     </main>
