@@ -42,6 +42,10 @@ const sanitizePhoneForTel = (value?: string) => {
   return value.replace(/[^\d+]/g, '');
 };
 
+const SEDIFEX_CALL_TO_ORDER_PHONE = '059 505 4266';
+const SEDIFEX_CALL_TO_ORDER_TEL = sanitizePhoneForTel(SEDIFEX_CALL_TO_ORDER_PHONE);
+const SEDIFEX_CALL_TO_ORDER_WHATSAPP = '233595054266';
+
 const normalizedValues = (input: { itemType?: string; listingType?: string; serviceKind?: string; salesMode?: string }) =>
   [input.itemType, input.listingType, input.serviceKind, input.salesMode].map((v) => (v ?? '').trim().toLowerCase());
 
@@ -149,8 +153,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const resolvedLocation =
     [storeProfile?.city ?? product.city, storeProfile?.country ?? product.country].filter(Boolean).join(', ') ||
     'Location unavailable';
-  const resolvedStorePhone = storeProfile?.storePhone?.trim() || product.waLink?.trim() || 'Phone unavailable';
-  const storePhoneHref = sanitizePhoneForTel(storeProfile?.storePhone ?? product.waLink);
   const originalPrice = typeof (product as { originalPrice?: number }).originalPrice === 'number' ? (product as { originalPrice?: number }).originalPrice : null;
   const hasSedifexDeal = originalPrice != null && product.price != null && product.price < originalPrice;
   const resolvedStoreId = getStoreRouteId(storeProfile?.storeId ?? product.storeId, resolvedStoreName);
@@ -219,6 +221,9 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
   const productPath = getProductHref(product.id, product.productName);
   const productUrl = canonicalUrlForPath(productPath);
+  const sedifexWhatsAppText = encodeURIComponent(
+    `Hello Sedifex, I want to order ${product.productName} from ${resolvedStoreName}. Product link: ${productUrl}`,
+  );
   const storeUrl = storeHref ? canonicalUrlForPath(storeHref) : undefined;
   const availability =
     typeof product.stockCount === 'number' && product.stockCount <= 0
@@ -375,6 +380,35 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             </section>
           </section>
 
+          {!serviceLike ? (
+            <section
+              className="productStoreCard"
+              aria-label="Sedifex call to order"
+              style={{
+                border: '1px solid #fed7aa',
+                background: 'linear-gradient(135deg, #fff7ed, #ffffff)',
+              }}
+            >
+              <p className="eyebrow">Call to order</p>
+              <h2>Need help placing this order?</h2>
+              <p>
+                Call or WhatsApp Sedifex on <strong>{SEDIFEX_CALL_TO_ORDER_PHONE}</strong>. We will help you place this order on Sedifex Market, confirm delivery or pickup, and keep the order record on Sedifex.
+              </p>
+              <div className="productStoreActions">
+                <a className="requestButton" href={`tel:${SEDIFEX_CALL_TO_ORDER_TEL}`}>Call Sedifex</a>
+                <a
+                  className="secondaryButton"
+                  href={`https://wa.me/${SEDIFEX_CALL_TO_ORDER_WHATSAPP}?text=${sedifexWhatsAppText}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  WhatsApp Sedifex
+                </a>
+              </div>
+              <p className="checkoutHint">Store phone numbers are not shown before Sedifex checkout so the sale stays inside Sedifex Market.</p>
+            </section>
+          ) : null}
+
           <section className="productStoreCard" aria-label="Store contact details">
             <h2>{courseLike ? 'School information' : serviceLike ? 'Business information' : 'Store information'}</h2>
             <p>
@@ -388,7 +422,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               <strong>Sedifex connection:</strong>{' '}
               {serviceLike
                 ? `This ${courseLike ? 'school' : 'business'} can use Sedifex to manage online ${courseLike ? 'registrations' : 'bookings'}, payments, and records.`
-                : 'Order through Sedifex first to unlock direct store contact details.'}
+                : 'Customers can order through Sedifex Market or use the Sedifex call-to-order number for help placing the order.'}
             </p>
 
             <div className="productStoreActions">
@@ -456,7 +490,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
                 <li>Sedifex support if there is an issue</li>
               </ul>
             )}
-            {storePhoneHref ? <p className="checkoutHint">Need urgent help after placing an order? Call <a href={`tel:${storePhoneHref}`}>{resolvedStorePhone}</a>.</p> : null}
+            <p className="checkoutHint">Need urgent help after placing an order? Call Sedifex on <a href={`tel:${SEDIFEX_CALL_TO_ORDER_TEL}`}>{SEDIFEX_CALL_TO_ORDER_PHONE}</a>.</p>
           </section>
 
           <ProductEngagementPanel
