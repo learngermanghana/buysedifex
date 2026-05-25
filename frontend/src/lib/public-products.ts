@@ -13,6 +13,18 @@ export type PublicProductDetail = {
   stockCount?: number;
   city?: string;
   country?: string;
+  area?: string;
+  publicLocationArea?: string;
+  publicLocationCity?: string;
+  publicLocationCountry?: string;
+  deliveryOriginArea?: string;
+  deliveryOriginCity?: string;
+  deliveryOriginCountry?: string;
+  pickupAddress?: string;
+  pickupAvailable?: boolean;
+  deliveryAvailable?: boolean;
+  sameDayDeliveryAvailable?: boolean;
+  sameDayCutoffTime?: string;
   waLink?: string;
   verified?: boolean;
   isPublished?: boolean;
@@ -152,6 +164,18 @@ const productFromDocument = (doc: FirestoreDocument): PublicProductDetail => {
     stockCount: readNumber(fields, ['stockCount', 'stock']),
     city: readString(fields, ['city', 'storeCity', 'town']),
     country: readString(fields, ['country', 'storeCountry']),
+    area: readString(fields, ['area', 'locationArea', 'storeArea']),
+    publicLocationArea: readString(fields, ['publicLocationArea', 'area', 'locationArea', 'storeArea']),
+    publicLocationCity: readString(fields, ['publicLocationCity', 'city', 'storeCity', 'town']),
+    publicLocationCountry: readString(fields, ['publicLocationCountry', 'country', 'storeCountry']),
+    deliveryOriginArea: readString(fields, ['deliveryOriginArea', 'dispatchArea', 'pickupArea', 'publicLocationArea', 'area', 'locationArea']),
+    deliveryOriginCity: readString(fields, ['deliveryOriginCity', 'dispatchCity', 'pickupCity', 'publicLocationCity', 'city', 'storeCity', 'town']),
+    deliveryOriginCountry: readString(fields, ['deliveryOriginCountry', 'dispatchCountry', 'pickupCountry', 'publicLocationCountry', 'country', 'storeCountry']),
+    pickupAddress: readString(fields, ['pickupAddress', 'pickupLocation', 'publicPickupAddress']),
+    pickupAvailable: readBoolean(fields, ['pickupAvailable', 'allowPickup', 'storePickupAvailable']),
+    deliveryAvailable: readBoolean(fields, ['deliveryAvailable', 'allowDelivery', 'storeDeliveryAvailable']),
+    sameDayDeliveryAvailable: readBoolean(fields, ['sameDayDeliveryAvailable', 'sameDayDelivery', 'allowSameDayDelivery']),
+    sameDayCutoffTime: readString(fields, ['sameDayCutoffTime', 'deliveryCutoffTime', 'cutoffTime']),
     waLink: readString(fields, ['waLink', 'storePhone', 'phone', 'telephone', 'whatsappNumber']),
     verified: readBoolean(fields, ['verified']),
     isPublished: readBoolean(fields, ['isPublished', 'isVisible', 'isMarketplaceVisible']),
@@ -176,7 +200,14 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
     'productName', 'name', 'title', 'description', 'details', 'imageUrls', 'imageUrl', 'image',
     'serviceImageUrls', 'serviceImageUrl', 'serviceImage', 'imageAlt', 'price', 'amount', 'currency',
     'storeName', 'businessName', 'shopName', 'categoryKey', 'category', 'sku', 'stockCount', 'stock',
-    'city', 'storeCity', 'town', 'country', 'storeCountry', 'storeId', 'waLink', 'storePhone', 'phone',
+    'city', 'storeCity', 'town', 'country', 'storeCountry', 'area', 'locationArea', 'storeArea',
+    'publicLocationArea', 'publicLocationCity', 'publicLocationCountry', 'deliveryOriginArea',
+    'deliveryOriginCity', 'deliveryOriginCountry', 'dispatchArea', 'dispatchCity', 'dispatchCountry',
+    'pickupArea', 'pickupCity', 'pickupCountry', 'pickupAddress', 'pickupLocation', 'publicPickupAddress',
+    'pickupAvailable', 'allowPickup', 'storePickupAvailable', 'deliveryAvailable', 'allowDelivery',
+    'storeDeliveryAvailable', 'sameDayDeliveryAvailable', 'sameDayDelivery', 'allowSameDayDelivery',
+    'sameDayCutoffTime', 'deliveryCutoffTime', 'cutoffTime',
+    'storeId', 'waLink', 'storePhone', 'phone',
     'telephone', 'whatsappNumber', 'verified', 'isPublished', 'isVisible', 'isMarketplaceVisible',
     'sourceProductId', 'itemType', 'type', 'listingType', 'rankingScore',
   ];
