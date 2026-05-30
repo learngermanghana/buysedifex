@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 
 const copyReplacements = new Map([
-  ['View product', 'View product & buy'],
   ['Buy on Sedifex', 'Buy now'],
   ['Checkout with Paystack', 'Buy now - Checkout with Paystack'],
   ['Details will be confirmed by the seller during checkout.', 'Open the product page to review full details, seller information, and checkout options.'],

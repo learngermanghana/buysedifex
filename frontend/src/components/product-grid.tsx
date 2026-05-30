@@ -235,8 +235,7 @@ const resolveCtaLabel = (item: Pick<PublicProduct, 'listingType' | 'itemType' | 
   if (salesMode === 'request_quote') return 'Request quote';
   if (listingType === 'service') return 'Book now';
   if (listingType === 'course') return 'Register';
-  if (listingType === 'product' && salesMode === 'buy_now') return 'Buy now';
-  return listingType === 'product' ? 'View product' : 'View details';
+  return listingType === 'product' ? 'Buy now' : 'View details';
 };
 
 const sortProducts = (items: PublicProduct[], selectedSort: SortOption) => {
