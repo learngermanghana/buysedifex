@@ -41,6 +41,12 @@ test('sitemap and robots routes are present for SEO', () => {
 
   assert.match(sitemapSource, /MetadataRoute\.Sitemap/);
   assert.match(sitemapSource, /canonicalUrlForPath\('\/about'\)/);
+  assert.match(sitemapSource, /canonicalUrlForPath\('\/products'\)/);
+  assert.match(sitemapSource, /canonicalUrlForPath\('\/courses'\)/);
+  assert.match(sitemapSource, /canonicalUrlForPath\('\/category'\)/);
+  assert.match(sitemapSource, /listPublicCategoryKeys/);
+  assert.match(sitemapSource, /getProductHref\(product\.id, product\.productName, product\.listingType\)/);
+  assert.match(sitemapSource, /canonicalUrlForPath\(`\/category\/\$\{encodeURIComponent\(categoryKey\)\}`\)/);
   assert.match(sitemapSource, /canonicalUrlForPath\('\/search'\)/);
   assert.match(sitemapSource, /canonicalUrlForPath\('\/privacy'\)/);
   assert.match(sitemapSource, /canonicalUrlForPath\('\/terms'\)/);
