@@ -128,15 +128,20 @@ async function getDirectDoc(collectionName: string, reference: string) {
 
 async function getDirectNestedDoc(path: string[], label: string, reference: string) {
   if (!db || firebaseConfigError) return null;
-  const snapshot = await getDoc(doc(db, ...path, reference)).catch(() => null);
+  const [firstSegment, ...additionalSegments] = [...path, reference];
+  if (!firstSegment) return null;
+  const snapshot = await getDoc(doc(db, firstSegment, ...additionalSegments)).catch(() => null);
   return snapshot?.exists() ? snapshotRecord(label, snapshot.id, snapshot.data() as Record<string, unknown>) : null;
 }
 
 async function queryByReference(collectionPath: string[], label: string, reference: string) {
   if (!db || firebaseConfigError) return [] as GuestOrderRecord[];
+  const [firstSegment, ...additionalSegments] = collectionPath;
+  if (!firstSegment) return [] as GuestOrderRecord[];
+  const collectionReference = collection(db, firstSegment, ...additionalSegments);
   const results: GuestOrderRecord[] = [];
   for (const field of ['reference', 'paymentReference', 'payment_reference', 'clientOrderId', 'client_order_id']) {
-    const snapshot = await getDocs(query(collection(db, ...collectionPath), where(field, '==', reference), limit(3))).catch(() => null);
+    const snapshot = await getDocs(query(collectionReference, where(field, '==', reference), limit(3))).catch(() => null);
     snapshot?.docs.forEach((item) => results.push(snapshotRecord(label, item.id, item.data() as Record<string, unknown>)));
   }
   return results;
