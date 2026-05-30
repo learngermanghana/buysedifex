@@ -1,3 +1,9 @@
+export type PublicProductSitemapEntry = {
+  id: string;
+  productName: string;
+  listingType?: string;
+};
+
 export type PublicProductDetail = {
   id: string;
   storeId?: string;
@@ -224,7 +230,7 @@ export const getPublicProductById = async (productId: string): Promise<PublicPro
   return null;
 };
 
-export const listPublicProductIds = async (limitCount = 200): Promise<string[]> => {
+export const listPublicProductSitemapEntries = async (limitCount = 200): Promise<PublicProductSitemapEntry[]> => {
   if (!projectId) return [];
   const endpoint = new URL(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`);
   if (firebaseApiKey) endpoint.searchParams.set('key', firebaseApiKey);
@@ -234,7 +240,15 @@ export const listPublicProductIds = async (limitCount = 200): Promise<string[]> 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       structuredQuery: {
-        select: { fields: [{ fieldPath: 'publishedAt' }] },
+        select: { fields: [
+          { fieldPath: 'publishedAt' },
+          { fieldPath: 'productName' },
+          { fieldPath: 'name' },
+          { fieldPath: 'title' },
+          { fieldPath: 'listingType' },
+          { fieldPath: 'itemType' },
+          { fieldPath: 'type' },
+        ] },
         from: [{ collectionId: PRIMARY_COLLECTION }],
         where: {
           compositeFilter: {
@@ -251,7 +265,20 @@ export const listPublicProductIds = async (limitCount = 200): Promise<string[]> 
     next: { revalidate: 300 },
   });
 
-  if (!response.ok) throw new Error(`Failed to list public product ids. Status: ${response.status}`);
+  if (!response.ok) throw new Error(`Failed to list public product sitemap entries. Status: ${response.status}`);
   const rows = (await response.json()) as Array<{ document?: FirestoreDocument }>;
-  return rows.flatMap((row) => (row.document?.name ? [row.document.name.split('/').at(-1) ?? ''] : [])).filter((id) => id.length > 0);
+  return rows.flatMap((row) => {
+    const document = row.document;
+    const id = document?.name?.split('/').at(-1)?.trim() ?? '';
+    if (!document || !id) return [];
+    const fields = document.fields ?? {};
+    return [{
+      id,
+      productName: readString(fields, ['productName', 'name', 'title']) ?? 'Untitled item',
+      listingType: readString(fields, ['listingType', 'itemType', 'type']),
+    }];
+  });
 };
+
+export const listPublicProductIds = async (limitCount = 200): Promise<string[]> =>
+  (await listPublicProductSitemapEntries(limitCount)).map((entry) => entry.id);
