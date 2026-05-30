@@ -182,6 +182,10 @@ main { padding-top: var(--market-header-height); }
 .productDetailImage { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: .8rem; background: #eef2f7; }
 .productSummaryCard h1 { margin: .25rem 0 .5rem; font-size: clamp(2rem, 4vw, 3.4rem); }
 .productTrustLine { color: #334155; font-weight: 700; }
+.productLocalSeoCard { display: grid; gap: .65rem; padding: .95rem; border: 1px solid #bbf7d0; border-radius: .95rem; background: linear-gradient(135deg, #f0fdf4, #ffffff); }
+.productLocalSeoCard h2 { margin: 0; color: #0f172a; font-size: clamp(1.2rem, 2.4vw, 1.75rem); }
+.productLocalSeoCard ul { margin: 0; padding-left: 1.2rem; color: #253044; line-height: 1.6; }
+.productLocalSeoCard li::marker { color: #16a34a; }
 .formattedDescription { color: #1f2937; line-height: 1.7; }
 .productStats { display: grid; gap: .5rem; padding: .9rem; border-radius: .9rem; background: #fff7ed; border: 1px solid #fed7aa; }
 .productStats p { margin: 0; }

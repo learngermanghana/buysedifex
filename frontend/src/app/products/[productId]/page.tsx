@@ -105,7 +105,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     };
   }
 
-  const canonicalPath = getProductHref(product.id, product.productName);
+  const canonicalPath = getProductHref(product.id, product.productName, product.listingType);
   const canonicalUrl = canonicalUrlForPath(canonicalPath);
   const title = `${product.productName}${buildLocation(product.city)} | ${product.storeName} | Sedifex Market`;
   const description = buildMetadataDescription(product);
@@ -185,7 +185,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       public: (item as { public?: boolean }).public,
     }));
 
-  const productPath = getProductHref(product.id, product.productName);
+  const productPath = getProductHref(product.id, product.productName, productListingType);
   const productUrl = canonicalUrlForPath(productPath);
   const sedifexWhatsAppText = encodeURIComponent(`Hello Sedifex, I want to order ${product.productName} from ${resolvedStoreName}. Product link: ${productUrl}`);
   const storeUrl = storeHref ? canonicalUrlForPath(storeHref) : undefined;
@@ -234,6 +234,16 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const deliveryHelperText = deliveryOrigin !== 'Location unavailable'
     ? `This item ships from ${deliveryOrigin}. Delivery fee depends on your area and will be shown or confirmed before dispatch.`
     : 'Delivery fee depends on your location and may be confirmed manually by Sedifex support before dispatch.';
+  const localSeoLocation = buildLocationLabel(
+    storeProfile?.city ?? product.publicLocationCity ?? product.city,
+    storeProfile?.country ?? product.publicLocationCountry ?? product.country,
+  );
+  const visibleSeoHeading = localSeoLocation
+    ? `${serviceLike ? (courseLike ? 'Register for' : 'Book') : 'Buy'} ${product.productName} in ${localSeoLocation}`
+    : `${serviceLike ? (courseLike ? 'Register for' : 'Book') : 'Buy'} ${product.productName} on Sedifex Market`;
+  const visibleSeoCheckoutText = serviceLike
+    ? `Secure ${courseLike ? 'registration' : 'booking'} request with Sedifex follow-up records where available`
+    : 'Secure checkout with instant receipt';
 
   return (
     <main className="productDetailPage">
@@ -252,6 +262,15 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               <h1>{product.productName}</h1>
               <p className="productTrustLine"><strong>{resolvedStoreName}</strong> {isVerifiedStore ? <span className="verifiedBadge">Verified store</span> : null}</p>
             </div>
+
+            <section className="productLocalSeoCard" aria-label="Local purchase and checkout details">
+              <h2>{visibleSeoHeading}</h2>
+              <ul>
+                <li>Available from {isVerifiedStore ? 'verified store' : 'listed store'} {resolvedStoreName}</li>
+                {!serviceLike ? <li>{product.sameDayDeliveryAvailable === false ? 'Delivery timing confirmed before dispatch where available' : 'Same-day delivery before 4PM where available'}</li> : null}
+                <li>{visibleSeoCheckoutText}</li>
+              </ul>
+            </section>
 
             <div className="productStats">
               <p className="productPriceLine">{priceLabel}</p>
@@ -308,7 +327,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             <p><strong>Sedifex connection:</strong> {serviceLike ? `This ${courseLike ? 'school' : 'business'} can use Sedifex to manage online ${courseLike ? 'registrations' : 'bookings'}, payments, and records.` : 'Customers can order through Sedifex Market or use the Sedifex call-to-order number for help placing the order.'}</p>
             <div className="productStoreActions">
               {hasStorePage ? <Link href={storeHref ?? '#'}>View store details</Link> : null}
-              <ShareButton className="secondaryButton" url={getProductHref(product.id, product.productName)} title={product.productName || 'Product on Sedifex'} text={`Check out ${product.productName || 'this product'} on Sedifex.`} label="Share product" />
+              <ShareButton className="secondaryButton" url={productPath} title={product.productName || 'Product on Sedifex'} text={`Check out ${product.productName || 'this product'} on Sedifex.`} label="Share product" />
               {hasWebsite ? <a href={storeProfile?.websiteUrl} target="_blank" rel="noopener noreferrer">{courseLike ? 'Visit school website' : serviceLike ? 'Visit business website' : 'Visit store website'}</a> : null}
             </div>
           </section>

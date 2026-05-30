@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { Inter, Sora } from 'next/font/google';
 import { CartProvider } from '@/components/cart-provider';
 import { CustomerAuthProvider } from '@/components/customer-auth-provider';
@@ -51,11 +52,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <script
+        <Script
           async
+          strategy="afterInteractive"
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8991390842894141"
           crossOrigin="anonymous"
-        ></script>
+        />
       </head>
       <body className={`${inter.variable} ${sora.variable}`}>
         <CustomerAuthProvider>
