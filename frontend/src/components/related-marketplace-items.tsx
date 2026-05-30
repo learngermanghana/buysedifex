@@ -62,8 +62,7 @@ const getCta = (item: MarketplaceItem) => {
   const kind = getKind(item);
   if (kind === 'service') return 'Book service';
   if (kind === 'course' || kind === 'event') return 'Register';
-  if (lower(item.salesMode) === 'buy_now') return 'Buy now';
-  return 'View product';
+  return 'Buy now';
 };
 
 const scoreItem = (item: MarketplaceItem, current: RelatedMarketplaceItemsProps) => {
