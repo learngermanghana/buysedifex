@@ -61,20 +61,20 @@ const buildBookingExplainer = (input: { isCourse: boolean; storeName: string; ha
     return {
       title: 'How to register',
       heading: 'Register through the school website',
-      body: `Visit ${input.storeName} website, open the registration or courses page, select this course, and complete your application or payment online. Online registrations and payments are connected to Sedifex, so the school receives your details automatically.`,
-      steps: ['Visit the school website.', 'Open Registration, Courses, or Apply.', 'Select this course.', 'Submit your application or payment online.', 'The school receives your details through Sedifex.'],
+      body: `Visit ${input.storeName} website, open the registration or courses page, select this course, and complete your registration directly with the school. Sedifex Market does not take course payments on this page.`,
+      steps: ['Visit the school website.', 'Open Registration, Courses, or Apply.', 'Select this course.', 'Complete registration directly with the school.'],
       websiteLabel: 'Visit school website',
-      missingWebsite: 'This school has not added a website link yet. Use the Sedifex request option on this page.',
+      missingWebsite: 'This school has not added a website link yet. Contact the school directly to complete registration.',
     };
   }
 
   return {
     title: 'How to book',
     heading: 'Book through the business website',
-    body: `Visit ${input.storeName} website, open the booking or services page, select this service, and complete your booking or payment online. Online bookings and payments are connected to Sedifex, so the business receives your request automatically.`,
-    steps: ['Visit the business website.', 'Open Booking, Services, or Appointments.', 'Select this service.', 'Submit your booking or payment online.', 'The business receives your request through Sedifex.'],
+    body: `Visit ${input.storeName} website, open the booking or services page, select this service, and complete your booking directly with the business. Sedifex Market does not take service payments on this page.`,
+    steps: ['Visit the business website.', 'Open Booking, Services, or Appointments.', 'Select this service.', 'Complete booking directly with the business.'],
     websiteLabel: 'Visit business website',
-    missingWebsite: 'This business has not added a website link yet. Use the Sedifex request option on this page.',
+    missingWebsite: 'This business has not added a website link yet. Contact the business directly to complete booking.',
   };
 };
 
@@ -242,7 +242,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     ? `${serviceLike ? (courseLike ? 'Register for' : 'Book') : 'Buy'} ${product.productName} in ${localSeoLocation}`
     : `${serviceLike ? (courseLike ? 'Register for' : 'Book') : 'Buy'} ${product.productName} on Sedifex Market`;
   const visibleSeoCheckoutText = serviceLike
-    ? `Secure ${courseLike ? 'registration' : 'booking'} request with Sedifex follow-up records where available`
+    ? `${courseLike ? 'Registration' : 'Booking'} is completed directly on the ${courseLike ? 'school' : 'business'} website`
     : 'Secure checkout with instant receipt';
 
   return (
@@ -284,7 +284,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
                 </div>
               ) : null}
               {hasSedifexDeal ? <p><strong>Sedifex online deal:</strong> Order through Sedifex to get this price.</p> : null}
-              <p className="productTrustMessage">{serviceLike ? `Online ${courseLike ? 'registrations' : 'bookings'} and payments are powered by Sedifex when completed through the ${courseLike ? 'school' : 'business'} website or Sedifex Market.` : 'Verified checkout and payment record on Sedifex.'}</p>
+              <p className="productTrustMessage">{serviceLike ? `${courseLike ? 'Registration' : 'Booking'} and any payment happen directly on the ${courseLike ? 'school' : 'business'} website; Sedifex Market does not take payment for this listing.` : 'Verified checkout and payment record on Sedifex.'}</p>
               {availabilityLabel && !serviceLike ? <p><strong>Availability:</strong> {availabilityLabel}</p> : null}
               {product.categoryKey ? <p><strong>Category:</strong> <Link href={`/category/${encodeURIComponent(product.categoryKey)}`}>{product.categoryKey}</Link></p> : null}
             </div>
@@ -324,7 +324,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             <p><strong>Store area:</strong> {publicLocation}</p>
             {!serviceLike ? <p><strong>Delivery from:</strong> {deliveryOrigin}</p> : null}
             {!serviceLike ? <p><strong>Pickup area:</strong> {pickupLocation}</p> : null}
-            <p><strong>Sedifex connection:</strong> {serviceLike ? `This ${courseLike ? 'school' : 'business'} can use Sedifex to manage online ${courseLike ? 'registrations' : 'bookings'}, payments, and records.` : 'Customers can order through Sedifex Market or use the Sedifex call-to-order number for help placing the order.'}</p>
+            <p><strong>Sedifex connection:</strong> {serviceLike ? `Sedifex Market lists this ${courseLike ? 'course' : 'service'} for discovery. Customers continue to the ${courseLike ? 'school' : 'business'} website for ${courseLike ? 'registration' : 'booking'} and any payment.` : 'Customers can order through Sedifex Market or use the Sedifex call-to-order number for help placing the order.'}</p>
             <div className="productStoreActions">
               {hasStorePage ? <Link href={storeHref ?? '#'}>View store details</Link> : null}
               <ShareButton className="secondaryButton" url={productPath} title={product.productName || 'Product on Sedifex'} text={`Check out ${product.productName || 'this product'} on Sedifex.`} label="Share product" />
@@ -349,14 +349,14 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             </section>
           ) : null}
 
-          <section className="productStoreCard productWhyCard" aria-label={serviceLike ? 'Why use Sedifex powered booking' : 'Why order through Sedifex'}>
-            <h2>{serviceLike ? `Why ${courseLike ? 'register' : 'book'} through a Sedifex-powered channel` : 'Why buy on Sedifex'}</h2>
+          <section className="productStoreCard productWhyCard" aria-label={serviceLike ? 'Why use Sedifex discovery' : 'Why order through Sedifex'}>
+            <h2>{serviceLike ? `Why find this ${courseLike ? 'course' : 'service'} on Sedifex` : 'Why buy on Sedifex'}</h2>
             {serviceLike ? (
-              <ul><li>Verified {courseLike ? 'school' : 'business'} listing</li><li>{courseLike ? 'Registration' : 'Booking'} and payment records when completed online</li><li>Details are communicated to the {courseLike ? 'school' : 'business'} automatically</li><li>Cleaner follow-up between customer and {courseLike ? 'school' : 'business'}</li><li>Sedifex support if the online request has an issue</li></ul>
+              <ul><li>Verified {courseLike ? 'school' : 'business'} listing</li><li>Direct link to the official {courseLike ? 'school' : 'business'} website where available</li><li>No Sedifex Market payment is collected for this {courseLike ? 'course' : 'service'}</li><li>Customers complete {courseLike ? 'registration' : 'booking'} directly with the {courseLike ? 'school' : 'business'}</li></ul>
             ) : (
               <ul><li>Verified store listing</li><li>Order receipt</li><li>Payment record</li><li>Store follow-up</li><li>Sedifex support if there is an issue</li></ul>
             )}
-            <p className="checkoutHint">Need urgent help after placing an order? Call Sedifex on <a href={`tel:${SEDIFEX_CALL_TO_ORDER_TEL}`}>{SEDIFEX_CALL_TO_ORDER_PHONE}</a>.</p>
+            <p className="checkoutHint">{serviceLike ? `Use the official ${courseLike ? 'school' : 'business'} website button above to continue.` : <>Need urgent help after placing an order? Call Sedifex on <a href={`tel:${SEDIFEX_CALL_TO_ORDER_TEL}`}>{SEDIFEX_CALL_TO_ORDER_PHONE}</a>.</>}</p>
           </section>
 
           <ProductEngagementPanel publicProductId={product.id} storeId={product.storeId} sourceProductId={product.sourceProductId} isPublished={product.isPublished} />
