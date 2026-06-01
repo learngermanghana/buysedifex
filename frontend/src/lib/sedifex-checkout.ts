@@ -268,6 +268,18 @@ const getBaseTotalMinor = (preview: SedifexCheckoutPreviewResponse) => {
   return 0;
 };
 
+const calculateCustomerProcessingFeeMinor = (baseTotalMinor: number, feePercent: number) => {
+  if (!baseTotalMinor || feePercent <= 0) return 0;
+
+  const rate = feePercent / 100;
+
+  if (rate >= 1) {
+    throw new Error('Processing fee percent must be less than 100.');
+  }
+
+  return Math.max(0, Math.ceil(baseTotalMinor / (1 - rate)) - baseTotalMinor);
+};
+
 export const applyMarketplaceFeeModel = (
   pricingSnapshot: SedifexCheckoutPreviewResponse,
   items: CheckoutItem[],
@@ -279,7 +291,10 @@ export const applyMarketplaceFeeModel = (
     itemType === 'service' ? 'SEDIFEX_MARKET_SERVICE_COMMISSION_PERCENT' : 'SEDIFEX_MARKET_PRODUCT_COMMISSION_PERCENT',
     itemType === 'service' ? 5 : 3,
   );
-  const customerProcessingFeeMinor = Math.round((baseTotalMinor * customerProcessingFeePercent) / 100);
+  const customerProcessingFeeMinor = calculateCustomerProcessingFeeMinor(
+    baseTotalMinor,
+    customerProcessingFeePercent,
+  );
   const sedifexCommissionMinor = Math.round((baseTotalMinor * sedifexCommissionPercent) / 100);
   const customerFinalTotalMinor = baseTotalMinor + customerProcessingFeeMinor;
   const estimatedMerchantGrossMinor = baseTotalMinor;
@@ -343,6 +358,11 @@ const buildPaystackSplitPayload = (routing?: MerchantPaymentRouting | null, prev
     subaccount: cleaned.paystackSubaccountCode,
     paystackSubaccountCode: cleaned.paystackSubaccountCode,
     paystack_subaccount_code: cleaned.paystackSubaccountCode,
+
+    bearer: 'subaccount',
+    transaction_charge: typeof sedifexCommissionMinor === 'number' ? sedifexCommissionMinor : undefined,
+    transactionChargeMinor: typeof sedifexCommissionMinor === 'number' ? sedifexCommissionMinor : null,
+
     splitPayment: {
       provider: 'paystack',
       mode: 'subaccount',
@@ -350,8 +370,10 @@ const buildPaystackSplitPayload = (routing?: MerchantPaymentRouting | null, prev
       percentageCharge: cleaned.percentageCharge,
       commissionControlledBy: cleaned.commissionControlledBy,
       transactionChargeMinor: typeof sedifexCommissionMinor === 'number' ? sedifexCommissionMinor : null,
+      transaction_charge: typeof sedifexCommissionMinor === 'number' ? sedifexCommissionMinor : null,
       bearer: 'subaccount',
     },
+
     paymentRouting: cleaned,
   };
 };
