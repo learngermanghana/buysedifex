@@ -46,15 +46,60 @@ const readFirstItemName = (cart: CheckoutItem[]) => {
 
 const readMerchantPaymentRouting = async (merchantId: string): Promise<MerchantPaymentRouting | null> => {
   if (!db || firebaseConfigError) return null;
-  const storeSnap = await getDoc(doc(db, 'storeSettings', merchantId)).catch(() => null);
-  const fallbackSnap = storeSnap?.exists() ? storeSnap : await getDoc(doc(db, 'stores', merchantId)).catch(() => null);
-  if (!fallbackSnap?.exists()) return null;
-  const data = fallbackSnap.data() as Record<string, unknown>;
-  const routing = data.paymentRouting && typeof data.paymentRouting === 'object' ? (data.paymentRouting as MerchantPaymentRouting) : null;
-  const directSubaccount = cleanText(data.paystackSubaccountCode, 120);
-  if (routing) return routing;
+
+  const [storeSnap, settingsSnap] = await Promise.all([
+    getDoc(doc(db, 'stores', merchantId)).catch(() => null),
+    getDoc(doc(db, 'storeSettings', merchantId)).catch(() => null),
+  ]);
+
+  const storeData = storeSnap?.exists() ? (storeSnap.data() as Record<string, unknown>) : {};
+  const settingsData = settingsSnap?.exists() ? (settingsSnap.data() as Record<string, unknown>) : {};
+
+  const routingFromStore =
+    storeData.paymentRouting && typeof storeData.paymentRouting === 'object'
+      ? (storeData.paymentRouting as MerchantPaymentRouting)
+      : null;
+
+  const routingFromSettings =
+    settingsData.paymentRouting && typeof settingsData.paymentRouting === 'object'
+      ? (settingsData.paymentRouting as MerchantPaymentRouting)
+      : null;
+
+  const directSubaccount =
+    cleanText(storeData.paystackSubaccountCode, 120) ||
+    cleanText(settingsData.paystackSubaccountCode, 120);
+
+  const routing = routingFromStore ?? routingFromSettings;
+
+  if (routing) {
+    const routingSubaccount =
+      cleanText(routing.paystackSubaccountCode, 120) ||
+      cleanText(routing.subaccountCode, 120) ||
+      directSubaccount;
+
+    if (!routingSubaccount) return null;
+
+    return {
+      ...routing,
+      provider: routing.provider ?? 'paystack',
+      settlementMode: routing.settlementMode ?? 'subaccount',
+      paystackSubaccountCode: routingSubaccount,
+      subaccountCode: routingSubaccount,
+      commissionControlledBy: routing.commissionControlledBy ?? 'sedifex',
+      status: routing.status ?? 'active',
+    };
+  }
+
   return directSubaccount
-    ? { provider: 'paystack', settlementMode: 'subaccount', paystackSubaccountCode: directSubaccount, subaccountCode: directSubaccount, commissionControlledBy: 'sedifex', status: 'active' }
+    ? {
+        provider: 'paystack',
+        settlementMode: 'subaccount',
+        paystackSubaccountCode: directSubaccount,
+        subaccountCode: directSubaccount,
+        commissionControlledBy: 'sedifex',
+        percentageCharge: 3,
+        status: 'active',
+      }
     : null;
 };
 
