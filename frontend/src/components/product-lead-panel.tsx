@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { addPurchaseHistoryItem, getSignedInCustomerProfile, getSignedInUserId, subscribeToAuth } from '@/lib/customer-auth';
+import { CHECKOUT_PHONE_PATTERN, validateCheckoutCustomer } from '@/lib/checkout-customer-validation';
 
 type ProductLeadPanelProps = {
   productId: string;
@@ -140,6 +141,9 @@ export function ProductLeadPanel({ productId, merchantId, productName, storeName
     setManualReference('');
 
     try {
+      const customerValidation = validateCheckoutCustomer({ name: formState.customerName, email: formState.email, phone: formState.phone });
+      if (!customerValidation.valid) throw new Error(customerValidation.firstError);
+      const validatedCustomer = customerValidation.customer;
       const quantity = isService ? 1 : normalizeCheckoutQuantity(formState.quantity);
       const checkoutType = normalizeCheckoutItemType(itemType);
       const isOnlinePayment = formState.paymentMethod === 'online';
@@ -152,9 +156,9 @@ export function ProductLeadPanel({ productId, merchantId, productName, storeName
           body: JSON.stringify({
             cart: [{ productId, merchantId, quantity, type: checkoutType, productName, serviceName: checkoutType === 'SERVICE' ? productName : undefined, itemName: productName }],
             customer: {
-              name: formState.customerName.trim(),
-              email: formState.email.trim(),
-              phone: formState.phone.trim(),
+              name: validatedCustomer.name,
+              email: validatedCustomer.email,
+              phone: validatedCustomer.phone,
             },
             booking: isService
               ? {
@@ -181,9 +185,9 @@ export function ProductLeadPanel({ productId, merchantId, productName, storeName
             serviceId: productId,
             serviceName: productName,
             customer: {
-              name: formState.customerName.trim(),
-              email: formState.email.trim(),
-              phone: formState.phone.trim(),
+              name: validatedCustomer.name,
+              email: validatedCustomer.email,
+              phone: validatedCustomer.phone,
             },
             booking: {
               preferredDate: formState.preferredDate.trim(),
@@ -211,9 +215,9 @@ export function ProductLeadPanel({ productId, merchantId, productName, storeName
             unitPrice: price ?? null,
             currency: currency ?? 'GHS',
             customer: {
-              name: formState.customerName.trim(),
-              email: formState.email.trim(),
-              phone: formState.phone.trim(),
+              name: validatedCustomer.name,
+              email: validatedCustomer.email,
+              phone: validatedCustomer.phone,
             },
             delivery: {
               location: formState.deliveryLocation.trim(),
@@ -235,8 +239,9 @@ export function ProductLeadPanel({ productId, merchantId, productName, storeName
           productId,
           productName,
           storeName,
-          customerName: formState.customerName.trim(),
-          contact: `${formState.phone.trim()} | ${formState.email.trim()}`,
+          customerName: validatedCustomer.name,
+          contact: `${validatedCustomer.phone} | ${validatedCustomer.email}`,
+          customer: validatedCustomer,
           companyName: storeName,
           quantity,
           paymentMethod: formState.paymentMethod,
@@ -331,13 +336,13 @@ export function ProductLeadPanel({ productId, merchantId, productName, storeName
 
       <form id="service-booking-form" className="requestForm" onSubmit={onSubmit}>
         <label htmlFor="checkout-name">Full name</label>
-        <input id="checkout-name" name="customerName" type="text" required value={formState.customerName} onChange={(event) => setFormState((current) => ({ ...current, customerName: event.target.value }))} />
+        <input id="checkout-name" name="customerName" type="text" required autoComplete="name" minLength={4} maxLength={100} value={formState.customerName} onChange={(event) => setFormState((current) => ({ ...current, customerName: event.target.value }))} />
 
         <label htmlFor="checkout-email">Email address</label>
-        <input id="checkout-email" name="email" type="email" required value={formState.email} onChange={(event) => setFormState((current) => ({ ...current, email: event.target.value }))} placeholder="name@example.com" />
+        <input id="checkout-email" name="email" type="email" required autoComplete="email" maxLength={220} value={formState.email} onChange={(event) => setFormState((current) => ({ ...current, email: event.target.value }))} placeholder="name@example.com" />
 
         <label htmlFor="checkout-phone">Phone number</label>
-        <input id="checkout-phone" name="phone" type="tel" pattern="[+0-9\s()\-]{7,}" required value={formState.phone} onChange={(event) => setFormState((current) => ({ ...current, phone: event.target.value }))} placeholder="+233 20 000 0000" />
+        <input id="checkout-phone" name="phone" type="tel" required autoComplete="tel" pattern={CHECKOUT_PHONE_PATTERN} title="Use a Ghana number such as 0241234567 or an international number beginning with +" maxLength={20} value={formState.phone} onChange={(event) => setFormState((current) => ({ ...current, phone: event.target.value }))} placeholder="0241234567 or +233241234567" />
 
         <label htmlFor="checkout-payment">Payment method</label>
         <select id="checkout-payment" name="paymentMethod" required value={formState.paymentMethod} onChange={(event) => setFormState((current) => ({ ...current, paymentMethod: event.target.value }))}>

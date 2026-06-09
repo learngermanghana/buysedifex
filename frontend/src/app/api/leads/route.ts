@@ -1,6 +1,7 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, firebaseConfigError } from '@/lib/firebase';
+import { validateCheckoutCustomer } from '@/lib/checkout-customer-validation';
 
 type LeadPayload = {
   productId?: string;
@@ -51,18 +52,23 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, leadReference: docRef.id });
   }
+  const customerValidation = validateCheckoutCustomer({
+    name: body.customer?.name ?? body.customerName,
+    email: body.customer?.email,
+    phone: body.customer?.phone,
+  });
+
   if (
     !isNonEmptyString(body.productId) ||
     !isNonEmptyString(body.productName) ||
-    !isNonEmptyString(body.customerName) ||
-    !isNonEmptyString(body.contact) ||
+    !customerValidation.valid ||
     !isNonEmptyString(body.paymentMethod) ||
     !isNonEmptyString(body.deliveryLocation) ||
     typeof body.quantity !== 'number' ||
     Number.isNaN(body.quantity) ||
     body.quantity < 1
   ) {
-    return NextResponse.json({ error: 'Invalid checkout payload' }, { status: 400 });
+    return NextResponse.json({ error: customerValidation.firstError || 'Invalid checkout payload', fieldErrors: customerValidation.errors }, { status: 400 });
   }
 
   if (!db || firebaseConfigError) {
@@ -72,8 +78,9 @@ export async function POST(request: NextRequest) {
   const lead = {
     productId: body.productId.trim(),
     productName: body.productName.trim(),
-    customerName: body.customerName.trim(),
-    contact: body.contact.trim(),
+    customerName: customerValidation.customer.name,
+    contact: `${customerValidation.customer.phone} | ${customerValidation.customer.email}`,
+    customer: customerValidation.customer,
     companyName: isNonEmptyString(body.companyName) ? body.companyName.trim() : '',
     paymentMethod: body.paymentMethod.trim(),
     deliveryLocation: body.deliveryLocation.trim(),
