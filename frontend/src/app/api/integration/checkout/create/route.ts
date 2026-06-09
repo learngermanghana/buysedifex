@@ -1,6 +1,7 @@
 import { collection, doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, firebaseConfigError } from '@/lib/firebase';
+import { validateCheckoutCustomer } from '@/lib/checkout-customer-validation';
 import {
   amountFromPreview,
   createMasterReference,
@@ -34,7 +35,6 @@ const normalizeType = (item: CheckoutItem) => String((item as { type?: unknown }
 const isProductOnlyCart = (cart: CheckoutItem[]) => cart.every((item) => normalizeType(item) === 'PRODUCT');
 const hasMixedTypes = (cart: CheckoutItem[]) => new Set(cart.map((item) => normalizeType(item))).size > 1;
 const cleanText = (value: unknown, max = 300) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
-const cleanEmail = (value: unknown) => cleanText(value, 220).toLowerCase();
 const readFirstItemName = (cart: CheckoutItem[]) => {
   const first = cart[0] as (CheckoutItem & { itemName?: string; productName?: string; serviceName?: string }) | undefined;
   return {
@@ -234,14 +234,13 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as CheckoutCreateBody;
     const cart = Array.isArray(body.cart) ? body.cart : [];
     const customerUid = cleanText(body.customerUid || body.customer?.uid, 160) || null;
-    const customerName = cleanText(body.customer?.name, 160);
-    const customerEmail = cleanEmail(body.customer?.email);
-    const customerPhone = cleanText(body.customer?.phone, 80);
+    const customerValidation = validateCheckoutCustomer(body.customer ?? {});
+    const { name: customerName, email: customerEmail, phone: customerPhone } = customerValidation.customer;
     const deliveryLocation = cleanText(body.delivery?.location, 300);
     const deliveryNotes = cleanText(body.delivery?.notes, 1200);
     if (cart.length === 0) return NextResponse.json({ error: 'Cart is required' }, { status: 400 });
-    if (!customerEmail && !customerPhone) return NextResponse.json({ error: 'customer.email or customer.phone is required' }, { status: 400 });
-    const resolvedEmail = customerEmail || `${customerPhone.replace(/[^\d]/g, '') || 'buyer'}@sedifex.local`; 
+    if (!customerValidation.valid) return NextResponse.json({ error: customerValidation.firstError, fieldErrors: customerValidation.errors }, { status: 400 });
+    const resolvedEmail = customerEmail;
     const grouped = groupCartByMerchant(cart);
     if (!isProductOnlyCart(cart) && (hasMixedTypes(cart) || grouped.size > 1)) {
       return NextResponse.json({ error: 'Only physical products can be checked out together. Services, courses, and events must be booked separately.' }, { status: 400 });

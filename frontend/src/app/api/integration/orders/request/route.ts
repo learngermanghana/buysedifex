@@ -1,6 +1,7 @@
 import { addDoc, collection, doc, getDoc, getDocs, limit, query, serverTimestamp, where } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, firebaseConfigError } from '@/lib/firebase';
+import { validateCheckoutCustomer } from '@/lib/checkout-customer-validation';
 import { createCheckoutReference, type CheckoutItem } from '@/lib/sedifex-checkout';
 
 type PayOnDeliveryOrderBody = {
@@ -108,9 +109,8 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as PayOnDeliveryOrderBody;
     const merchantId = cleanText(body.merchantId, 140);
     const productId = cleanText(body.productId, 180);
-    const customerName = cleanText(body.customer?.name, 160);
-    const customerEmail = cleanText(body.customer?.email, 180).toLowerCase();
-    const customerPhone = cleanText(body.customer?.phone, 80);
+    const customerValidation = validateCheckoutCustomer(body.customer ?? {});
+    const { name: customerName, email: customerEmail, phone: customerPhone } = customerValidation.customer;
     const deliveryLocation = cleanText(body.delivery?.location, 300);
     const notes = cleanText(body.delivery?.notes, 1200);
     const quantity = Math.max(1, Math.floor(Number(body.quantity) || 1));
@@ -119,8 +119,7 @@ export async function POST(request: NextRequest) {
 
     if (!merchantId) return NextResponse.json({ error: 'merchantId is required' }, { status: 400 });
     if (!productId) return NextResponse.json({ error: 'productId is required' }, { status: 400 });
-    if (!customerName) return NextResponse.json({ error: 'customer.name is required' }, { status: 400 });
-    if (!customerEmail && !customerPhone) return NextResponse.json({ error: 'customer email or phone is required' }, { status: 400 });
+    if (!customerValidation.valid) return NextResponse.json({ error: customerValidation.firstError, fieldErrors: customerValidation.errors }, { status: 400 });
     if (!deliveryLocation) return NextResponse.json({ error: 'delivery.location is required' }, { status: 400 });
 
     const productSnapshot = await readProductPriceSnapshot({ merchantId, productId });

@@ -1,6 +1,7 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, firebaseConfigError } from '@/lib/firebase';
+import { validateCheckoutCustomer } from '@/lib/checkout-customer-validation';
 import { createCheckoutReference, type CheckoutItem } from '@/lib/sedifex-checkout';
 import { createIntegrationBooking, getIntegrationAvailability } from '@/lib/sedifex-bookings';
 
@@ -28,9 +29,8 @@ export async function POST(request: NextRequest) {
     const merchantId = cleanText(body.merchantId, 140);
     const serviceId = cleanText(body.serviceId, 180);
     const serviceName = cleanText(body.serviceName, 220) || 'Service booking';
-    const customerName = cleanText(body.customer?.name, 160);
-    const customerEmail = cleanText(body.customer?.email, 180).toLowerCase();
-    const customerPhone = cleanText(body.customer?.phone, 80);
+    const customerValidation = validateCheckoutCustomer(body.customer ?? {});
+    const { name: customerName, email: customerEmail, phone: customerPhone } = customerValidation.customer;
     const preferredDate = cleanText(body.booking?.preferredDate, 40);
     const preferredTime = cleanText(body.booking?.preferredTime, 40);
     const preferredBranch = cleanText(body.booking?.preferredBranch, 180);
@@ -38,8 +38,7 @@ export async function POST(request: NextRequest) {
     const slotId = cleanText(body.slotId, 180);
     if (!merchantId) return NextResponse.json({ error: 'merchantId is required' }, { status: 400 });
     if (!serviceId) return NextResponse.json({ error: 'serviceId is required' }, { status: 400 });
-    if (!customerName) return NextResponse.json({ error: 'customer.name is required' }, { status: 400 });
-    if (!customerEmail && !customerPhone) return NextResponse.json({ error: 'customer email or phone is required' }, { status: 400 });
+    if (!customerValidation.valid) return NextResponse.json({ error: customerValidation.firstError, fieldErrors: customerValidation.errors }, { status: 400 });
     if (!preferredDate) return NextResponse.json({ error: 'booking.preferredDate is required' }, { status: 400 });
     if (!preferredTime) return NextResponse.json({ error: 'booking.preferredTime is required' }, { status: 400 });
 
