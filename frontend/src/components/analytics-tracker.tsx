@@ -41,6 +41,18 @@ const VISITOR_KEY = 'sedifex_market_visitor_id';
 const SESSION_KEY = 'sedifex_market_session_id';
 const SESSION_STARTED_KEY = 'sedifex_market_session_started_at';
 const SESSION_TTL_MS = 30 * 60 * 1000;
+const BROWSING_SAMPLE_PERCENT = 10;
+const DUPLICATE_EVENT_WINDOW_MS = 2500;
+const BROWSING_EVENTS = new Set<AnalyticsEventName>([
+  'page_view',
+  'store_view',
+  'product_view',
+  'search',
+  'seller_profile_click',
+]);
+
+let lastEventKey = '';
+let lastEventAt = 0;
 
 function id(prefix: string) {
   const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -59,7 +71,7 @@ function storageSet(key: string, value: string) {
   try {
     window.localStorage.setItem(key, value);
   } catch {
-    // ignore storage failures
+    // Ignore storage failures.
   }
 }
 
@@ -83,6 +95,14 @@ function getSessionId() {
   storageSet(SESSION_KEY, next);
   storageSet(SESSION_STARTED_KEY, String(now));
   return next;
+}
+
+function isSampledBrowsingSession(sessionId: string) {
+  let hash = 0;
+  for (let index = 0; index < sessionId.length; index += 1) {
+    hash = (hash * 31 + sessionId.charCodeAt(index)) >>> 0;
+  }
+  return hash % 100 < BROWSING_SAMPLE_PERCENT;
 }
 
 function paramsToUtm(searchParams: URLSearchParams) {
@@ -131,10 +151,27 @@ function classifyClick(target: Element | null): { eventName: AnalyticsEventName;
 
 export function trackSedifexMarketEvent(payload: AnalyticsPayload) {
   if (typeof window === 'undefined') return;
+
+  const sessionId = getSessionId();
+  if (BROWSING_EVENTS.has(payload.eventName) && !isSampledBrowsingSession(sessionId)) return;
+
+  const eventKey = [
+    sessionId,
+    payload.eventName,
+    payload.pagePath || window.location.pathname,
+    payload.productId || '',
+    payload.storeId || '',
+    payload.actionTarget || '',
+  ].join(':');
+  const now = Date.now();
+  if (eventKey === lastEventKey && now - lastEventAt < DUPLICATE_EVENT_WINDOW_MS) return;
+  lastEventKey = eventKey;
+  lastEventAt = now;
+
   const url = new URL(window.location.href);
   const body = {
     site: 'sedifexmarket',
-    sessionId: getSessionId(),
+    sessionId,
     visitorId: getVisitorId(),
     pageUrl: payload.pageUrl || window.location.href,
     pagePath: payload.pagePath || window.location.pathname,
