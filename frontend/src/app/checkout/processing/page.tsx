@@ -17,8 +17,17 @@ type PollState = {
 const SUCCESS_PAYMENT_STATUSES = new Set(['confirmed', 'success', 'paid', 'captured']);
 const SUCCESS_ORDER_STATUSES = new Set(['confirmed', 'success', 'paid', 'completed']);
 const FAILED_PAYMENT_STATUSES = new Set(['failed', 'cancelled', 'canceled', 'abandoned', 'verification_failed']);
+const MAX_POLL_ATTEMPTS = 10;
+const HIDDEN_TAB_RETRY_MS = 30_000;
 
 const normalizeStatus = (value?: string) => value?.trim().toLowerCase() ?? '';
+
+const getNextPollDelay = (attempt: number) => {
+  if (attempt <= 1) return 5_000;
+  if (attempt <= 3) return 10_000;
+  if (attempt <= 5) return 15_000;
+  return 30_000;
+};
 
 function CheckoutProcessingContent() {
   const router = useRouter();
@@ -26,6 +35,7 @@ function CheckoutProcessingContent() {
   const reference = params.get('reference') ?? '';
   const [state, setState] = useState<PollState>({ reference });
   const [lastCheckedAt, setLastCheckedAt] = useState<string>('');
+  const [automaticChecksPaused, setAutomaticChecksPaused] = useState(false);
 
   const paymentStatus = normalizeStatus(state.paymentStatus);
   const orderStatus = normalizeStatus(state.orderStatus);
@@ -40,14 +50,49 @@ function CheckoutProcessingContent() {
 
   useEffect(() => {
     if (!reference) return;
+
     let active = true;
-    let timer: ReturnType<typeof setInterval> | null = null;
+    let inFlight = false;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let redirectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearPollTimer = () => {
+      if (!timer) return;
+      clearTimeout(timer);
+      timer = null;
+    };
+
+    const schedulePoll = (delay: number) => {
+      if (!active) return;
+      clearPollTimer();
+      timer = setTimeout(() => {
+        void pollStatus();
+      }, delay);
+    };
 
     const pollStatus = async () => {
+      if (!active || inFlight) return;
+
+      if (document.visibilityState === 'hidden') {
+        schedulePoll(HIDDEN_TAB_RETRY_MS);
+        return;
+      }
+
+      if (attempt >= MAX_POLL_ATTEMPTS) {
+        setAutomaticChecksPaused(true);
+        return;
+      }
+
+      attempt += 1;
+      inFlight = true;
+      let shouldContinue = true;
+
       try {
         const response = await fetch(`/api/integration/orders/${encodeURIComponent(reference)}`, { cache: 'no-store' });
         const payload = (await response.json().catch(() => ({}))) as PollState;
         if (!active) return;
+
         setLastCheckedAt(new Date().toLocaleTimeString());
         setState((current) => ({
           ...current,
@@ -58,13 +103,16 @@ function CheckoutProcessingContent() {
 
         const nextPaymentStatus = normalizeStatus(payload.paymentStatus);
         const nextOrderStatus = normalizeStatus(payload.orderStatus);
-        if (SUCCESS_PAYMENT_STATUSES.has(nextPaymentStatus) || SUCCESS_ORDER_STATUSES.has(nextOrderStatus)) {
-          if (timer) clearInterval(timer);
-          window.setTimeout(() => router.replace(`/checkout/success?reference=${encodeURIComponent(reference)}`), 900);
-          return;
-        }
-        if (FAILED_PAYMENT_STATUSES.has(nextPaymentStatus) || FAILED_PAYMENT_STATUSES.has(nextOrderStatus)) {
-          if (timer) clearInterval(timer);
+        const paid = SUCCESS_PAYMENT_STATUSES.has(nextPaymentStatus) || SUCCESS_ORDER_STATUSES.has(nextOrderStatus);
+        const failed = FAILED_PAYMENT_STATUSES.has(nextPaymentStatus) || FAILED_PAYMENT_STATUSES.has(nextOrderStatus);
+
+        if (paid) {
+          shouldContinue = false;
+          redirectTimer = setTimeout(() => {
+            router.replace(`/checkout/success?reference=${encodeURIComponent(reference)}`);
+          }, 900);
+        } else if (failed) {
+          shouldContinue = false;
         }
       } catch (error) {
         if (!active) return;
@@ -74,15 +122,34 @@ function CheckoutProcessingContent() {
           ok: false,
           error: error instanceof Error ? error.message : 'Unable to check order status',
         }));
+      } finally {
+        inFlight = false;
+        if (!active || !shouldContinue) return;
+
+        if (attempt >= MAX_POLL_ATTEMPTS) {
+          setAutomaticChecksPaused(true);
+          return;
+        }
+
+        schedulePoll(getNextPollDelay(attempt));
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (!active || document.visibilityState !== 'visible' || inFlight || attempt >= MAX_POLL_ATTEMPTS) return;
+      clearPollTimer();
+      void pollStatus();
+    };
+
+    setAutomaticChecksPaused(false);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     void pollStatus();
-    timer = setInterval(pollStatus, 4000);
 
     return () => {
       active = false;
-      if (timer) clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearPollTimer();
+      if (redirectTimer) clearTimeout(redirectTimer);
     };
   }, [reference, router]);
 
@@ -101,6 +168,9 @@ function CheckoutProcessingContent() {
         <p>Payment status: {state.paymentStatus ?? 'pending'}</p>
         <p>Order status: {state.orderStatus ?? 'processing'}</p>
         {lastCheckedAt ? <p>Last checked: {lastCheckedAt}</p> : null}
+        {automaticChecksPaused && !isPaid && !hasFailed ? (
+          <p>Payment confirmation is taking longer than expected. Automatic checks have paused; open the order details to refresh the status.</p>
+        ) : null}
         {state.error ? <p className="requestFeedback error">Status check error: {state.error}</p> : null}
         <div className="productStoreActions">
           <Link href={`/account/orders/${encodeURIComponent(reference)}`}>View order details</Link>
