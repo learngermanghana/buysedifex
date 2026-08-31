@@ -43,7 +43,7 @@ export default function SellPage() {
         <ul>
           <li>
             To appear on Sedifex Market, a store must create an account at{' '}
-            <Link href="https://wwe.sedifex.com">wwe.sedifex.com</Link> and add products and services.
+            <Link href="https://www.sedifex.com">www.sedifex.com</Link> and add products and services.
           </li>
           <li>Stores must provide accurate product details, prices, images, and contact information.</li>
           <li>Sellers should be ready to respond quickly to customer inquiries and order follow-ups.</li>
